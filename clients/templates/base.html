@@ -1,0 +1,204 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Личный кабинет{% endblock %}</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Подключаем шрифты -->
+  <style>
+    @font-face {
+      font-family: "TT Norms Medium";
+      src: url("{% static 'fonts/tt-norms-medium.otf' %}") format("opentype");
+      font-weight: 500;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: "Gilroy Light";
+      src: url("{% static 'fonts/gilroy-light.otf' %}") format("opentype");
+      font-weight: 300;
+      font-style: normal;
+    }
+
+    @font-face {
+      font-family: "SF Pro Display";
+      src: url("{% static 'fonts/SF-Pro.ttf' %}") format("truetype");
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    :root {
+      scroll-behavior: smooth;
+      scroll-padding-top: 88px;
+    }
+
+    body {
+      font-family: "SF Pro Display", sans-serif;
+    }
+
+    h1, h2, h3 {
+      font-family: "TT Norms Medium", sans-serif;
+    }
+
+    nav a, footer a, .menu-text {
+      font-family: "Gilroy Light", sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+  <!-- Хедер -->
+  <header class="bg-white shadow-md flex items-center justify-between px-4 py-3 md:px-6 fixed top-0 w-full z-50">
+    <div class="flex items-center space-x-3">
+      <!-- Лого -->
+      <img src="{% static 'img/logo.svg' %}" alt="Logo" class="h-16 w-auto">
+
+      <!-- Текст рядом с логотипом -->
+      <span class="text-lg text-gray-800 hidden sm:block menu-text">
+        Личный кабинет
+      </span>
+    </div>
+
+    <!-- Кнопка бургера -->
+    <button id="menu-toggle" class="md:hidden text-gray-700 focus:outline-none text-2xl">
+      ☰
+    </button>
+
+    <!-- Десктопное меню -->
+    <nav class="hidden md:flex space-x-6">
+      <a href="{% url 'client_dashboard' %}#stages" class="py-2 px-3 font-medium text-[#365C80]">Стадии</a>
+      <a href="{% url 'client_dashboard' %}#contract" class="py-2 px-3 font-medium text-[#365C80]">Договор</a>
+      <a href="{% url 'client_dashboard' %}#installment" class="py-2 px-3 font-medium text-[#365C80]">Рассрочка</a>
+      <a href="{% url 'client_dashboard' %}#referral" class="py-2 px-3 font-medium text-[#365C80]">Реферальная программа</a>
+    </nav>
+  </header>
+
+  <!-- Контент -->
+  <main class="flex-1 p-4 relative z-10">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Футер -->
+  <footer class="bg-white shadow-inner mt-auto relative overflow-hidden z-10">
+    <div class="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8 relative z-10">
+
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-start">
+        <!-- Лого для десктопа -->
+        <div class="hidden sm:flex flex-shrink-0 items-center justify-center mb-4 sm:mb-0">
+          <img src="{% static 'img/logo.svg' %}" alt="Логотип" class="h-32 w-auto">
+        </div>
+
+        <!-- Меню футера для десктопа -->
+        <nav class="hidden sm:flex space-x-6 ml-6 flex-1">
+          <a href="{% url 'client_dashboard' %}#stages" class="text-[#365C80] hover:underline">Стадии</a>
+          <a href="{% url 'client_dashboard' %}#contract" class="text-[#365C80] hover:underline">Договор</a>
+          <a href="{% url 'client_dashboard' %}#installment" class="text-[#365C80] hover:underline">Рассрочка</a>
+          <a href="{% url 'client_dashboard' %}#referral" class="text-[#365C80] hover:underline">Реферальная программа</a>
+        </nav>
+
+        <!-- Мобильная версия: логотип и меню -->
+        <div class="grid grid-cols-2 gap-4 w-full sm:hidden mt-6">
+          <div class="flex items-center justify-center">
+            <img src="{% static 'img/logo.svg' %}" alt="Логотип" class="h-20 w-auto">
+          </div>
+          <div class="flex flex-col items-start space-y-2">
+            <a href="{% url 'client_dashboard' %}#stages" class="text-[#365C80] hover:underline">Стадии</a>
+            <a href="{% url 'client_dashboard' %}#contract" class="text-[#365C80] hover:underline">Договор</a>
+            <a href="{% url 'client_dashboard' %}#installment" class="text-[#365C80] hover:underline">Рассрочка</a>
+            <a href="{% url 'client_dashboard' %}#referral" class="text-[#365C80] hover:underline">Реферальная программа</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Соцсети -->
+      <div class="flex justify-center space-x-3 mt-6">
+        <!-- Десктоп -->
+        <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/rutube.svg' %}" alt="RuTube" class="w-7 h-7">
+        </a>
+        <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/YouTube.svg' %}" alt="YouTube" class="w-7 h-7">
+        </a>
+        <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/dzen.svg' %}" alt="Dzen" class="w-7 h-7">
+        </a>
+        <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/Telegram.svg' %}" alt="Telegram" class="w-7 h-7">
+        </a>
+        <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/TikTok.svg' %}" alt="TikTok" class="w-7 h-7">
+        </a>
+        <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/vk.svg' %}" alt="VK" class="w-7 h-7">
+        </a>
+
+        <!-- Мобильная версия -->
+        <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/rutube.svg' %}" alt="RuTube" class="w-6 h-6">
+        </a>
+        <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/YouTube.svg' %}" alt="YouTube" class="w-6 h-6">
+        </a>
+        <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/dzen.svg' %}" alt="Dzen" class="w-6 h-6">
+        </a>
+        <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/Telegram.svg' %}" alt="Telegram" class="w-6 h-6">
+        </a>
+        <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/TikTok.svg' %}" alt="TikTok" class="w-6 h-6">
+        </a>
+        <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
+          <img src="{% static 'img/vk.svg' %}" alt="VK" class="w-6 h-6">
+        </a>
+      </div>
+
+      <div class="mt-6 text-center">
+        <a href="#" class="text-sm text-gray-500 hover:underline">Политика конфиденциальности</a>
+      </div>
+
+      <div class="mt-2 text-center text-xs text-gray-500">
+        <span>ИП Коравчук Н.А. | ИНН 21312321312321312 | ОГРНИП</span>
+      </div>
+    </div>
+
+    <!-- Декоративная линия справа (lines_1) -->
+    <img src="{% static 'img/lines_1.svg' %}" alt="Декоративная линия"
+         class="absolute bottom-0 right-0 w-auto h-[80%] pointer-events-none z-0">
+
+    <!-- Новая линия слева (footerlines) -->
+    <!-- Десктоп -->
+    <img src="{% static 'img/footerlines.svg' %}" alt="Footer Lines"
+         class="hidden sm:block absolute bottom-0 left-0 w-auto h-[60%] pointer-events-none z-0">
+    <!-- Мобильная версия -->
+    <img src="{% static 'img/footerlines.svg' %}" alt="Footer Lines"
+         class="sm:hidden absolute bottom-0 left-0 w-auto h-[60%] pointer-events-none z-0">
+  </footer>
+
+ <!-- === Оверлей и Сайдбар === -->
+<div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[99998]"></div>
+
+<nav id="sidebar"
+     class="fixed md:hidden top-0 right-0 h-full w-64 bg-white shadow-2xl transform translate-x-full
+            transition-transform duration-300 ease-in-out z-[99999]">
+  <div class="flex items-center justify-between px-4 py-3 border-b">
+    <span class="text-lg font-bold text-[#365C80]">Меню</span>
+    <button id="close-sidebar" class="text-gray-600 text-2xl">&times;</button>
+  </div>
+
+  <ul class="flex flex-col p-6 space-y-4">
+    <li><a href="{% url 'client_dashboard' %}#stages" class="px-3 text-[#365C80]">➜ Стадии</a></li>
+    <li><a href="{% url 'client_dashboard' %}#contract" class="px-3 text-[#365C80]">➜ Договор</a></li>
+    <li><a href="{% url 'client_dashboard' %}#installment" class="px-3 text-[#365C80]">➜ Рассрочка</a></li>
+    <li><a href="{% url 'client_dashboard' %}#referral" class="px-3 text-[#365C80]">➜ Реферальная программа</a></li>
+  </ul>
+</nav>
+
+  <!-- Скрипты -->
+  <script src="{% static 'js/base.js' %}" defer></script>
+</body>
+</html>

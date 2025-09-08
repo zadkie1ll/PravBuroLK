@@ -1,0 +1,70 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск клиентов</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <!-- Шапка -->
+    <header class="bg-white shadow p-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <h1 class="text-2xl font-bold text-gray-800">Поиск клиента</h1>
+            <a href="/" class="text-blue-600 hover:underline">На главную</a>
+        </div>
+    </header>
+
+    <!-- Форма поиска -->
+    <section class="max-w-3xl mx-auto mt-6 w-full px-4">
+        <form method="get" action="{% url 'client_search' %}" class="flex flex-col sm:flex-row gap-3">
+            <input
+                type="text"
+                name="q"
+                value="{{ query }}"
+                placeholder="Введите имя, фамилию или Bitrix ID"
+                class="flex-1 p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+            <button
+                type="submit"
+                class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition duration-200"
+            >
+                Поиск
+            </button>
+        </form>
+    </section>
+
+    <!-- Результаты -->
+    <section class="max-w-7xl mx-auto mt-8 w-full px-4 flex-1">
+        {% if results %}
+            <h2 class="text-lg font-semibold text-gray-700 mb-4">Результаты поиска</h2>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {% for client in results %}
+                    <a href="{% url 'client_admin_view' client.id %}"
+                       class="bg-white p-5 rounded-lg shadow hover:shadow-lg transition duration-200 block">
+                        <h3 class="text-xl font-bold text-gray-800">
+                            {{ client.surname }} {{ client.name }}{% if client.middlename %} {{ client.middlename }}{% endif %}
+                        </h3>
+                        <p class="text-gray-500 mt-1">Bitrix ID: {{ client.bitrix_id }}</p>
+                        {% if client.stage %}
+                            <p class="mt-2 text-sm bg-blue-100 text-blue-800 px-3 py-1 rounded-full w-fit">
+                                {{ client.stage.name }}
+                            </p>
+                        {% endif %}
+                    </a>
+                {% endfor %}
+            </div>
+        {% elif query %}
+            <p class="text-gray-500 mt-4">Ничего не найдено</p>
+        {% endif %}
+    </section>
+
+    <!-- Подвал -->
+    <footer class="bg-white shadow mt-10 p-4 text-center text-gray-500 text-sm">
+        © {{ now|date:"Y" }} CRM
+    </footer>
+
+</body>
+</html>

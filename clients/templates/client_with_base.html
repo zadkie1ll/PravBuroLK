@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+{% comment %} <div class="relative w-full overflow-visible">
+  <img src="{% static 'img/line2.svg' %}" 
+       alt="Линия слева" 
+       class="absolute top-0 left-[-15px] h-[30%] w-auto pointer-events-none z-0">
+
+  <img src="{% static 'img/line4.svg' %}" 
+       alt="Линия слева" 
+       class="absolute top-[-220px] left-[1100px] h-[20%] w-auto pointer-events-none z-[-10]">
+
+  <img src="{% static 'img/line4.svg' %}" 
+       alt="Линия слева" 
+       class="absolute top-[200px] left-[500px] h-[20%] w-auto pointer-events-none z-[-10]">
+
+  <img src="{% static 'img/line3.svg' %}" 
+       alt="Линия внизу слева" 
+       class="absolute bottom-[-20px] left-[-20px] h-[30%] w-auto pointer-events-none z-0">
+    
+  <img src="{% static 'img/line7.svg' %}" 
+       alt="Линия внизу справа" 
+       class="absolute bottom-[-20px] right-[-20px] h-[30%] w-auto pointer-events-none z-0">
+
+  <img src="{% static 'img/line8.svg' %}" 
+       alt="Линия сверху слева" 
+       class="absolute top-[-20px] left-[20px] h-[15%] w-auto pointer-events-none z-[-10]">
+
+  <img src="{% static 'img/line9.svg' %}" 
+       alt="Линия снизу по центру" 
+       class="absolute bottom-[-20px] right-[500px] h-[20%] w-auto pointer-events-none z-[-10]">
+  </div> {% endcomment %}
+
+
+<!-- Обёртка для всей страницы с relative -->
+<div class="relative w-full">
+  <div class="max-w-5xl w-full mx-auto space-y-16 py-12 relative z-10">
+
+   <!-- Блок приветствия -->
+<section id="welcome" class="relative bg-white shadow-xl rounded-2xl p-8 mb-6">
+  <div class="absolute inset-0 rounded-2xl border-4 border-transparent pointer-events-none"
+       style="background: linear-gradient(to right, #3F8FE2, #6FABD6) border-box;
+              -webkit-mask: linear-gradient(#fff 0 0) padding-box, 
+                             linear-gradient(#fff 0 0);
+              -webkit-mask-composite: destination-out;
+              mask-composite: exclude;"></div>
+
+  <h1 class="relative text-2xl sm:text-3xl font-bold text-gray-800 mb-4">
+    Здравствуйте, {{ client_name }}
+  </h1>
+  <p class="relative text-gray-700 text-sm sm:text-base">
+    Прогресс по вашему делу: 
+    <span class="font-semibold text-blue-700">
+      {{ progress_percent }}%
+    </span>
+  </p>
+</section>
+
+    <!-- Стадии работы над вашим делом -->
+<section id="stages" class="relative bg-white shadow-xl rounded-2xl p-8">
+  <div class="absolute inset-0 rounded-2xl border-4 border-transparent pointer-events-none"
+       style="background: linear-gradient(to right, #3F8FE2, #6FABD6) border-box;
+              -webkit-mask: linear-gradient(#fff 0 0) padding-box, 
+                             linear-gradient(#fff 0 0);
+              -webkit-mask-composite: destination-out;
+              mask-composite: exclude;"></div>
+
+  <h2 class="relative text-2xl font-bold text-gray-800 mb-6">Стадии работы над вашим делом</h2>
+
+  <!-- SVG для линий -->
+  <svg id="roadmap-lines" class="absolute top-0 left-0 w-full h-full pointer-events-none z-0"></svg>
+
+  <!-- Grid с этапами -->
+<div id="roadmap" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-8 gap-y-16 relative z-10">
+  {% for stage in all_stages %}
+  <div class="stage relative flex flex-col items-center w-24 sm:w-28
+              {% if forloop.last %} last-stage col-span-full justify-self-center {% endif %}"
+       style="transform: translateY({{ forloop.counter|divisibleby:2|yesno:'20px,-20px' }});">
+
+    <!-- Кружок -->
+    <div class="circle w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full text-white shadow-lg z-10
+      {% if stage.id == current_stage_id %}
+        bg-blue-600 ring-4 ring-blue-200
+      {% elif stage.order < current_stage_order %}
+        bg-green-600 ring-4 ring-green-200
+      {% else %}
+        bg-gray-300
+      {% endif %}">
+      {{ forloop.counter }}
+    </div>
+
+    <span class="mt-2 text-xs sm:text-sm text-center w-20 sm:w-24
+      {% if stage.id == current_stage_id %}
+        font-bold text-blue-600
+      {% elif stage.order < current_stage_order %}
+        text-green-700
+      {% else %}
+        text-gray-500
+      {% endif %}">
+      {{ stage.name }}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+</section>
+
+    <!-- Секция с графиком платежей -->
+<section id="installments" class="relative bg-white shadow-xl rounded-2xl p-8 mt-6">
+  <div class="absolute inset-0 rounded-2xl border-4 border-transparent pointer-events-none"
+       style="background: linear-gradient(to right, #3F8FE2, #6FABD6) border-box;
+              -webkit-mask: linear-gradient(#fff 0 0) padding-box, 
+                             linear-gradient(#fff 0 0);
+              -webkit-mask-composite: destination-out;
+              mask-composite: exclude;"></div>
+
+  <h2 class="relative text-2xl font-bold text-gray-800 mb-6">График платежей</h2>
+
+  {% if contract %}
+    <div class="bg-gray-50 p-4 rounded-lg shadow-sm text-sm text-gray-700 space-y-1 mb-6">
+      <p><strong>Сумма договора:</strong> {{ contract.total_amount }} ₽</p>
+      <p><strong>Первый платёж:</strong> {{ contract.first_payment }} ₽ ({{ contract.first_payment_date }})</p>
+      <p><strong>Всего платежей:</strong> {{ contract.number_of_payments }}</p>
+    </div>
+
+    {% if installment_payments %}
+      <!-- Десктопная таблица -->
+      <div class="hidden md:block overflow-x-auto">
+        <table class="w-full text-sm text-left border rounded-lg">
+          <thead class="bg-blue-100 text-gray-700">
+            <tr>
+              <th class="px-3 py-2">#</th>
+              <th class="px-3 py-2">Срок</th>
+              <th class="px-3 py-2">Сумма</th>
+              <th class="px-3 py-2 text-center">Действие</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for payment in installment_payments %}
+            <tr class="border-b {% if payment.status == 'paid' %}bg-green-100{% endif %}">
+              <td class="px-3 py-2">{{ payment.number }}</td>
+              <td class="px-3 py-2">{{ payment.due_date|date:"d E Y" }}</td>
+              <td class="px-3 py-2">{{ payment.amount_due }} ₽</td>
+              <td class="px-3 py-2 text-center">
+                <button class="px-3 py-1 rounded-lg text-white
+                  {% if payment.status == 'paid' %}bg-gray-400 cursor-not-allowed
+                  {% elif payment.status == 'overdue' %}bg-red-600 hover:bg-red-700
+                  {% else %}bg-blue-600 hover:bg-blue-700{% endif %}"
+                  {% if payment.status == 'paid' %}disabled{% endif %}>
+                  {% if payment.status == 'paid' %}Оплачено{% elif payment.status == 'overdue' %}Просрочено{% else %}Оплатить{% endif %}
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Мобильная версия -->
+      <div class="block md:hidden space-y-3">
+        {% for payment in installment_payments %}
+          <div class="border rounded-lg p-4 flex justify-between items-center
+                      {% if payment.status == 'paid' %}bg-green-50
+                      {% elif payment.status == 'overdue' %}bg-red-50{% endif %}">
+            <div>
+              <p class="text-sm text-gray-500">Платёж №{{ payment.number }}</p>
+              <p class="text-sm text-gray-500">{{ payment.due_date|date:"d E Y" }}</p>
+              <p class="text-lg font-semibold">{{ payment.amount_due }} ₽</p>
+            </div>
+            <div>
+              <button class="px-3 py-1 rounded-lg text-white text-sm
+                {% if payment.status == 'paid' %}bg-gray-400 cursor-not-allowed
+                {% elif payment.status == 'overdue' %}bg-red-600 hover:bg-red-700
+                {% else %}bg-blue-600 hover:bg-blue-700{% endif %}"
+                {% if payment.status == 'paid' %}disabled{% endif %}>
+                {% if payment.status == 'paid' %}Оплачено{% elif payment.status == 'overdue' %}Просрочено{% else %}Оплатить{% endif %}
+              </button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+    {% else %}
+      <p class="text-sm text-gray-500 mt-4">План рассрочки ещё не рассчитан.</p>
+    {% endif %}
+  {% else %}
+    <p class="text-sm text-gray-500 mt-4">У вас пока нет активного договора.</p>
+  {% endif %}
+</section>
+
+    <!-- Реферальная программа -->
+<section id="referral" class="relative bg-white shadow-xl rounded-2xl p-8">
+  <div class="absolute inset-0 rounded-2xl border-4 border-transparent pointer-events-none"
+       style="background: linear-gradient(to right, #3F8FE2, #6FABD6) border-box;
+              -webkit-mask: linear-gradient(#fff 0 0) padding-box, 
+                             linear-gradient(#fff 0 0);
+              -webkit-mask-composite: destination-out;
+              mask-composite: exclude;"></div>
+
+  <h2 class="relative text-2xl font-bold text-gray-800 mb-6">Реферальная программа</h2>
+  <p class="relative text-gray-700">Здесь будет информация о вашей реферальной программе.</p>
+</section>
+
+  </div>
+</div>
+
+<script src="{% static 'js/stages.js' %}"></script>
+<script src="{% static 'js/installment.js' %}"></script>
+{% endblock %}

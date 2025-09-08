@@ -1,0 +1,191 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Личный кабинет</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <!-- Хедер -->
+    <header class="bg-white shadow-md flex items-center justify-between px-4 py-3 md:px-6">
+        <!-- Логотип -->
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
+                Л
+            </div>
+            <span class="text-lg font-bold text-gray-800 hidden sm:block">Личный кабинет</span>
+        </div>
+
+        <!-- Кнопка бургера для мобилы -->
+        <button id="menu-toggle" class="md:hidden text-gray-700 focus:outline-none text-2xl">
+            ☰
+        </button>
+
+        <!-- Десктопное меню -->
+        <nav class="hidden md:flex space-x-6">
+            <a href="#" class="py-2 px-3 font-medium" style="color:#365C80;">Пункт 1</a>
+            <a href="#" class="py-2 px-3 font-medium" style="color:#365C80;">Пункт 2</a>
+            <a href="#" class="py-2 px-3 font-medium" style="color:#365C80;">Пункт 3</a>
+            <a href="#" class="py-2 px-3 font-medium" style="color:#365C80;">Пункт 4</a>
+        </nav>
+    </header>
+
+    <!-- Оверлей -->
+    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40"></div>
+
+    <!-- Сайдбар для мобилы (выезжает справа) -->
+    <nav id="sidebar" class="fixed md:hidden top-0 right-0 h-full w-64 bg-white shadow-lg transform translate-x-full transition-transform duration-300 z-50">
+        
+        <!-- Шапка сайдбара -->
+        <div class="flex items-center justify-between px-4 py-3 border-b">
+            <span class="text-lg font-bold" style="color:#365C80;">Главная</span>
+            <!-- Кнопка закрытия -->
+            <button id="close-sidebar" class="text-gray-600 text-2xl">&larr;</button>
+        </div>
+
+        <ul class="flex flex-col p-6 space-y-4">
+            <li>
+                <a href="#" class="flex flex-col items-start px-3" style="color:#365C80;">
+                    <span class="flex items-center space-x-2">
+                        <span class="text-lg" style="color:#6FABD6;">➜</span>
+                        <span class="font-medium">Пункт 1</span>
+                    </span>
+                    <span class="mt-1 block h-px w-20 bg-[#2AABEE]"></span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="flex flex-col items-start px-3" style="color:#365C80;">
+                    <span class="flex items-center space-x-2">
+                        <span class="text-lg" style="color:#6FABD6;">➜</span>
+                        <span class="font-medium">Пункт 2</span>
+                    </span>
+                    <span class="mt-1 block h-px w-20 bg-[#2AABEE]"></span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="flex flex-col items-start px-3" style="color:#365C80;">
+                    <span class="flex items-center space-x-2">
+                        <span class="text-lg" style="color:#6FABD6;">➜</span>
+                        <span class="font-medium">Пункт 3</span>
+                    </span>
+                    <span class="mt-1 block h-px w-20 bg-[#2AABEE]"></span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="flex flex-col items-start px-3" style="color:#365C80;">
+                    <span class="flex items-center space-x-2">
+                        <span class="text-lg" style="color:#6FABD6;">➜</span>
+                        <span class="font-medium">Пункт 4</span>
+                    </span>
+                    <span class="mt-1 block h-px w-20 bg-[#2AABEE]"></span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Контент -->
+    <main class="flex-1 flex items-center justify-center p-4">
+        <div class="bg-white shadow-xl rounded-2xl p-8 max-w-2xl w-full">
+            <h1 class="text-2xl font-bold text-gray-800 mb-4">Личный кабинет</h1>
+
+            <div class="space-y-4">
+                <div>
+                    <h2 class="text-lg text-gray-700">ФИО клиента:</h2>
+                    <p class="text-xl font-semibold text-blue-600">{{ client_name }}</p>
+                </div>
+
+                <div>
+                    <h2 class="text-lg text-gray-700">Текущая стадия:</h2>
+                    <p class="text-xl font-semibold text-green-600">{{ current_stage }}</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const toggleBtn = document.getElementById("menu-toggle");
+        const sidebar = document.getElementById("sidebar");
+        const overlay = document.getElementById("overlay");
+        const closeBtn = document.getElementById("close-sidebar");
+
+        function openSidebar() {
+            sidebar.classList.remove("translate-x-full");
+            overlay.classList.remove("hidden");
+        }
+
+        function closeSidebar() {
+            sidebar.classList.add("translate-x-full");
+            overlay.classList.add("hidden");
+        }
+
+        toggleBtn.addEventListener("click", openSidebar);
+        closeBtn.addEventListener("click", closeSidebar);
+        overlay.addEventListener("click", closeSidebar);
+    </script>
+
+    <!-- Футер -->
+    <footer class="bg-white shadow-inner mt-auto relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 relative z-10">
+            <!-- Верхняя часть: лого + меню -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-start">
+                <!-- Лого: скрываем на мобильных, показываем только на десктопе -->
+                <div class="hidden sm:flex flex-shrink-0 items-center justify-center mb-4 sm:mb-0">
+                    <div class="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-2xl">
+                        Л
+                    </div>
+                </div>
+
+                <!-- Меню футера -->
+                <!-- Десктоп: горизонтально -->
+                <nav class="hidden sm:flex space-x-6 ml-6 flex-1">
+                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 1</a>
+                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 2</a>
+                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 3</a>
+                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 4</a>
+                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 5</a>
+                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 6</a>
+                </nav>
+
+                <!-- Мобильная версия: три колонки -->
+                <div class="grid grid-cols-3 gap-2 w-full sm:hidden">
+                    <!-- 1-й столбец: логотип -->
+                    <div class="flex items-center justify-center">
+                        <div class="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-2xl">
+                            Л
+                        </div>
+                    </div>
+                    <!-- 2-й столбец: пункты меню -->
+                    <div class="flex flex-col justify-between">
+                        <a href="#" class="text-[#365C80] font-medium hover:underline mb-2">Пункт 1</a>
+                        <a href="#" class="text-[#365C80] font-medium hover:underline mb-2">Пункт 2</a>
+                        <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 3</a>
+                    </div>
+                    <!-- 3-й столбец: пункты меню -->
+                    <div class="flex flex-col justify-between">
+                        <a href="#" class="text-[#365C80] font-medium hover:underline mb-2">Пункт 4</a>
+                        <a href="#" class="text-[#365C80] font-medium hover:underline mb-2">Пункт 5</a>
+                        <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 6</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Политика конфиденциальности -->
+            <div class="mt-6 text-center">
+                <a href="#" class="text-sm text-gray-500 hover:underline">Политика конфиденциальности</a>
+            </div>
+
+            <!-- ИНН и ОГРНИП под политикой -->
+            <div class="mt-2 text-center text-xs text-gray-500">
+                <span>ИП Коравчук Н.А. | ИНН 21312321312321312 | ОГРНИП</span>
+            </div>
+        </div>
+
+        <!-- Картинка lines_1.svg внизу и справа -->
+        <img src="{% static 'img/lines_1.svg' %}" alt="Декоративная линия"
+             class="absolute bottom-0 right-0 w-auto h-[80%] pointer-events-none z-0">
+    </footer>
+</body>
+</html>

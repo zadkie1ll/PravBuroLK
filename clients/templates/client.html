@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Личный кабинет</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white shadow-xl rounded-2xl p-8 max-w-2xl w-full">
+        <h1 class="text-2xl font-bold text-gray-800 mb-4">Личный кабинет</h1>
+
+        <div class="space-y-4">
+            <div>
+                <h2 class="text-lg text-gray-700">ФИО клиента:</h2>
+                <p class="text-xl font-semibold text-blue-600">{{ client_name }}</p>
+            </div>
+
+            <div>
+                <h2 class="text-lg text-gray-700">Текущая стадия:</h2>
+                <p class="text-xl font-semibold text-green-600">{{ current_stage }}</p>
+            </div>
+
+<div class="mt-6 relative">
+  <h2 class="text-lg font-semibold text-gray-800 mb-4">Этапы работы</h2>
+
+  <!-- SVG для линий -->
+  <svg id="roadmap-lines" class="absolute top-0 left-0 w-full h-full pointer-events-none z-0"></svg>
+
+  <!-- Grid с этапами -->
+  <div id="roadmap" class="grid grid-cols-4 gap-x-12 gap-y-16 relative z-10">
+    {% for stage in all_stages %}
+    <div class="stage relative flex flex-col items-center w-28"
+         style="transform: translateY({{ forloop.counter|divisibleby:2|yesno:"20px,-20px" }});">
+
+      <div class="circle w-12 h-12 flex items-center justify-center rounded-full text-white shadow-lg z-10
+        {% if stage.id == current_stage_id %}
+          bg-blue-600 ring-4 ring-blue-200
+        {% elif stage.order < current_stage_order %}
+          bg-green-600 ring-4 ring-green-200
+        {% else %}
+          bg-gray-300
+        {% endif %}">
+        {{ forloop.counter }}
+      </div>
+
+      <span class="mt-2 text-xs text-center w-24
+        {% if stage.id == current_stage_id %}
+          font-bold text-blue-600
+        {% elif stage.order < current_stage_order %}
+          text-green-700
+        {% else %}
+          text-gray-500
+        {% endif %}">
+        {{ stage.name }}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+            <!-- Договор -->
+            {% if contract %}
+            <div class="mt-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-2">Договор</h2>
+                <div class="bg-gray-50 p-4 rounded-lg shadow-sm text-sm text-gray-700 space-y-1">
+                    <p><strong>Сумма договора:</strong> {{ contract.total_amount }} ₽</p>
+                    <p><strong>Первый платёж:</strong> {{ contract.first_payment }} ₽ ({{ contract.first_payment_date }})</p>
+                    <p><strong>Всего платежей:</strong> {{ contract.number_of_payments }}</p>
+                </div>
+            </div>
+
+            <!-- Платежи -->
+            {% if installment_payments %}
+            <div class="mt-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-2">График платежей</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left border rounded-lg">
+                        <thead class="bg-blue-100 text-gray-700">
+                            <tr>
+                                <th class="px-3 py-2">#</th>
+                                <th class="px-3 py-2">Срок</th>
+                                <th class="px-3 py-2">Сумма</th>
+                                <th class="px-3 py-2">Статус</th>
+                                <th class="px-3 py-2">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for payment in installment_payments %}
+                                <tr class="border-b {% if payment.status == 'paid' %}bg-green-100{% endif %}">
+                                    <td class="px-3 py-2">{{ payment.number }}</td>
+                                    <td class="px-3 py-2">{{ payment.due_date }}</td>
+                                    <td class="px-3 py-2">{{ payment.amount_due }} ₽</td>
+                                    <td class="px-3 py-2">
+                                        {% if payment.status == 'paid' %}
+                                            <span class="text-green-700 font-medium">Оплачен</span>
+                                        {% elif payment.status == 'partial' %}
+                                            <span class="text-yellow-600 font-medium">Частично</span>
+                                        {% elif payment.status == 'overdue' %}
+                                            <span class="text-red-600 font-medium">Просрочен</span>
+                                        {% else %}
+                                            <span class="text-gray-600">Ожидается</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-3 py-2 text-center">
+                                        <button 
+                                            class="px-3 py-1 rounded-lg text-white {% if payment.status == 'paid' %}bg-gray-400 cursor-not-allowed{% else %}bg-blue-600 hover:bg-blue-700{% endif %}" 
+                                            {% if payment.status == 'paid' %}disabled{% endif %}
+                                            data-amount="{{ payment.amount_due }}">
+                                            {% if payment.status == 'paid' %}Оплачено{% else %}Оплатить{% endif %}
+                                        </button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+                <p class="text-sm text-gray-500 mt-4">План рассрочки ещё не рассчитан.</p>
+            {% endif %}
+            {% else %}
+                <p class="text-sm text-gray-500 mt-4">У вас пока нет активного договора.</p>
+            {% endif %}
+        </div>
+
+        <div class="mt-8 text-right">
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="text-sm text-red-500 hover:underline">Выйти</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.querySelectorAll("button[data-amount]").forEach(button => {
+            button.addEventListener("click", () => {
+                if (!button.disabled) {
+                    const amount = button.getAttribute("data-amount");
+                    alert(`Оплата на сумму ${amount} ₽ будет проведена (интеграция с платёжкой здесь).`);
+                }
+            });
+        });
+    </script>
+    <script>
+document.addEventListener("DOMContentLoaded", () => {
+  const stages = document.querySelectorAll("#roadmap .stage");
+  const svg = document.getElementById("roadmap-lines");
+
+  // очистка svg
+  svg.innerHTML = "";
+
+  for (let i = 0; i < stages.length - 1; i++) {
+    const start = stages[i].querySelector(".circle").getBoundingClientRect();
+    const end = stages[i + 1].querySelector(".circle").getBoundingClientRect();
+    const container = svg.getBoundingClientRect();
+
+    // центр кружка
+    const x1 = start.left + start.width / 2 - container.left;
+    const y1 = start.top + start.height / 2 - container.top;
+    const x2 = end.left + end.width / 2 - container.left;
+    const y2 = end.top + end.height / 2 - container.top;
+
+    // линия
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", x1);
+    line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", y2);
+    line.setAttribute("stroke", "#9ca3af"); // серый по умолчанию
+    line.setAttribute("stroke-width", "3");
+
+    svg.appendChild(line);
+  }
+});
+</script>
+</body>
+</html>

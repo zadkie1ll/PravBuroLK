@@ -1,0 +1,49 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Реферальное приглашение</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="{% static 'js/validation.js' %}" defer></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-10 rounded-2xl shadow-lg w-full max-w-md text-center">
+        <div class="flex justify-center mb-6">
+            <img src="{% static 'img/logo.svg' %}" alt="Логотип" class="w-32 h-32 rounded-full bg-gray-200 p-4">
+        </div>
+
+        <h2 class="text-2xl font-semibold mb-8 text-gray-800">
+            Добро пожаловать! Вас пригласил {{ client.name }} {{ client.surname }}
+        </h2>
+
+        <form method="post" action="{% url 'referral_submit' %}" class="space-y-6">
+            {% csrf_token %}
+            <input type="hidden" name="referral_code" value="{{ client.referral_code }}">
+
+            <div class="text-left">
+                <label for="name" class="block mb-2 text-gray-700 font-medium">Ваше имя или обращение</label>
+                <input type="text" id="name" name="name" placeholder="Введите ФИО или обращение"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400" required>
+            </div>
+
+            <div class="text-left">
+                <label for="phone" class="block mb-2 text-gray-700 font-medium">Ваш телефон</label>
+                <input type="tel" id="phone" name="phone" placeholder="+7 (999) 123-45-67"
+                    pattern="^\+7\d{10}$"
+                    title="Введите телефон в формате +7XXXXXXXXXX"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400"
+                    required>
+            </div>
+
+            <button type="submit"
+                class="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition">
+                Отправить
+            </button>
+        </form>
+    </div>
+
+</body>
+</html>

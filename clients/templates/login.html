@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Вход в личный кабинет</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Вход в личный кабинет</h2>
+
+        {% if form.errors %}
+            <div class="bg-red-100 text-red-700 p-3 rounded mb-4">
+                Неверное имя пользователя или пароль.
+            </div>
+        {% endif %}
+
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <label for="id_username" class="block text-sm text-gray-600">Имя пользователя</label>
+                <input type="text" name="username" autofocus required
+                       class="mt-1 w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+
+            <div>
+                <label for="id_password" class="block text-sm text-gray-600">Пароль</label>
+                <input type="password" name="password" required
+                       class="mt-1 w-full border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+            </div>
+
+            <div class="flex items-center justify-between">
+                <button type="submit"
+                        class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition duration-200">
+                    Войти
+                </button>
+                <a href="#" class="text-sm text-blue-600 hover:underline">Забыли пароль?</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
