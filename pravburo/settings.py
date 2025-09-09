@@ -20,7 +20,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'administration',
     'bitrix',
-    'payments',
+    'payments.apps.PaymentsConfig',
     'clients',
 ]
 

@@ -2,6 +2,7 @@ from django.db import models
 from django.utils import timezone
 
 
+
 class Contract(models.Model):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -14,8 +15,6 @@ class Contract(models.Model):
     deposit = models.BooleanField(default=False)
     publication = models.BooleanField(default=False)
 
-    
-    
     def __str__(self):
         return f"Contract #{self.id} — {self.client}"
 
@@ -41,7 +40,24 @@ class InstallmentPayment(models.Model):
     number = models.PositiveIntegerField()
     due_date = models.DateField()
     amount_due = models.DecimalField(max_digits=10, decimal_places=2)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+
+    def apply_payment(self, amount):
+        """Применяем платёж к этому месяцу"""
+        self.amount_paid += amount
+        if self.amount_paid >= self.amount_due:
+            self.status = "paid"
+            extra = self.amount_paid - self.amount_due
+            self.amount_paid = self.amount_due
+        elif self.amount_paid > 0:
+            self.status = "partial"
+            extra = 0
+        else:
+            self.status = "pending"
+            extra = 0
+        self.save()
+        return extra  # если переплата → вернём остаток
 
     def __str__(self):
         return f"Платеж #{self.number} — {self.get_status_display()} — {self.amount_due}₽"
@@ -52,10 +68,52 @@ class ActualPayment(models.Model):
     date = models.DateField(default=timezone.now)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)  # сначала сохраняем платёж
+
+        # распределяем сумму по ближайшим платежам рассрочки
+        plan = InstallmentPlan.objects.filter(contract=self.contract).first()
+        if not plan:
+            return
+
+        remaining = self.amount
+        for payment in plan.payments.filter(status__in=['pending', 'partial']).order_by('due_date'):
+            if remaining <= 0:
+                break
+
+            before = payment.amount_paid
+            remaining = payment.apply_payment(remaining)
+            applied = payment.amount_paid - before
+
+            if applied > 0:
+                PaymentApplication.objects.create(
+                    payment=payment,
+                    actual_payment=self,
+                    applied_amount=applied
+                )
+
     def __str__(self):
-        return f"Платеж {self.amount}₽ от {self.date}"
+        return f"Факт. платёж {self.amount}₽ от {self.date}"
 
 
+class PaymentApplication(models.Model):
+    """Связь между фактическим платёжом и платежом по рассрочке"""
+    payment = models.ForeignKey(
+        InstallmentPayment,
+        on_delete=models.CASCADE,
+        related_name='applications'
+    )
+    actual_payment = models.ForeignKey(
+        ActualPayment,
+        on_delete=models.CASCADE,
+        related_name='applications'
+    )
+    applied_amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.applied_amount} ₽ → {self.payment} ({self.actual_payment.date})"
 
 
 class OtherPayment(models.Model):

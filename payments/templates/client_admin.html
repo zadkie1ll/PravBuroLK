@@ -38,17 +38,17 @@
           </div>
           <div>
             <label class="block text-sm font-medium">Первый платёж (₽)</label>
-            <input type="number" name="first_payment" value="{{ contract.first_payment }}" step="0.01" class="mt-1 block w-full border rounded-lg p-2">
+            <input type="number" name="first_payment" value="{{ contract.first_payment|stringformat:'f' }}" step="0.01" class="mt-1 block w-full border rounded-lg p-2">
           </div>
           <div>
             <label class="block text-sm font-medium">Общая сумма (₽)</label>
-            <input type="hidden" id="base-amount" value="{{ contract.total_amount|floatformat:2 }}">
-            <input type="number" name="total_amount" value="{{ contract.total_amount }}" step="0.01"
+            <input type="hidden" id="base-amount" value="{{ contract.total_amount|stringformat:'f' }}">
+            <input type="number" name="total_amount" value="{{ contract.total_amount|stringformat:'f' }}" step="0.01"
                    class="mt-1 block w-full border rounded-lg p-2" id="total-amount">
           </div>
           <div>
             <label class="block text-sm font-medium">Скидка (₽)</label>
-            <input type="number" name="discount" value="{{ contract.discount }}" step="0.01" class="mt-1 block w-full border rounded-lg p-2">
+            <input type="number" name="discount" value="{{ contract.discount|stringformat:'f' }}" step="0.01" class="mt-1 block w-full border rounded-lg p-2">
           </div>
           <div>
             <label class="block text-sm font-medium">Кол-во платежей</label>
@@ -76,152 +76,178 @@
         </form>
       </section>
 
-      <!-- Платежи по рассрочке -->
-      {% if payments %}
-        <section class="bg-white rounded-2xl shadow p-6">
-          <h3 class="text-xl font-semibold mb-4 text-center">💰 Платежи по рассрочке</h3>
-          <form method="post" action="{% url 'update_custom_payments' client.id %}" id="custom-payments-form">
-            {% csrf_token %}
-            <div class="overflow-x-auto">
-              <table class="mx-auto w-full max-w-4xl text-sm text-left border border-gray-200 rounded-lg shadow">
-                <thead class="bg-gray-100 text-gray-700">
-                  <tr>
-                    <th class="p-2 border">№</th>
-                    <th class="p-2 border">Дата</th>
-                    <th class="p-2 border">Сумма</th>
-                    <th class="p-2 border">Статус</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for p in payments %}
-                    <tr class="border-t hover:bg-gray-50">
-                      <td class="p-2 text-center">{{ p.number }}</td>
-                      <td class="p-2 text-center">{{ p.due_date }}</td>
-                      <td class="p-2 text-center">
-                        {% if p.status == 'pending' %}
-                          <input type="number" name="payment_{{ p.id }}" value="{{ p.amount_due }}" step="0.01"
-                            class="payment-input w-24 text-center border rounded-lg p-1">
-                        {% else %}
-                          {{ p.amount_due }} ₽
-                        {% endif %}
-                      </td>
-                      <td class="p-2 text-center">
-                        <select name="status_{{ p.id }}" class="border rounded-lg px-2 py-1">
-                          {% for key, label in p.STATUS_CHOICES %}
-                            <option value="{{ key }}" {% if p.status == key %}selected{% endif %}>{{ label }}</option>
-                          {% endfor %}
-                        </select>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            <div class="mt-4 flex justify-between items-center max-w-4xl mx-auto">
-              <p class="text-sm">
-                <strong>Ожидаемая сумма:</strong> {{ expected_total|floatformat:2 }} ₽<br>
-                <span id="total-custom-payments"
-                      data-expected="{{ expected_total|floatformat:2 }}"
-                      data-already-paid="{{ paid_sum|floatformat:2 }}">0.00</span>
-              </p>
-              <button type="submit" class="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow">
-                Сохранить
-              </button>
-            </div>
-          </form>
-        </section>
-      {% else %}
-        <p class="text-gray-500">Нет рассрочки.</p>
-      {% endif %}
+<!-- Платежи по рассрочке -->
+{% if payments_data %}
+  <section class="bg-white rounded-2xl shadow p-6">
+    <h3 class="text-xl font-semibold mb-4 text-center">💰 Платежи по рассрочке</h3>
+    <form method="post" action="{% url 'update_custom_payments' client.id %}" id="custom-payments-form">
+      {% csrf_token %}
+      <div class="overflow-x-auto">
+        <table class="mx-auto w-full max-w-4xl text-sm text-left border border-gray-200 rounded-lg shadow">
+          <thead class="bg-gray-100 text-gray-700">
+            <tr>
+              <th class="p-2 border">№</th>
+              <th class="p-2 border">Дата</th>
+              <th class="p-2 border">Сумма к оплате</th>
+              <th class="p-2 border">Оплачено</th>
+              <th class="p-2 border">Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in payments_data %}
+              {% with p=item.payment %}
+              <tr class="border-t hover:bg-gray-50">
+                <td class="p-2 text-center">{{ p.number }}</td>
+                <td class="p-2 text-center">
+                  <input type="date" name="due_date_{{ p.id }}" value="{{ p.due_date|date:'Y-m-d' }}" 
+                         class="border rounded-lg px-2 py-1 w-36 text-center">
+                </td>
+                <td class="p-2 text-center">
+                  {% if p.status == "paid" %}
+                    <span class="text-green-600 font-medium">{{ p.amount_due }} ₽ (оплачен)</span>
+                  {% else %}
+                    <input type="number" name="amount_{{ p.id }}" value="{{ p.amount_due|stringformat:'f' }}" 
+                           step="0.01" class="payment-input border rounded-lg px-2 py-1 w-28 text-center">
+                  {% endif %}
+                </td>
+
+                <td class="p-2 text-center">
+                  {% if item.applications %}
+                    {% for app in item.applications %}
+                      <div class="text-green-600">
+                        {{ app.applied_amount }} ₽ ({{ app.actual_payment.date }})
+                      </div>
+                    {% endfor %}
+                    <div class="font-medium">Итого: {{ item.total_paid }} ₽</div>
+                  {% else %}
+                    <span class="text-gray-400">—</span>
+                  {% endif %}
+                </td>
+
+                <td class="p-2 text-center">
+                  <select name="status_{{ p.id }}" class="border rounded-lg px-2 py-1">
+                    {% for key, label in p.STATUS_CHOICES %}
+                      <option value="{{ key }}" {% if p.status == key %}selected{% endif %}>
+                        {{ label }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </td>
+              </tr>
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Итог -->
+      <div class="mt-4 text-center">
+        <p>Ожидаемая сумма по договору: <strong>{{ expected_total }}</strong> ₽</p>
+        <p>Уже оплачено: <strong>{{ paid_sum }}</strong> ₽</p>
+        <p>Всего после изменений: 
+          <strong id="total-custom-payments" 
+                  data-expected="{{ expected_total }}" 
+                  data-already-paid="{{ paid_sum }}">0.00</strong> ₽
+        </p>
+      </div>
+
+      <div class="mt-4 text-center">
+        <button type="submit" 
+                class="px-5 py-2 bg-green-600 text-white rounded-lg shadow hover:bg-green-700">
+          💾 Сохранить изменения
+        </button>
+      </div>
+    </form>
+  </section>
+{% endif %}
+      <!-- Фактические платежи -->
+      <section class="bg-white rounded-2xl shadow p-6">
+        <h2 class="text-xl font-semibold">📊 Фактические платежи</h2>
+        {% if actual_payments %}
+          <ul class="list-disc list-inside text-sm mt-2 space-y-1">
+            {% for p in actual_payments %}
+              <li>{{ p.date }} — {{ p.amount }} ₽</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-gray-500">Нет фактических платежей.</p>
+        {% endif %}
+      </section>
+
+      <!-- Прочие платежи -->
+      <section class="bg-white rounded-2xl shadow p-6">
+        <h2 class="text-xl font-semibold">📌 Прочие платежи</h2>
+        {% if other_payments %}
+          <ul class="list-disc list-inside text-sm mt-2 space-y-1">
+            {% for p in other_payments %}
+              <li>
+                {{ p.get_payment_type_display }} — {{ p.amount }} ₽ — 
+                {% if p.is_paid %}
+                  <span class="text-green-600">Оплачен</span>
+                {% else %}
+                  <span class="text-red-600">Не оплачен</span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-gray-500">Нет прочих платежей.</p>
+        {% endif %}
+      </section>
+
     {% else %}
-      <p class="text-red-500">Контракт не найден.</p>
+      <p class="text-gray-500">У клиента нет контракта.</p>
     {% endif %}
-
-    <!-- Фактические платежи -->
-    <section class="bg-white rounded-2xl shadow p-6">
-      <h2 class="text-xl font-semibold">📊 Фактические платежи</h2>
-      {% if actual_payments %}
-        <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-          {% for p in actual_payments %}
-            <li>{{ p.date }} — {{ p.amount }} ₽</li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="text-gray-500">Нет фактических платежей.</p>
-      {% endif %}
-    </section>
-
-    <!-- Прочие платежи -->
-    <section class="bg-white rounded-2xl shadow p-6">
-      <h2 class="text-xl font-semibold">📌 Прочие платежи</h2>
-      {% if other_payments %}
-        <ul class="list-disc list-inside text-sm mt-2 space-y-1">
-          {% for p in other_payments %}
-            <li>
-              {{ p.get_payment_type_display }} — {{ p.amount }} ₽ —
-              {% if p.is_paid %}
-                <span class="text-green-600">Оплачен</span>
-              {% else %}
-                <span class="text-red-600">Не оплачен</span>
-              {% endif %}
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="text-gray-500">Нет прочих платежей.</p>
-      {% endif %}
-    </section>
 
   </div>
 </body>
-</html>
-
 <script>
 document.addEventListener("DOMContentLoaded", function () {
   const inputs = document.querySelectorAll(".payment-input");
   const totalDisplay = document.getElementById("total-custom-payments");
   const form = document.getElementById("custom-payments-form");
+  if (!form) return;
   const submitButton = form.querySelector("button[type='submit']");
 
-  const expectedTotal = parseFloat(totalDisplay.dataset.expected);
-  const alreadyPaid = parseFloat(totalDisplay.dataset.alreadyPaid);
+  function parseNumber(val) {
+    if (!val) return 0;
+    return parseFloat(val.toString().replace(",", "."));
+  }
+
+  const expectedTotal = parseNumber(totalDisplay.dataset.expected);
+  const alreadyPaid = parseNumber(totalDisplay.dataset.alreadyPaid);
 
   function updateTotalPayments() {
-  let sum = 0;  // 🔄 перемещено сюда
+    let sum = 0;
+    inputs.forEach(input => {
+      const val = parseNumber(input.value);
+      if (!isNaN(val)) sum += val;
+    });
 
-  inputs.forEach(input => {
-    let val = parseFloat(input.value);
-    if (!isNaN(val)) sum += val;
-  });
+    const fullTotal = sum + alreadyPaid;
+    totalDisplay.textContent = fullTotal.toFixed(2);
 
-  const fullTotal = sum + alreadyPaid;
-  totalDisplay.textContent = fullTotal.toFixed(2);
-
-  const difference = Math.abs(fullTotal - expectedTotal);
-
-  if (difference > 0.01) {
-    submitButton.disabled = true;
-    submitButton.classList.add('bg-gray-400', 'cursor-not-allowed');
-    submitButton.classList.remove('bg-green-600', 'hover:bg-green-700');
-  } else {
-    submitButton.disabled = false;
-    submitButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
-    submitButton.classList.add('bg-green-600', 'hover:bg-green-700');
+    if (Math.abs(fullTotal - expectedTotal) > 0.01) {
+      submitButton.disabled = true;
+      submitButton.classList.add('bg-gray-400', 'cursor-not-allowed');
+      submitButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+    } else {
+      submitButton.disabled = false;
+      submitButton.classList.remove('bg-gray-400', 'cursor-not-allowed');
+      submitButton.classList.add('bg-green-600', 'hover:bg-green-700');
+    }
   }
-}
 
   inputs.forEach(input => input.addEventListener("input", updateTotalPayments));
   updateTotalPayments();
 
- form.addEventListener("submit", function (e) {
-  let current = parseFloat(totalDisplay.textContent);
-  // fullTotal уже включает alreadyPaid, так что просто:
-  let fullTotal = current;
-
-  if (Math.abs(fullTotal - expectedTotal) > 0.01) {
-    e.preventDefault();
-    alert("Сумма всех платежей (включая уже оплаченные) должна быть равна ожидаемой сумме по договору.");
-  }
-});
+  form.addEventListener("submit", function (e) {
+    const fullTotal = parseNumber(totalDisplay.textContent);
+    if (Math.abs(fullTotal - expectedTotal) > 0.01) {
+      e.preventDefault();
+      alert("Сумма всех платежей (включая уже оплаченные) должна быть равна ожидаемой сумме по договору.");
+    }
+  });
 });
 </script>
+</html>

@@ -4,7 +4,8 @@ from payments.models import (
     InstallmentPlan,
     InstallmentPayment,
     ActualPayment,
-    OtherPayment
+    OtherPayment,
+    PaymentApplication,   # 👈 добавляем
 )
 from clients.models import (
     Client,
@@ -47,6 +48,13 @@ class InstallmentPaymentInline(admin.TabularInline):
     extra = 0
 
 
+class PaymentApplicationInline(admin.TabularInline):
+    """Inline для отображения распределения платежей"""
+    model = PaymentApplication
+    extra = 0
+    readonly_fields = ('applied_amount', 'created_at')
+
+
 @admin.register(Contract)
 class ContractAdmin(admin.ModelAdmin):
     list_display = ('id', 'client', 'total_amount', 'discount', 'first_payment', 'first_payment_date', 'number_of_payments', 'created_at')
@@ -65,10 +73,11 @@ class InstallmentPlanAdmin(admin.ModelAdmin):
 
 @admin.register(InstallmentPayment)
 class InstallmentPaymentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'plan', 'number', 'due_date', 'amount_due', 'status')
+    list_display = ('id', 'plan', 'number', 'due_date', 'amount_due', 'amount_paid', 'status')
     list_filter = ('status', 'due_date')
     search_fields = ('plan__contract__client__surname',)
     ordering = ('due_date',)
+    inlines = [PaymentApplicationInline]  # 👈 добавили
 
 
 @admin.register(ActualPayment)
@@ -76,6 +85,7 @@ class ActualPaymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'contract', 'date', 'amount')
     list_filter = ('date',)
     ordering = ('-date',)
+    inlines = [PaymentApplicationInline]  # 👈 добавили
 
 
 @admin.register(OtherPayment)

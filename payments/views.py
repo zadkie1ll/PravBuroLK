@@ -64,17 +64,35 @@ def client_admin_view(request, client_id):
     contract = Contract.objects.filter(client=client).first()
     plan = InstallmentPlan.objects.filter(contract=contract).first() if contract else None
     payments = plan.payments.all() if plan else []
-    paid_sum = plan.payments.filter(status='paid').aggregate(total=Sum('amount_due'))['total'] or 0
+
+    paid_sum = (
+        plan.payments.filter(status='paid').aggregate(total=Sum('amount_due'))['total']
+        if plan else 0
+    )
+
     actual_payments = ActualPayment.objects.filter(contract=contract)
     other_payments = client.other_payments.all()
-    expected_total = contract.total_amount - contract.discount
+    expected_total = contract.total_amount - contract.discount if contract else 0
+
+    # 🔥 формируем удобный список с подсчётами
+    payments_data = []
+    for p in payments:
+        applications = p.applications.all()
+        total_paid = sum(app.applied_amount for app in applications)
+        payments_data.append({
+            "payment": p,
+            "applications": applications,
+            "total_paid": total_paid,
+        })
 
     if request.method == "POST":
+        # обновляем данные клиента
         client.name = request.POST.get("name", client.name)
         client.surname = request.POST.get("surname", client.surname)
         client.middlename = request.POST.get("middlename", client.middlename)
         client.save()
 
+        # обновляем контракт
         if contract:
             preferred_day = request.POST.get("second_payment_day")
             if preferred_day and preferred_day.isdigit():
@@ -88,7 +106,7 @@ def client_admin_view(request, client_id):
         "client": client,
         "contract": contract,
         "plan": plan,
-        "payments": payments,
+        "payments_data": payments_data,   
         "actual_payments": actual_payments,
         "paid_sum": paid_sum,
         "expected_total": expected_total,
@@ -222,7 +240,7 @@ def update_custom_payments(request, client_id):
     errors = []
 
     for payment in plan.payments.all():  
-        amount_field = f"payment_{payment.id}"
+        amount_field = f"amount_{payment.id}"   # вместо payment_
         status_field = f"status_{payment.id}"
 
         new_amount_str = request.POST.get(amount_field)
@@ -259,10 +277,9 @@ def update_custom_payments(request, client_id):
     return redirect("client_admin_view", client_id=client.id)
 
 def client_search_view(request):
-    q = (request.GET.get('q') or '').strip().lower()  # приводим запрос к нижнему регистру
+    q = (request.GET.get('q') or '').strip().lower() 
 
     if q:
-        # Грубый поиск для SQLite: приводим данные в Python, чтобы убрать зависимость от collation
         results = [
             client for client in Client.objects.all()
             if (
@@ -284,3 +301,37 @@ def client_search_view(request):
 @user_passes_test(lambda u: u.is_staff or u.is_superuser)
 def admin_dashboard(request):
     return render(request, 'admin_dashboard.html')
+
+
+@require_POST
+def add_actual_payment(request, client_id):
+    client = get_object_or_404(Client, pk=client_id)
+    contract = Contract.objects.filter(client=client).first()
+
+    if not contract:
+        messages.error(request, "У клиента нет контракта.")
+        return redirect("client_admin_view", client_id=client.id)
+
+    try:
+        amount = Decimal(request.POST.get("amount", "0"))
+        if amount <= 0:
+            raise ValueError("Сумма должна быть положительной.")
+
+        date_str = request.POST.get("date")
+        if date_str:
+            payment_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        else:
+            payment_date = now().date()
+
+        ActualPayment.objects.create(
+            contract=contract,
+            amount=amount,
+            date=payment_date
+        )
+
+        messages.success(request, "Платёж успешно добавлен.")
+
+    except Exception as e:
+        messages.error(request, f"Ошибка при добавлении платежа: {e}")
+
+    return redirect("client_admin_view", client_id=client.id)
