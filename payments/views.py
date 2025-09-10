@@ -74,7 +74,6 @@ def client_admin_view(request, client_id):
     other_payments = client.other_payments.all()
     expected_total = contract.total_amount - contract.discount if contract else 0
 
-    # 🔥 формируем удобный список с подсчётами
     payments_data = []
     for p in payments:
         applications = p.applications.all()
@@ -86,13 +85,11 @@ def client_admin_view(request, client_id):
         })
 
     if request.method == "POST":
-        # обновляем данные клиента
         client.name = request.POST.get("name", client.name)
         client.surname = request.POST.get("surname", client.surname)
         client.middlename = request.POST.get("middlename", client.middlename)
         client.save()
 
-        # обновляем контракт
         if contract:
             preferred_day = request.POST.get("second_payment_day")
             if preferred_day and preferred_day.isdigit():
@@ -240,7 +237,7 @@ def update_custom_payments(request, client_id):
     errors = []
 
     for payment in plan.payments.all():  
-        amount_field = f"amount_{payment.id}"   # вместо payment_
+        amount_field = f"amount_{payment.id}"
         status_field = f"status_{payment.id}"
 
         new_amount_str = request.POST.get(amount_field)
