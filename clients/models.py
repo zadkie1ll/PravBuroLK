@@ -1,6 +1,8 @@
 from django.contrib.auth.models import User
 from django.db import models
 import uuid
+from django.db.models import Q
+
 
 
 class StageTemplate(models.Model):
@@ -22,10 +24,20 @@ class Client(models.Model):
     name = models.CharField(max_length=100)
     surname = models.CharField(max_length=100)
     middlename = models.CharField(max_length=100, blank=True, null=True)
-    bitrix_id = models.CharField(max_length=100, unique=True)
+    bitrix_id = models.CharField(max_length=255, null=True, blank=True)
+
     stage = models.ForeignKey("StageTemplate", on_delete=models.SET_NULL, null=True, blank=True)
     referral_code = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['bitrix_id'],
+                condition=~Q(bitrix_id=None),
+                name='unique_bitrix_id_not_null'
+            )
+        ]
+    
     def __str__(self):
         return f"{self.surname} {self.name} {self.middlename or ''}".strip()
 

@@ -1,11 +1,16 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from clients.models import Client, StageTemplate
 from django.contrib.auth.views import LoginView
 from payments.models import Contract, InstallmentPlan
+import time
 from django.shortcuts import redirect
 from django.utils import timezone
-
+from django.views import View
+from clients.services import ClientService
 
 
 
@@ -82,3 +87,39 @@ def redirect_handler(request):
 def referral_page(request):
     client = get_object_or_404(Client, user=request.user)
     return render(request, "referral.html", {"client": client})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class TestCreateClientView(View):
+    """Тестовый вью для проверки ClientService."""
+
+    def post(self, request):
+        try:
+            # уникальный username с временным суффиксом
+            unique_username = f"test_user_{int(time.time() * 1000)}"
+
+            client, contract, plan = ClientService.create_client_with_contract(
+                username=unique_username,
+                password="12345",
+                name="Иван",
+                surname="Иванов",
+                middlename="Иванович",
+                email="ivanov@example.com",
+                bitrix_id = f"BX123_{int(time.time() * 1000)}",
+                total_amount="100000",
+                discount="10000",
+                first_payment="20000",
+                number_of_payments=6,
+                preferred_payment_day=10,
+            )
+
+            return JsonResponse({
+                "client_id": client.id,
+                "contract_id": contract.id,
+                "plan_id": plan.id,
+                "username": client.user.username,
+                "message": "Клиент успешно создан"
+            })
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
