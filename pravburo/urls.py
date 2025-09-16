@@ -17,7 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from clients.views import client_dashboard, redirect_handler, referral_page
-from clients.views import CustomLoginView, TestCreateClientView
+from clients.views import CustomLoginView, TestCreateClientView, stage_detail
 from django.contrib.auth.views import LogoutView
 from payments.views import client_admin_view, recalculate_installment, update_custom_payments, client_search_view, admin_dashboard
 from bitrix.views import referral_landing, referral_submit, application_success
@@ -31,6 +31,7 @@ urlpatterns = [
     path("ref/submit/", referral_submit, name="referral_submit"),
     path('dashboard/', client_dashboard, name='client_dashboard'),
     path('', redirect_handler, name='index'),
+    path('stages/<slug:slug>/', stage_detail, name='stage_detail'),
     path('accounts/login/', CustomLoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path("test-create-client/", TestCreateClientView.as_view(), name="test-create-client"),

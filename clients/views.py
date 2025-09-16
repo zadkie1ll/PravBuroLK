@@ -76,6 +76,13 @@ def client_dashboard(request):
     return render(request, "clientnew.html", context)
 
 
+def stage_detail(request, slug):
+    stage = get_object_or_404(StageTemplate, slug=slug)
+    return render(request, "stage_detail.html", {
+        "stage": stage,
+        "next_stage": stage.get_next()
+    })
+
 @login_required
 def redirect_handler(request):
     if request.user.is_staff or request.user.is_superuser:

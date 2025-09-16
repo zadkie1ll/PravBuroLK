@@ -31,9 +31,9 @@ class OtherPaymentInline(admin.TabularInline):
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ('id', 'surname', 'name', 'middlename', 'bitrix_id', 'user', 'referral_code')
+    list_display = ('id', 'surname', 'name', 'middlename', 'bitrix_id', 'user', 'stage', 'referral_code')
     search_fields = ('surname', 'name', 'middlename', 'bitrix_id', 'user__username', 'referral_code')
-    list_filter = ('bitrix_id',)
+    list_filter = ('bitrix_id', 'stage')  # добавляем фильтр по стадиям
     ordering = ('surname', 'name')
     readonly_fields = ('referral_code', 'installment_payments_list')
     inlines = [ContractInline, OtherPaymentInline]
@@ -41,7 +41,7 @@ class ClientAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {
             "fields": (
-                'surname', 'name', 'middlename', 'bitrix_id', 'user', 'referral_code'
+                'surname', 'name', 'middlename', 'bitrix_id', 'user', 'stage', 'referral_code'
             ),
         }),
         ("Платежи по рассрочке", {
@@ -69,8 +69,15 @@ class ClientAdmin(admin.ModelAdmin):
 
 @admin.register(StageTemplate)
 class StageTemplateAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'order')
+    list_display = ('id', 'name', 'slug', 'order', 'short_description')
     ordering = ('order',)
+    search_fields = ('name', 'slug', 'description')
+
+    def short_description(self, obj):
+        if obj.description:
+            return obj.description[:50] + ("…" if len(obj.description) > 50 else "")
+        return "-"
+    short_description.short_description = "Описание"
 
 
 class InstallmentPaymentInline(admin.TabularInline):

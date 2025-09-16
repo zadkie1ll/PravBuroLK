@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 import uuid
+from django.utils.text import slugify
 from django.db.models import Q
 
 
@@ -8,6 +9,8 @@ from django.db.models import Q
 class StageTemplate(models.Model):
     name = models.CharField(max_length=100, unique=True)
     order = models.PositiveIntegerField(default=0)
+    slug = models.SlugField(max_length=100, unique=True, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)  # описание стадии
 
     class Meta:
         ordering = ['order']
@@ -15,7 +18,19 @@ class StageTemplate(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.name)
+            slug = base_slug
+            counter = 1
+            while StageTemplate.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
     def get_next(self):
+        """Возвращает следующую стадию по order"""
         return StageTemplate.objects.filter(order__gt=self.order).order_by('order').first()
 
 
