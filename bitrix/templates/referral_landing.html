@@ -1,168 +1,239 @@
+{% extends "base.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Реферальное приглашение</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="{% static 'js/validation.js' %}" defer></script>
-</head>
-<body class="bg-gray-50 relative flex flex-col min-h-screen">
 
-    <!-- Фоновые картинки -->
-    <div class="absolute inset-0 pointer-events-none">
-        <img src="{% static 'img/line2.svg' %}" alt="line2" class="absolute top-10 left-0 w-32 md:w-48">
-        <img src="{% static 'img/line3.svg' %}" alt="line3" class="absolute bottom-0 left-0 w-40 md:w-56">
-        <img src="{% static 'img/line4.svg' %}" alt="line4" class="absolute bottom-5 left-1/2 transform -translate-x-1/2 w-48 md:w-72">
-        <img src="{% static 'img/line5.svg' %}" alt="line5" class="absolute top-0 right-0 w-40 md:w-64">
-        <img src="{% static 'img/line7.svg' %}" alt="line7" class="absolute top-[700px] right-6 transform -translate-y-1/2 w-36 md:w-56">
-        <img src="{% static 'img/line8.svg' %}" alt="line8" class="absolute top-0 left-1/3 -translate-x-full w-[500px] md:w-[500px]">
-        <img src="{% static 'img/line9.svg' %}" alt="line9" class="absolute top-[500px] left-[500px] w-32 md:w-[400px]">
+{% block content %}
+<div class="relative bg-gray-50 text-gray-800 min-h-screen overflow-hidden" style="font-family: 'SF Pro Display', sans-serif;">
+
+  <!-- Фоновые линии -->
+  <div class="absolute inset-0 pointer-events-none">
+    <img src="{% static 'img/line2.svg' %}" alt="line2" class="absolute top-10 left-0 w-32 md:w-48">
+    <img src="{% static 'img/line3.svg' %}" alt="line3" class="absolute bottom-0 left-0 w-40 md:w-56">
+    <img src="{% static 'img/line4.svg' %}" alt="line4" class="absolute bottom-5 left-1/2 transform -translate-x-1/2 w-48 md:w-72">
+    <img src="{% static 'img/line5.svg' %}" alt="line5" class="absolute top-0 right-0 w-40 md:w-64">
+    <img src="{% static 'img/line7.svg' %}" alt="line7" class="absolute top-[700px] right-6 transform -translate-y-1/2 w-36 md:w-56">
+    <img src="{% static 'img/line8.svg' %}" alt="line8" class="absolute top-0 left-1/3 -translate-x-full w-[500px]">
+    <img src="{% static 'img/line9.svg' %}" alt="line9" class="absolute top-[500px] left-[500px] w-32 md:w-[400px]">
+  </div>
+
+  <!-- Контент -->
+  <div class="relative max-w-5xl mx-auto px-6 py-12 space-y-16">
+
+    <!-- Лого -->
+    <div class="flex justify-center mt-8">
+      <img src="{% static 'img/logo1.svg' %}" alt="Логотип" class="w-56 h-auto">
     </div>
 
-    <main class="relative max-w-5xl mx-auto px-6 py-12 space-y-12 flex-1">
+    <!-- Блок 1 -->
+    <section class="text-center space-y-6">
+      <h1 class="text-3xl md:text-4xl font-bold" style="font-family: 'TT Norms Medium', sans-serif;">
+        Жить без долгов — реальна!
+      </h1>
+      <p class="text-lg text-gray-600">
+        Коллекторы, звонки, просрочки и кредиты? Это можно оставить в прошлом.<br>
+        Списываем долги законно и помогаем начать жизнь заново.
+      </p>
+      <p class="font-medium">Заполните форму ниже и сделайте первый шаг к свободе.</p>
 
-        <section class="bg-white shadow-md p-10 rounded-2xl text-center">
-            <h1 class="text-3xl font-bold mb-4 text-gray-800">О нашей компании</h1>
-            <p class="text-gray-700 text-lg">
-                Здесь будет описание вашей компании, чем вы занимаетесь, какие преимущества для клиентов и т.д.
-                Сделайте текст информативным и привлекательным.
+      <!-- Форма заявки -->
+<section class="bg-gradient-to-tr from-white to-blue-100 shadow-md p-8 rounded-2xl max-w-md mx-auto">
+  <h2 class="text-2xl font-semibold mb-6 text-gray-800 text-center" style="font-family: 'TT Norms Medium', sans-serif;">
+    Отправить заявку
+  </h2>
+
+  <form method="post" action="{% url 'referral_submit' %}" class="space-y-6">
+    {% csrf_token %}
+    <input type="hidden" name="referral_code" value="{{ client.referral_code }}">
+
+    <div class="text-left">
+      <label for="name" class="block mb-2 text-gray-700 font-medium">Ваше имя или обращение</label>
+      <input type="text" id="name" name="name" placeholder="Введите ФИО или обращение"
+        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+        required>
+    </div>
+
+    <div class="text-left">
+      <label for="phone" class="block mb-2 text-gray-700 font-medium">Ваш телефон</label>
+      <input type="tel" id="phone" name="phone" placeholder="+7 (999) 123-45-67"
+        pattern="^\+7\d{10}$"
+        title="Введите телефон в формате +7XXXXXXXXXX"
+        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+        required>
+    </div>
+
+    <button type="submit"
+      class="w-full py-3 rounded-lg text-white font-semibold transition bg-gradient-to-r from-green-400 to-blue-400 hover:from-green-500 hover:to-blue-500">
+      Хочу жизнь без долгов
+    </button>
+  </form>
+</section>
+
+<!-- Блок 2 -->
+<section class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-6 md:p-8">
+  <div class="grid md:grid-cols-2 gap-8 items-center">
+    <div class="flex justify-center">
+      <img src="{% static 'img/ruk.svg' %}" alt="Руководитель компании"
+           class="w-64 h-90 object-cover rounded-2xl">
+    </div>
+    <div class="space-y-4">
+        <h2 class="text-2xl md:text-3xl font-bold text-slate-700"
+            style="font-family: 'TT Norms Medium', sans-serif;">
+        Руководитель компании&nbsp;Станислав Свириденко
+        </h2>
+      <p>
+        Мы с командой помогаем людям выбираться из долговой ямы с 2016 года.<br>
+        Мы знаем, каково вам — когда коллекторы звонят днём и ночью, а мысли только об одном: «Когда это закончиться?»
+      </p>
+
+      <!-- Список с кастомными точками -->
+      <ul class="space-y-3 text-slate-700 font-semibold">
+        <li class="flex items-start gap-3">
+          <span class="w-4 h-4 min-w-[1rem] min-h-[1rem] bg-blue-300 rounded-full flex-shrink-0"></span>
+          Надёжное списание долгов через суд
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="w-4 h-4 min-w-[1rem] min-h-[1rem] bg-blue-300 rounded-full flex-shrink-0"></span>
+          Работаем по всей России
+        </li>
+        <li class="flex items-start gap-3">
+          <span class="w-4 h-4 min-w-[1rem] min-h-[1rem] bg-blue-300 rounded-full flex-shrink-0"></span>
+          Более 3500 человек уже начали жизнь с чистого листа вместе с нами
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- Блок 3 -->
+<section class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-6 md:p-8">
+  <div class="space-y-6 text-slate-700">
+    <h2 class="text-2xl md:text-3xl font-bold text-center"
+        style="font-family: 'TT Norms Medium', sans-serif;">
+      Почему нам доверяют?
+    </h2>
+
+    <!-- Список с синими кружками -->
+    <ul class="space-y-4 font-semibold max-w-3xl mx-auto">
+      <li class="flex items-start gap-3">
+        <span class="w-4 h-4 min-w-[1rem] min-h-[1rem] bg-blue-300 rounded-full flex-shrink-0"></span>
+        Мы помогаем, пока другие обещают
+      </li>
+      <li class="flex items-start gap-3">
+        <span class="w-4 h-4 min-w-[1rem] min-h-[1rem] bg-blue-300 rounded-full flex-shrink-0"></span>
+        Не берёмся за дело, если не уверены в результате
+      </li>
+      <li class="flex items-start gap-3">
+        <span class="w-4 h-4 min-w-[1rem] min-h-[1rem] bg-blue-300 rounded-full flex-shrink-0"></span>
+        Поддерживаем вас на каждом шаге — от первой консультации до финального решения суда
+      </li>
+      <li class="flex items-start gap-3">
+        <span class="w-4 h-4 min-w-[1rem] min-h-[1rem] bg-blue-300 rounded-full flex-shrink-0"></span>
+        Всегда на связи
+      </li>
+    </ul>
+
+    <p class="mt-6 font-medium text-center">
+      Подписывайтесь на наши соцсети, чтобы узнать о нас и процедуре банкротства больше
+    </p>
+
+<!-- Соцсети -->
+<div class="flex justify-center gap-6">
+  <a href="https://vk.com/yourpage" target="_blank" class="transition transform hover:scale-110">
+    <img src="{% static 'img/vk.svg' %}" alt="VK" class="w-10 h-10">
+  </a>
+
+  <a href="https://t.me/yourchannel" target="_blank" class="transition transform hover:scale-110">
+    <img src="{% static 'img/Telegram.svg' %}" alt="Telegram" class="w-10 h-10">
+  </a>
+
+  <a href="https://youtube.com/yourchannel" target="_blank" class="transition transform hover:scale-110">
+    <img src="{% static 'img/YouTube.svg' %}" alt="YouTube" class="w-9 h-9">
+  </a>
+</div>
+</section>
+
+    <!-- Блок 4 -->
+    <section class="space-y-8">
+
+      <!-- ✅ Новый адаптивный блок чата поддержки -->
+      <div class="bg-gradient-to-tr from-white to-blue-100 rounded-2xl shadow-md p-8">
+        <div class="grid lg:grid-cols-2 gap-10 items-center">
+          <!-- Левая часть текста -->
+          <div class="space-y-6">
+            <h3 class="text-2xl md:text-3xl font-medium text-slate-700" style="font-family:'TT Norms',sans-serif;">
+              Хотите пообщаться с людьми, которые уже прошли процедуру банкротства,
+              находятся в процессе или только думают над решением?
+            </h3>
+
+            <p class="text-lg md:text-xl text-slate-600 font-medium" style="font-family:'SF Pro Display',sans-serif;">
+              Вступайте в наш закрытый чат в Telegram и общайтесь.<br><br>
+              Также в нём состоят юристы, которые дают ответы на все вопросы.
             </p>
-        </section>
 
-        <!-- Второй блок: форма заявки -->
-        <section class="bg-white shadow-md p-10 rounded-2xl max-w-md mx-auto">
-            <h2 class="text-2xl font-semibold mb-6 text-gray-800 text-center">Отправить заявку</h2>
+            <ul class="space-y-4 text-slate-700 font-semibold">
+              <li class="flex items-center gap-3">
+                <span class="w-4 h-4 bg-blue-300 rounded-full"></span>
+                Новые знакомства.
+              </li>
+              <li class="flex items-center gap-3">
+                <span class="w-4 h-4 bg-blue-300 rounded-full"></span>
+                Здесь люди, которые вас поймут и поддержат.
+              </li>
+              <li class="flex items-center gap-3">
+                <span class="w-4 h-4 bg-blue-300 rounded-full"></span>
+                Получите ответы на свои вопросы.
+              </li>
+            </ul>
 
-            <form method="post" action="{% url 'referral_submit' %}" class="space-y-6">
-                {% csrf_token %}
-                <input type="hidden" name="referral_code" value="{{ client.referral_code }}">
+            <a href="#" class="inline-flex items-center justify-center px-8 py-4 border-2 border-blue-400 rounded-full text-xl text-slate-600 font-medium hover:bg-blue-50 transition">
+              Вступить в чат поддержки
+              <svg class="ml-3 w-6 h-6 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M12 4l8 8-8 8M4 12h16"/>
+              </svg>
+            </a>
+          </div>
 
-                <div class="text-left">
-                    <label for="name" class="block mb-2 text-gray-700 font-medium">Ваше имя или обращение</label>
-                    <input type="text" id="name" name="name" placeholder="Введите ФИО или обращение"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400"
-                        required>
-                </div>
+          <!-- Правая часть — картинка -->
+          <div class="flex justify-center">
+            <img src="{% static 'img/tel.svg' %}" alt="chat" class="rounded-xl w-full max-w-sm">
+          </div>
+        </div>
+      </div>
 
-                <div class="text-left">
-                    <label for="phone" class="block mb-2 text-gray-700 font-medium">Ваш телефон</label>
-                    <input type="tel" id="phone" name="phone" placeholder="+7 (999) 123-45-67"
-                        pattern="^\+7\d{10}$"
-                        title="Введите телефон в формате +7XXXXXXXXXX"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400"
-                        required>
-                </div>
+      <!-- Блок отзывов -->
+        <div class="bg-white shadow-md rounded-2xl p-6 flex flex-col items-center space-y-4">
+        <!-- Заголовок -->
+        <h3 class="text-xl md:text-2xl font-semibold text-center" style="font-family: 'TT Norms Medium', sans-serif;">
+            Отзывы
+        </h3>
 
-                <button type="submit"
-                    class="w-full py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition">
-                    Отправить
-                </button>
-            </form>
-        </section>
+        <!-- Подзаголовок -->
+        <p class="text-sm md:text-base text-center text-gray-600 font-medium" style="font-family: 'SF Pro Display', sans-serif;">
+            Не верьте нам на слово — доверьтесь реальным историям
+        </p>
 
-        <!-- Третий блок: реклама соцсетей -->
-        <section class="bg-white shadow-md p-10 rounded-2xl text-center">
-            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Наши соцсети</h2>
-            <p class="text-gray-500">Здесь будут ссылки или виджеты соцсетей.</p>
-        </section>
-
-    </main>
-
-    <!-- Футер (из первого шаблона) -->
-    <footer class="bg-white shadow-inner mt-auto relative overflow-hidden z-10">
-        <div class="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8 relative z-10">
-
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-start">
-                <!-- Лого для десктопа -->
-                <div class="hidden sm:flex flex-shrink-0 items-center justify-center mb-4 sm:mb-0">
-                    <img src="{% static 'img/logo.svg' %}" alt="Логотип" class="h-32 w-auto">
-                </div>
-
-                <!-- Меню футера для десктопа -->
-                <nav class="hidden sm:flex space-x-6 ml-6 flex-1">
-                    <a href="#" class="text-[#365C80] hover:underline">Стадии</a>
-                    <a href="#" class="text-[#365C80] hover:underline">Договор</a>
-                    <a href="#" class="text-[#365C80] hover:underline">Рассрочка</a>
-                    <a href="#" class="text-[#365C80] hover:underline">Реферальная программа</a>
-                </nav>
-
-                <!-- Мобильная версия: логотип и меню -->
-                <div class="grid grid-cols-2 gap-4 w-full sm:hidden mt-6">
-                    <div class="flex items-center justify-center">
-                        <img src="{% static 'img/logo.svg' %}" alt="Логотип" class="h-20 w-auto">
-                    </div>
-                    <div class="flex flex-col items-start space-y-2">
-                        <a href="#" class="text-[#365C80] hover:underline">Стадии</a>
-                        <a href="#" class="text-[#365C80] hover:underline">Договор</a>
-                        <a href="#" class="text-[#365C80] hover:underline">Рассрочка</a>
-                        <a href="#" class="text-[#365C80] hover:underline">Реферальная программа</a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Соцсети -->
-            <div class="flex justify-center space-x-3 mt-6">
-                <!-- Десктоп -->
-                <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/rutube.svg' %}" alt="RuTube" class="w-7 h-7">
-                </a>
-                <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/YouTube.svg' %}" alt="YouTube" class="w-7 h-7">
-                </a>
-                <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/dzen.svg' %}" alt="Dzen" class="w-7 h-7">
-                </a>
-                <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/Telegram.svg' %}" alt="Telegram" class="w-7 h-7">
-                </a>
-                <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/TikTok.svg' %}" alt="TikTok" class="w-7 h-7">
-                </a>
-                <a href="#" class="hidden sm:flex w-10 h-10 items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/vk.svg' %}" alt="VK" class="w-7 h-7">
-                </a>
-
-                <!-- Мобильная версия -->
-                <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/rutube.svg' %}" alt="RuTube" class="w-6 h-6">
-                </a>
-                <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/YouTube.svg' %}" alt="YouTube" class="w-6 h-6">
-                </a>
-                <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/dzen.svg' %}" alt="Dzen" class="w-6 h-6">
-                </a>
-                <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/Telegram.svg' %}" alt="Telegram" class="w-6 h-6">
-                </a>
-                <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/TikTok.svg' %}" alt="TikTok" class="w-6 h-6">
-                </a>
-                <a href="#" class="sm:hidden w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200">
-                    <img src="{% static 'img/vk.svg' %}" alt="VK" class="w-6 h-6">
-                </a>
-            </div>
-
-            <div class="mt-6 text-center">
-                <a href="#" class="text-sm text-gray-500 hover:underline">Политика конфиденциальности</a>
-            </div>
-
-            <div class="mt-2 text-center text-xs text-gray-500">
-                <span>ИП Коравчук Н.А. | ИНН 21312321312321312 | ОГРНИП</span>
-            </div>
+        <!-- Виджет (центрированный и адаптивный) -->
+        <div class="w-full max-w-4xl mx-auto rounded-2xl overflow-hidden shadow-md">
+        <!-- обёртка для центровки -->
+        <div class="flex justify-center">
+            <iframe
+            src="https://yandex.ru/maps-reviews-widget/7626506757?comments"
+            class="w-full mx-auto h-[360px] sm:h-[420px] md:h-[520px] lg:h-[640px] border border-gray-200"
+            style="border-radius: 12px;"
+            loading="lazy"
+            allowfullscreen
+            ></iframe>
         </div>
 
-        <!-- Декоративные линии -->
-        <img src="{% static 'img/lines_1.svg' %}" alt="Декоративная линия"
-             class="absolute bottom-0 right-0 w-auto h-[80%] pointer-events-none z-0">
+        <a href="https://yandex.ru/maps/org/pravbyuro/7626506757/" target="_blank"
+            class="block text-center text-gray-400 text-xs mt-3 px-4 truncate mx-2"
+            style="font-family: 'SF Pro Display', sans-serif;">
+            Правбюро на карте Ростова-на-Дону — Яндекс Карты
+        </a>
+        </div>
 
-        <img src="{% static 'img/footerlines.svg' %}" alt="Footer Lines"
-             class="hidden sm:block absolute bottom-0 left-0 w-auto h-[60%] pointer-events-none z-0">
+    </section>
 
-        <img src="{% static 'img/footerlines.svg' %}" alt="Footer Lines"
-             class="sm:hidden absolute bottom-0 left-0 w-auto h-[60%] pointer-events-none z-0">
-    </footer>
-</body>
-</html>
+  </div>
+</div>
+<script src="{% static 'js/validation.js' %}"></script>
+{% endblock %}

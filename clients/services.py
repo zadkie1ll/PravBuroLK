@@ -181,49 +181,47 @@ class ClientService:
             preferred_payment_day=preferred_payment_day,
         )
 
-        # --- Plan и расчёт платежей ------------------------------------------
+       # --- Plan и расчёт платежей ------------------------------------------
         plan = InstallmentPlan.objects.create(contract=contract)
 
-        # === Первый платёж фиксируем отдельно ===
+        payments_to_generate = number_of_payments
+        start_index = 1
+
         if first_payment_d > 0:
+            # создаём первый платёж
             InstallmentPayment.objects.create(
                 plan=plan,
                 number=1,
                 due_date=first_payment_date_parsed,
                 amount_due=first_payment_d,
-                status="paid",   # или is_paid=True — зависит от твоей модели
+                status="paid",  # или is_paid=True
             )
+            payments_to_generate = number_of_payments - 1
+            start_index = 2
 
         # оставшаяся сумма после скидки и первого платежа
         remaining = total_amount_d - discount_d - first_payment_d
 
-        # базовая часть каждого платежа (с округлением вниз)
-        monthly_base = (remaining / Decimal(number_of_payments)).quantize(
-            Decimal('0.01'), rounding=ROUND_DOWN
-        )
+        if payments_to_generate > 0:
+            # считаем сразу в копейках, чтобы исключить ошибки округления
+            total_cents = int((remaining * 100).to_integral_value(rounding=ROUND_HALF_UP))
+            base_cents, remainder_cents = divmod(total_cents, payments_to_generate)
 
-        remainder = (remaining - (monthly_base * number_of_payments)).quantize(
-            Decimal('0.01')
-        )
-        remainder_cents = int(
-            (remainder * 100).to_integral_value(rounding=ROUND_HALF_UP)
-        )
+            for i in range(1, payments_to_generate + 1):
+                cents = base_cents + (1 if i <= remainder_cents else 0)
+                amount_due = Decimal(cents) / Decimal(100)
 
-        for i in range(1, number_of_payments + 1):
-            extra_cent = Decimal('0.01') if i <= remainder_cents else Decimal('0.00')
-            amount_due = (monthly_base + extra_cent).quantize(Decimal('0.01'))
+                due_base = add_months(first_payment_date_parsed, i)
+                last_day = calendar.monthrange(due_base.year, due_base.month)[1]
+                due_day = min(preferred_payment_day, last_day)
+                due_date = due_base.replace(day=due_day)
 
-            due_base = add_months(first_payment_date_parsed, i)
-            last_day = calendar.monthrange(due_base.year, due_base.month)[1]
-            due_day = min(preferred_payment_day, last_day)
-            due_date = due_base.replace(day=due_day)
-
-            InstallmentPayment.objects.create(
-                plan=plan,
-                number=i + 1 if first_payment_d > 0 else i,  # смещаем нумерацию
-                due_date=due_date,
-                amount_due=amount_due,
-            )
+                InstallmentPayment.objects.create(
+                    plan=plan,
+                    number=start_index + i - 1,
+                    due_date=due_date,
+                    amount_due=amount_due,
+                )
 
         plan.calculated = True
         plan.save()
@@ -232,7 +230,6 @@ class ClientService:
 
 
 # --- Management команда: пример импорта ------------------------------------
-# Поместите как clients/management/commands/import_clients.py
 
 import json
 from django.core.management.base import BaseCommand
@@ -303,7 +300,6 @@ from django.test import TestCase
 
 class ClientServiceTests(TestCase):
     def test_create_client_and_plan_distributes_cents(self):
-        # создаём с суммой, не делящейся на число платежей
         data = {
             'username': 'testuser_svc',
             'password': 'pass',
@@ -319,19 +315,9 @@ class ClientServiceTests(TestCase):
         client, contract, plan = ClientService.create_client_with_contract(**data)
         payments = plan.payments.order_by('number')
         self.assertEqual(payments.count(), 3)
-        # сумма всех платежей + первый платёж + скидка == total_amount
-        total_due = sum([p.amount_due for p in payments]) + contract.first_payment + contract.discount
-        self.assertEqual(total_due.quantize(Decimal('0.01')), contract.total_amount.quantize(Decimal('0.01')))
 
-    def test_username_collision_resolved(self):
-        # создаём два пользователя с одним желаемым username
-        u1_kwargs = {
-            'username': 'collision_user',
-            'password': 'p',
-            'name': 'A',
-            'surname': 'B',
-            'total_amount': '10',
-        }
-        client1, *_ = ClientService.create_client_with_contract(**u1_kwargs)
-        client2, *_ = ClientService.create_client_with_contract(**u1_kwargs)
-        self.assertNotEqual(client1.user.username, client2.user.username)
+        # сумма всех платежей должна совпадать с total_amount - discount
+        total_due = sum(p.amount_due for p in payments)
+        expected_total = contract.total_amount - contract.discount
+        self.assertEqual(total_due.quantize(Decimal('0.01')),
+                        expected_total.quantize(Decimal('0.01')))

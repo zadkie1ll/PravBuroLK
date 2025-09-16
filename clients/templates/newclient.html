@@ -1,191 +1,183 @@
+{% extends "base.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Личный кабинет</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
 
-    <!-- Хедер -->
-    <header class="bg-white shadow-md flex items-center justify-between px-4 py-3 md:px-6">
-        <!-- Логотип -->
-        <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
-                Л
-            </div>
-            <span class="text-lg font-bold text-gray-800 hidden sm:block">Личный кабинет</span>
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+<div class="relative min-h-screen w-full overflow-hidden bg-gray-50">
+
+  <!-- Фоновые картинки -->
+  <div class="absolute inset-0 pointer-events-none z-0">
+    <img src="{% static 'img/line2.svg' %}" alt="line2" class="absolute top-10 left-0 w-32 md:w-48">
+    <img src="{% static 'img/line3.svg' %}" alt="line3" class="absolute bottom-0 left-0 w-40 md:w-56">
+    <img src="{% static 'img/line4.svg' %}" alt="line4" class="absolute bottom-5 left-1/2 transform -translate-x-1/2 w-48 md:w-72">
+    <img src="{% static 'img/line5.svg' %}" alt="line5" class="absolute top-0 right-0 w-40 md:w-64">
+    <img src="{% static 'img/line7.svg' %}" alt="line7" class="absolute top-[700px] right-6 transform -translate-y-1/2 w-36 md:w-56">
+    <img src="{% static 'img/line8.svg' %}" alt="line8" class="absolute top-0 left-1/3 -translate-x-full w-[500px] md:w-[500px]">
+    <img src="{% static 'img/line9.svg' %}" alt="line9" class="absolute top-[500px] left-[500px] w-32 md:w-[400px]">
+  </div>
+  <!-- /Фоновые картинки -->
+
+  <!-- Контент -->
+  <div class="relative z-10 max-w-5xl w-full mx-auto space-y-16 py-12">
+
+    <!-- Блок приветствия -->
+    <section id="welcome" class="relative bg-white shadow-xl rounded-2xl p-8 mb-6">
+      <div class="absolute inset-0 rounded-2xl border-4 border-transparent pointer-events-none"
+           style="background: linear-gradient(to right, #3F8FE2, #6FABD6) border-box;
+                  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+                  -webkit-mask-composite: destination-out; mask-composite: exclude;">
+      </div>
+      <h1 class="relative text-2xl sm:text-3xl font-bold text-gray-800 mb-4">
+        Здравствуйте, {{ client_name }}
+      </h1>
+      <p class="relative text-gray-700 text-sm sm:text-base">
+        Прогресс по вашему делу:
+        <span class="font-semibold text-blue-700"> {{ progress_percent }}% </span>
+      </p>
+    </section>
+
+    <!-- Стадии работы -->
+    <section id="stages" class="relative bg-white shadow-xl rounded-2xl p-8">
+      <div class="absolute inset-0 rounded-2xl border-4 border-transparent pointer-events-none"
+           style="background: linear-gradient(to right, #3F8FE2, #6FABD6) border-box;
+                  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+                  -webkit-mask-composite: destination-out; mask-composite: exclude;">
+      </div>
+      <h2 class="relative text-2xl font-bold text-gray-800 mb-6">
+        Стадии работы над вашим делом
+      </h2>
+
+      <!-- SVG линии -->
+      <svg id="roadmap-lines" class="absolute top-0 left-0 w-full h-full pointer-events-none z-0"></svg>
+
+      <!-- Grid с этапами -->
+      <div id="roadmap" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-8 gap-y-16 relative z-10">
+        {% for stage in all_stages %}
+        <div class="stage relative flex flex-col items-center w-24 sm:w-28
+                    {% if forloop.last %} last-stage col-span-full justify-self-center {% endif %}"
+             style="transform: translateY({{ forloop.counter|divisibleby:2|yesno:'20px,-20px' }});">
+          <!-- Кружок -->
+          <div class="circle w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full text-white shadow-lg z-10
+                      {% if stage.id == current_stage_id %} bg-blue-600 ring-4 ring-blue-200
+                      {% elif stage.order < current_stage_order %} bg-green-600 ring-4 ring-green-200
+                      {% else %} bg-gray-300 {% endif %}">
+            {{ forloop.counter }}
+          </div>
+          <span class="mt-2 text-xs sm:text-sm text-center w-20 sm:w-24
+                       {% if stage.id == current_stage_id %} font-bold text-blue-600
+                       {% elif stage.order < current_stage_order %} text-green-700
+                       {% else %} text-gray-500 {% endif %}">
+            {{ stage.name }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- График платежей -->
+    <section id="installments" class="relative bg-white shadow-xl rounded-2xl p-8 mt-6">
+      <div class="absolute inset-0 rounded-2xl border-4 border-transparent pointer-events-none"
+           style="background: linear-gradient(to right, #3F8FE2, #6FABD6) border-box;
+                  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+                  -webkit-mask-composite: destination-out; mask-composite: exclude;">
+      </div>
+      <h2 class="relative text-2xl font-bold text-gray-800 mb-6">График платежей</h2>
+
+      {% if contract %}
+        <div class="bg-gray-50 p-4 rounded-lg shadow-sm text-sm text-gray-700 space-y-1 mb-6">
+          <p><strong>Сумма договора:</strong> {{ contract.total_amount }} ₽</p>
+          <p><strong>Первый платёж:</strong> {{ contract.first_payment }} ₽ ({{ contract.first_payment_date }})</p>
+          <p><strong>Всего платежей:</strong> {{ contract.number_of_payments }}</p>
         </div>
 
-        <!-- Кнопка бургера для мобилы -->
-        <button id="menu-toggle" class="md:hidden text-gray-700 focus:outline-none text-2xl">
-            ☰
-        </button>
-
-        <!-- Десктопное меню -->
-        <nav class="hidden md:flex space-x-6">
-            <a href="#" class="py-2 px-3 font-medium" style="color:#365C80;">Пункт 1</a>
-            <a href="#" class="py-2 px-3 font-medium" style="color:#365C80;">Пункт 2</a>
-            <a href="#" class="py-2 px-3 font-medium" style="color:#365C80;">Пункт 3</a>
-            <a href="#" class="py-2 px-3 font-medium" style="color:#365C80;">Пункт 4</a>
-        </nav>
-    </header>
-
-    <!-- Оверлей -->
-    <div id="overlay" class="fixed inset-0 bg-black bg-opacity-50 hidden z-40"></div>
-
-    <!-- Сайдбар для мобилы (выезжает справа) -->
-    <nav id="sidebar" class="fixed md:hidden top-0 right-0 h-full w-64 bg-white shadow-lg transform translate-x-full transition-transform duration-300 z-50">
-        
-        <!-- Шапка сайдбара -->
-        <div class="flex items-center justify-between px-4 py-3 border-b">
-            <span class="text-lg font-bold" style="color:#365C80;">Главная</span>
-            <!-- Кнопка закрытия -->
-            <button id="close-sidebar" class="text-gray-600 text-2xl">&larr;</button>
+        {% if installment_payments %}
+        <!-- Десктопная таблица -->
+        <div class="hidden md:block overflow-x-auto">
+          <table class="w-full text-sm text-left border rounded-lg">
+            <thead class="bg-blue-100 text-gray-700">
+              <tr>
+                <th class="px-3 py-2">#</th>
+                <th class="px-3 py-2">Срок</th>
+                <th class="px-3 py-2">Сумма</th>
+                <th class="px-3 py-2 text-center">Действие</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for payment in installment_payments %}
+              <tr class="border-b {% if payment.status == 'paid' %}bg-green-100{% endif %}">
+                <td class="px-3 py-2">{{ payment.number }}</td>
+                <td class="px-3 py-2">{{ payment.due_date|date:"d E Y" }}</td>
+                <td class="px-3 py-2">
+                  {{ payment.amount_paid }} / {{ payment.amount_due }} ₽
+                  {% if payment.status == 'overdue' %}
+                    <span class="ml-2 text-xs text-red-600 font-semibold">Просрочено</span>
+                  {% endif %}
+                </td>
+                <td class="px-3 py-2 text-center">
+                  <button class="px-3 py-1 rounded-lg text-white
+                                 {% if payment.status == 'paid' %}bg-gray-400 cursor-not-allowed
+                                 {% else %}bg-blue-600 hover:bg-blue-700{% endif %}"
+                          {% if payment.status == 'paid' %}disabled{% endif %}>
+                    {% if payment.status == 'paid' %}Оплачено{% else %}Оплатить{% endif %}
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
 
-        <ul class="flex flex-col p-6 space-y-4">
-            <li>
-                <a href="#" class="flex flex-col items-start px-3" style="color:#365C80;">
-                    <span class="flex items-center space-x-2">
-                        <span class="text-lg" style="color:#6FABD6;">➜</span>
-                        <span class="font-medium">Пункт 1</span>
-                    </span>
-                    <span class="mt-1 block h-px w-20 bg-[#2AABEE]"></span>
-                </a>
-            </li>
-            <li>
-                <a href="#" class="flex flex-col items-start px-3" style="color:#365C80;">
-                    <span class="flex items-center space-x-2">
-                        <span class="text-lg" style="color:#6FABD6;">➜</span>
-                        <span class="font-medium">Пункт 2</span>
-                    </span>
-                    <span class="mt-1 block h-px w-20 bg-[#2AABEE]"></span>
-                </a>
-            </li>
-            <li>
-                <a href="#" class="flex flex-col items-start px-3" style="color:#365C80;">
-                    <span class="flex items-center space-x-2">
-                        <span class="text-lg" style="color:#6FABD6;">➜</span>
-                        <span class="font-medium">Пункт 3</span>
-                    </span>
-                    <span class="mt-1 block h-px w-20 bg-[#2AABEE]"></span>
-                </a>
-            </li>
-            <li>
-                <a href="#" class="flex flex-col items-start px-3" style="color:#365C80;">
-                    <span class="flex items-center space-x-2">
-                        <span class="text-lg" style="color:#6FABD6;">➜</span>
-                        <span class="font-medium">Пункт 4</span>
-                    </span>
-                    <span class="mt-1 block h-px w-20 bg-[#2AABEE]"></span>
-                </a>
-            </li>
-        </ul>
-    </nav>
-
-    <!-- Контент -->
-    <main class="flex-1 flex items-center justify-center p-4">
-        <div class="bg-white shadow-xl rounded-2xl p-8 max-w-2xl w-full">
-            <h1 class="text-2xl font-bold text-gray-800 mb-4">Личный кабинет</h1>
-
-            <div class="space-y-4">
-                <div>
-                    <h2 class="text-lg text-gray-700">ФИО клиента:</h2>
-                    <p class="text-xl font-semibold text-blue-600">{{ client_name }}</p>
-                </div>
-
-                <div>
-                    <h2 class="text-lg text-gray-700">Текущая стадия:</h2>
-                    <p class="text-xl font-semibold text-green-600">{{ current_stage }}</p>
-                </div>
+        <!-- Мобильная версия -->
+        <div class="block md:hidden space-y-3">
+          {% for payment in installment_payments %}
+          <div class="border rounded-lg p-4 {% if payment.status == 'paid' %}bg-green-50{% endif %}">
+            <div class="flex justify-between items-center">
+              <div>
+                <p class="text-sm text-gray-500">Платёж №{{ payment.number }}</p>
+                <p class="text-sm text-gray-500">{{ payment.due_date|date:"d E Y" }}</p>
+                <p class="text-base font-semibold">
+                  {{ payment.amount_paid }} / {{ payment.amount_due }} ₽
+                  {% if payment.status == 'overdue' %}
+                    <span class="ml-2 text-xs text-red-600 font-semibold">Просрочено</span>
+                  {% endif %}
+                </p>
+              </div>
+              <div>
+                <button class="px-3 py-1 rounded-lg text-white text-sm
+                               {% if payment.status == 'paid' %}bg-gray-400 cursor-not-allowed
+                               {% else %}bg-blue-600 hover:bg-blue-700{% endif %}"
+                        {% if payment.status == 'paid' %}disabled{% endif %}>
+                  {% if payment.status == 'paid' %}Оплачено{% else %}Оплатить{% endif %}
+                </button>
+              </div>
             </div>
+          </div>
+          {% endfor %}
         </div>
-    </main>
+        {% else %}
+          <p class="text-sm text-gray-500 mt-4">План рассрочки ещё не рассчитан.</p>
+        {% endif %}
 
-    <script>
-        const toggleBtn = document.getElementById("menu-toggle");
-        const sidebar = document.getElementById("sidebar");
-        const overlay = document.getElementById("overlay");
-        const closeBtn = document.getElementById("close-sidebar");
+      {% else %}
+        <p class="text-sm text-gray-500 mt-4">У вас пока нет активного договора.</p>
+      {% endif %}
+    </section>
 
-        function openSidebar() {
-            sidebar.classList.remove("translate-x-full");
-            overlay.classList.remove("hidden");
-        }
+    <!-- Реферальная программа -->
+    <section id="referral" class="relative bg-white shadow-xl rounded-2xl p-8">
+      <div class="absolute inset-0 rounded-2xl border-4 border-transparent pointer-events-none"
+           style="background: linear-gradient(to right, #3F8FE2, #6FABD6) border-box;
+                  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+                  -webkit-mask-composite: destination-out; mask-composite: exclude;">
+      </div>
+      <h2 class="relative text-2xl font-bold text-gray-800 mb-6">Реферальная программа</h2>
+      <p class="relative text-gray-700">Здесь будет информация о вашей реферальной программе.</p>
+    </section>
 
-        function closeSidebar() {
-            sidebar.classList.add("translate-x-full");
-            overlay.classList.add("hidden");
-        }
+  </div>
+</div>
 
-        toggleBtn.addEventListener("click", openSidebar);
-        closeBtn.addEventListener("click", closeSidebar);
-        overlay.addEventListener("click", closeSidebar);
-    </script>
-
-    <!-- Футер -->
-    <footer class="bg-white shadow-inner mt-auto relative overflow-hidden">
-        <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8 relative z-10">
-            <!-- Верхняя часть: лого + меню -->
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-start">
-                <!-- Лого: скрываем на мобильных, показываем только на десктопе -->
-                <div class="hidden sm:flex flex-shrink-0 items-center justify-center mb-4 sm:mb-0">
-                    <div class="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-2xl">
-                        Л
-                    </div>
-                </div>
-
-                <!-- Меню футера -->
-                <!-- Десктоп: горизонтально -->
-                <nav class="hidden sm:flex space-x-6 ml-6 flex-1">
-                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 1</a>
-                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 2</a>
-                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 3</a>
-                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 4</a>
-                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 5</a>
-                    <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 6</a>
-                </nav>
-
-                <!-- Мобильная версия: три колонки -->
-                <div class="grid grid-cols-3 gap-2 w-full sm:hidden">
-                    <!-- 1-й столбец: логотип -->
-                    <div class="flex items-center justify-center">
-                        <div class="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-2xl">
-                            Л
-                        </div>
-                    </div>
-                    <!-- 2-й столбец: пункты меню -->
-                    <div class="flex flex-col justify-between">
-                        <a href="#" class="text-[#365C80] font-medium hover:underline mb-2">Пункт 1</a>
-                        <a href="#" class="text-[#365C80] font-medium hover:underline mb-2">Пункт 2</a>
-                        <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 3</a>
-                    </div>
-                    <!-- 3-й столбец: пункты меню -->
-                    <div class="flex flex-col justify-between">
-                        <a href="#" class="text-[#365C80] font-medium hover:underline mb-2">Пункт 4</a>
-                        <a href="#" class="text-[#365C80] font-medium hover:underline mb-2">Пункт 5</a>
-                        <a href="#" class="text-[#365C80] font-medium hover:underline">Пункт 6</a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Политика конфиденциальности -->
-            <div class="mt-6 text-center">
-                <a href="#" class="text-sm text-gray-500 hover:underline">Политика конфиденциальности</a>
-            </div>
-
-            <!-- ИНН и ОГРНИП под политикой -->
-            <div class="mt-2 text-center text-xs text-gray-500">
-                <span>ИП Коравчук Н.А. | ИНН 21312321312321312 | ОГРНИП</span>
-            </div>
-        </div>
-
-        <!-- Картинка lines_1.svg внизу и справа -->
-        <img src="{% static 'img/lines_1.svg' %}" alt="Декоративная линия"
-             class="absolute bottom-0 right-0 w-auto h-[80%] pointer-events-none z-0">
-    </footer>
-</body>
-</html>
+<script src="{% static 'js/stages.js' %}"></script>
+<script src="{% static 'js/installment.js' %}"></script>
+{% endblock %}

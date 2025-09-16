@@ -1,102 +1,84 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const stages = document.querySelectorAll("#roadmap .stage");
+  const roadmap = document.getElementById("roadmap");
   const svg = document.getElementById("roadmap-lines");
+  if (!roadmap || !svg) return;
 
-  if (!stages.length || !svg) return;
-
-  const drawLines = () => {
-    svg.innerHTML = ""; // очистка
-    const container = svg.getBoundingClientRect();
-    const isMobile = window.innerWidth < 640; // sm breakpoint
-
-    if (isMobile) {
-      // мобильная версия (прямая)
-      for (let i = 0; i < stages.length - 1; i++) {
-        const start = stages[i].querySelector(".circle").getBoundingClientRect();
-        const end = stages[i + 1].querySelector(".circle").getBoundingClientRect();
-
-        const x1 = start.left + start.width / 2 - container.left;
-        const y1 = start.top + start.height / 2 - container.top;
-        const x2 = end.left + end.width / 2 - container.left;
-        const y2 = end.top + end.height / 2 - container.top;
-
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", x1);
-        line.setAttribute("y1", y1);
-        line.setAttribute("x2", x2);
-        line.setAttribute("y2", y2);
-        line.setAttribute("stroke", "#9ca3af");
-        line.setAttribute("stroke-width", "3");
-
-        svg.appendChild(line);
-      }
+  function drawLines() {
+    const stages = Array.from(roadmap.querySelectorAll(".stage"));
+    if (!stages.length) {
+      svg.innerHTML = "";
       return;
     }
 
-    // десктопный зигзаг
-    const stagesArr = Array.from(stages);
-    const lastStage = stagesArr.find((s) => s.classList.contains("last-stage"));
+    svg.innerHTML = "";
+    const svgRect = svg.getBoundingClientRect();
+    svg.setAttribute("viewBox", `0 0 ${svgRect.width} ${svgRect.height}`);
+    svg.setAttribute("preserveAspectRatio", "none");
 
-    // исключаем последний из зигзага
-    const normalStages = lastStage
-      ? stagesArr.filter((s) => !s.classList.contains("last-stage"))
-      : stagesArr;
+    // собираем центры кругов
+    const centers = stages.map(el => {
+      const c = el.querySelector(".circle").getBoundingClientRect();
+      return {
+        x: c.left + c.width / 2 - svgRect.left,
+        y: c.top + c.height / 2 - svgRect.top
+      };
+    });
 
-    const cols = 4; // твоя md:grid-cols-4
-    let direction = "ltr";
-
-    for (let rowStart = 0; rowStart < normalStages.length; rowStart += cols) {
-      const rowStages = normalStages.slice(rowStart, rowStart + cols);
-
-      if (direction === "rtl") {
-        rowStages.reverse();
+    // группировка по строкам
+    const avgH = centers.reduce((s, p, _, arr) => s + p.y / arr.length, 0);
+    const rowTolerance = 40; // допуск по Y
+    const byY = centers.slice().sort((a, b) => a.y - b.y || a.x - b.x);
+    const rows = [];
+    byY.forEach(pt => {
+      const last = rows[rows.length - 1];
+      if (!last || Math.abs(pt.y - last[0].y) > rowTolerance) {
+        rows.push([pt]);
+      } else {
+        last.push(pt);
       }
+    });
+    rows.forEach(r => r.sort((a, b) => a.x - b.x));
 
-      for (let i = 0; i < rowStages.length - 1; i++) {
-        const start = rowStages[i].querySelector(".circle").getBoundingClientRect();
-        const end = rowStages[i + 1].querySelector(".circle").getBoundingClientRect();
+    // формируем змейку
+    const orderedPoints = [];
+    rows.forEach((row, i) => {
+      const use = (i % 2 === 0) ? row : row.slice().reverse();
+      orderedPoints.push(...use);
+    });
 
-        const x1 = start.left + start.width / 2 - container.left;
-        const y1 = start.top + start.height / 2 - container.top;
-        const x2 = end.left + end.width / 2 - container.left;
-        const y2 = end.top + end.height / 2 - container.top;
-
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", x1);
-        line.setAttribute("y1", y1);
-        line.setAttribute("x2", x2);
-        line.setAttribute("y2", y2);
-        line.setAttribute("stroke", "#9ca3af");
-        line.setAttribute("stroke-width", "3");
-
-        svg.appendChild(line);
+    // строим path простыми линиями
+    if (orderedPoints.length > 1) {
+      let d = `M ${orderedPoints[0].x} ${orderedPoints[0].y}`;
+      for (let i = 1; i < orderedPoints.length; i++) {
+        d += ` L ${orderedPoints[i].x} ${orderedPoints[i].y}`;
       }
-
-      direction = direction === "ltr" ? "rtl" : "ltr";
+      drawPath(d);
     }
+  }
 
-    // соединяем последний элемент только с предпоследним
-    if (lastStage) {
-      const prev = normalStages[normalStages.length - 1].querySelector(".circle").getBoundingClientRect();
-      const end = lastStage.querySelector(".circle").getBoundingClientRect();
+  function drawPath(d) {
+    const bg = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    bg.setAttribute("d", d);
+    bg.setAttribute("fill", "none");
+    bg.setAttribute("stroke", "rgba(0,0,0,0.1)");
+    bg.setAttribute("stroke-width", "12");
+    bg.setAttribute("stroke-linecap", "round");
+    svg.appendChild(bg);
 
-      const x1 = prev.left + prev.width / 2 - container.left;
-      const y1 = prev.top + prev.height / 2 - container.top;
-      const x2 = end.left + end.width / 2 - container.left;
-      const y2 = end.top + end.height / 2 - container.top;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "#64748b");
+    path.setAttribute("stroke-width", "4");
+    path.setAttribute("stroke-linecap", "round");
+    svg.appendChild(path);
+  }
 
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", x1);
-      line.setAttribute("y1", y1);
-      line.setAttribute("x2", x2);
-      line.setAttribute("y2", y2);
-      line.setAttribute("stroke", "#9ca3af");
-      line.setAttribute("stroke-width", "3");
+  setTimeout(drawLines, 50);
 
-      svg.appendChild(line);
-    }
-  };
-
-  drawLines();
-  window.addEventListener("resize", drawLines);
+  let t;
+  window.addEventListener("resize", () => {
+    clearTimeout(t);
+    t = setTimeout(drawLines, 150);
+  });
 });

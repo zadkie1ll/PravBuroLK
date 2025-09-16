@@ -95,7 +95,6 @@ class TestCreateClientView(View):
 
     def post(self, request):
         try:
-            # уникальный username с временным суффиксом
             unique_username = f"test_user_{int(time.time() * 1000)}"
 
             client, contract, plan = ClientService.create_client_with_contract(

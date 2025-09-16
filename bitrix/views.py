@@ -1,6 +1,12 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from clients.models import Client, Application
+import telebot
 
+
+BOT_TOKEN = "8208949436:AAEIzi6eP5R04crpwpIchWnpqCCFv8TROvY"
+CHAT_ID = "-4907127148"
+
+bot = telebot.TeleBot(BOT_TOKEN)
 
 def referral_landing(request, referral_code):
     """
@@ -15,9 +21,6 @@ def referral_landing(request, referral_code):
 
 
 def referral_submit(request):
-    """
-    Минимальная логика: создаём только заявку, остальное будет позже.
-    """
     if request.method == "POST":
         name = request.POST.get("name")
         phone = request.POST.get("phone")
@@ -34,10 +37,15 @@ def referral_submit(request):
             referral_owner=referral_owner
         )
 
-        # перенаправление на страницу успеха (можно сделать свою)
+        # отправка сообщения в Telegram через TeleBot
+        try:
+            text = f"📩 Новая заявка!\n\n👤 Имя: {name}\n📞 Телефон: {phone}"
+            bot.send_message(chat_id=CHAT_ID, text=text)
+        except Exception as e:
+            print("Ошибка при отправке в Telegram:", e)
+
         return redirect("application_success")
 
-    # если GET-запрос — просто редирект на главную
     return redirect("referral_landing_home")
 
 
