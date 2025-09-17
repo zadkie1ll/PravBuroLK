@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load rus_date %}
 
 {% block content %}
 <div class="relative bg-gray-50 text-gray-800 min-h-screen overflow-hidden" style="font-family: 'SF Pro Display', sans-serif;">
@@ -18,16 +19,21 @@
   <!-- Контент -->
   <div class="relative max-w-5xl mx-auto px-6 py-12 space-y-16">
 
-    <!-- Блок приветствия -->
-    <section id="welcome" class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 text-center space-y-4 mt-24">
-      <h1 class="text-3xl md:text-4xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
-        Здравствуйте, {{ client_name }}
-      </h1>
-      <p class="text-lg text-slate-600">
-        Прогресс по вашему делу: 
-        <span class="font-semibold text-blue-700">{{ progress_percent }}%</span>
-      </p>
-    </section>
+    <!-- Лого -->
+<div class="flex justify-center mt-8">
+  <img src="{% static 'img/logo1.svg' %}" alt="Логотип" class="w-56 h-auto">
+</div>
+
+<!-- Блок приветствия -->
+<section id="welcome" class="p-8 text-center space-y-4 mt-12">
+  <h1 class="text-3xl md:text-4xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
+    Здравствуйте, {{ client_name }}
+  </h1>
+  <p class="text-lg text-slate-600">
+    Прогресс по вашему делу:
+    <span class="font-semibold text-blue-700">{{ progress_percent }}%</span>
+  </p>
+</section>
 
 <!-- Стадии работы -->
 <section id="stages"
@@ -91,7 +97,7 @@
       {% if contract %}
         <div class="bg-white/70 p-4 rounded-lg shadow-sm text-sm text-gray-700 space-y-1">
           <p><strong>Сумма договора:</strong> {{ contract.total_amount }} ₽</p>
-          <p><strong>Первый платёж:</strong> {{ contract.first_payment }} ₽ ({{ contract.first_payment_date }})</p>
+          <p><strong>Первый платёж:</strong> {{ contract.first_payment }} ₽ ({{ contract.first_payment_date|rus_date  }})</p>
           <p><strong>Всего платежей:</strong> {{ contract.number_of_payments }}</p>
         </div>
 
@@ -111,7 +117,7 @@
               {% for payment in installment_payments %}
               <tr class="border-b {% if payment.status == 'paid' %}bg-green-50{% endif %}">
                 <td class="px-3 py-2">{{ payment.number }}</td>
-                <td class="px-3 py-2">{{ payment.due_date|date:"d E Y" }}</td>
+                <td class="px-3 py-2">{{ payment.due_date|rus_date }}</td>
                 <td class="px-3 py-2">
                   {{ payment.amount_paid }} / {{ payment.amount_due }} ₽
                   {% if payment.status == 'overdue' %}
@@ -139,7 +145,7 @@
             <div class="flex justify-between items-center">
               <div>
                 <p class="text-sm text-gray-500">Платёж №{{ payment.number }}</p>
-                <p class="text-sm text-gray-500">{{ payment.due_date|date:"d E Y" }}</p>
+                <p class="text-sm text-gray-500">{{ payment.due_date|rus_date }}</p>
                 <p class="text-base font-semibold">
                   {{ payment.amount_paid }} / {{ payment.amount_due }} ₽
                   {% if payment.status == 'overdue' %}
@@ -168,15 +174,67 @@
       {% endif %}
     </section>
 
-    <!-- Реферальная программа -->
-    <section id="referral" class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 space-y-4 text-center">
-      <h2 class="text-2xl md:text-3xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
-        Реферальная программа
-      </h2>
-      <p class="text-slate-600">
-        Здесь будет информация о вашей реферальной программе.
-      </p>
+ <!-- Реферальная программа -->
+    <section id="referral" class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 space-y-6 text-center">
+      <h1 class="text-3xl md:text-4xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
+        Помогайте и зарабатывайте!<br>Реферальная программа
+      </h1>
+
+      <p class="text-lg text-slate-600">
+  На этой странице вы найдёте краткое описание нашей реферальной программы и сможете сгенерировать персональную ссылку для приглашений.
+</p>
+<p class="text-slate-700 font-medium">
+  Все подробности о правилах, условиях и размере вознаграждений доступны в нашем Telegram-канале.
+</p>
+
+      <div class="flex justify-center">
+        <a href="{% url 'referral_page' %}"
+           class="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-green-400 to-blue-400 text-white rounded-full shadow hover:from-green-500 hover:to-blue-500 transition text-lg font-semibold">
+          Подробнее
+        </a>
+      </div>
     </section>
+
+    <!--Блок с чатом поддержки-->
+    <section class="space-y-8">
+      <div class="bg-gradient-to-tr from-white to-blue-100 rounded-2xl shadow-md p-8">
+        <div class="grid lg:grid-cols-2 gap-10 items-center">
+          <!-- Левая часть текста -->
+          <div class="space-y-6">
+            <h3 class="text-2xl md:text-3xl font-medium text-slate-700" style="font-family:'TT Norms',sans-serif;">
+              Хотите пообщаться с людьми, которые уже прошли процедуру банкротства, находятся в процессе или только думают над решением?
+            </h3>
+            <p class="text-lg md:text-xl text-slate-600 font-medium" style="font-family:'SF Pro Display',sans-serif;">
+              Вступайте в наш закрытый чат в Telegram и общайтесь.<br><br>
+              Также в нём состоят юристы, которые дают ответы на все вопросы.
+            </p>
+            <ul class="space-y-4 text-slate-700 font-semibold">
+              <li class="flex items-center gap-3">
+                <span class="w-4 h-4 bg-blue-300 rounded-full"></span> Новые знакомства.
+              </li>
+              <li class="flex items-center gap-3">
+                <span class="w-4 h-4 bg-blue-300 rounded-full"></span> Здесь люди, которые вас поймут и поддержат.
+              </li>
+              <li class="flex items-center gap-3">
+                <span class="w-4 h-4 bg-blue-300 rounded-full"></span> Получите ответы на свои вопросы.
+              </li>
+            </ul>
+            <a href="#"
+               class="inline-flex items-center justify-center px-8 py-4 border-2 border-blue-400 rounded-full text-xl text-slate-600 font-medium hover:bg-blue-50 transition">
+              Вступить в чат поддержки
+              <svg class="ml-3 w-6 h-6 text-blue-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M12 4l8 8-8 8M4 12h16"/>
+              </svg>
+            </a>
+          </div>
+          <!-- Правая часть — картинка -->
+          <div class="flex justify-center">
+            <img src="{% static 'img/tel.svg' %}" alt="chat" class="rounded-xl w-full max-w-sm">
+          </div>
+        </div>
+      </div>
+    </section>
+
 
   </div>
 </div>

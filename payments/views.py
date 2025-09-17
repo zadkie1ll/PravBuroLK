@@ -4,6 +4,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth.decorators import user_passes_test
 from decimal import Decimal
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.db import models
 from django.db.models.functions import Lower
@@ -17,7 +18,7 @@ from django.db.models.functions import Cast
 from django.db.models import CharField
 from django.db import connection
 
-
+@csrf_exempt
 def calculate_payments(num_payments, total_amount, discount, start_date, first_payment, second_payment_day):
     if num_payments == 1 and first_payment >= (total_amount - discount):
         return [[1, start_date, f"{first_payment:.2f}"]]
@@ -58,6 +59,7 @@ def calculate_payments(num_payments, total_amount, discount, start_date, first_p
 
     return table_data
 
+@csrf_exempt
 @login_required
 def client_admin_view(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
@@ -110,7 +112,7 @@ def client_admin_view(request, client_id):
         "other_payments": other_payments,
     })
 
-
+@csrf_exempt
 @require_POST
 def recalculate_installment(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
@@ -223,6 +225,7 @@ def recalculate_installment(request, client_id):
 
     return redirect("client_admin_view", client_id=client.id)
 
+@csrf_exempt
 @require_POST
 def update_custom_payments(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
@@ -272,7 +275,7 @@ def update_custom_payments(request, client_id):
         messages.success(request, "Платежи успешно обновлены.")
 
     return redirect("client_admin_view", client_id=client.id)
-
+@csrf_exempt
 def client_search_view(request):
     q = (request.GET.get('q') or '').strip().lower() 
 
@@ -294,12 +297,12 @@ def client_search_view(request):
         'results': results
     })
     
-    
+@csrf_exempt  
 @user_passes_test(lambda u: u.is_staff or u.is_superuser)
 def admin_dashboard(request):
     return render(request, 'admin_dashboard.html')
 
-
+@csrf_exempt
 @require_POST
 def add_actual_payment(request, client_id):
     client = get_object_or_404(Client, pk=client_id)

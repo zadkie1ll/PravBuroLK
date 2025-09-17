@@ -9,12 +9,8 @@ CHAT_ID = "-4907127148"
 bot = telebot.TeleBot(BOT_TOKEN)
 
 def referral_landing(request, referral_code):
-    """
-    Страница лендинга по реферальной ссылке.
-    """
     client = get_object_or_404(Client, referral_code=referral_code)
     
-    # Сохраняем в сессии ID реферера, чтобы потом связать заявку
     request.session["referral_client_id"] = client.id
 
     return render(request, "referral_landing.html", {"client": client})
@@ -30,14 +26,12 @@ def referral_submit(request):
         if ref_id:
             referral_owner = Client.objects.filter(id=ref_id).first()
 
-        # создаём заявку
         Application.objects.create(
             name=name,
             phone=phone,
             referral_owner=referral_owner
         )
 
-        # отправка сообщения в Telegram через TeleBot
         try:
             text = f"📩 Новая заявка!\n\n👤 Имя: {name}\n📞 Телефон: {phone}"
             bot.send_message(chat_id=CHAT_ID, text=text)

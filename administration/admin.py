@@ -33,7 +33,7 @@ class OtherPaymentInline(admin.TabularInline):
 class ClientAdmin(admin.ModelAdmin):
     list_display = ('id', 'surname', 'name', 'middlename', 'bitrix_id', 'user', 'stage', 'referral_code')
     search_fields = ('surname', 'name', 'middlename', 'bitrix_id', 'user__username', 'referral_code')
-    list_filter = ('bitrix_id', 'stage')  # добавляем фильтр по стадиям
+    list_filter = ('bitrix_id', 'stage') 
     ordering = ('surname', 'name')
     readonly_fields = ('referral_code', 'installment_payments_list')
     inlines = [ContractInline, OtherPaymentInline]
@@ -86,7 +86,6 @@ class InstallmentPaymentInline(admin.TabularInline):
 
 
 class PaymentApplicationInline(admin.TabularInline):
-    """Inline для отображения распределения платежей"""
     model = PaymentApplication
     extra = 0
     readonly_fields = ('applied_amount', 'created_at')

@@ -17,7 +17,7 @@ from clients.services import ClientService
 class CustomLoginView(LoginView):
     template_name = 'login.html'
 
-
+@csrf_exempt
 @login_required
 def client_dashboard(request):
     client = request.user.client
@@ -32,7 +32,6 @@ def client_dashboard(request):
             .prefetch_related("applications__actual_payment")
             .order_by("number")
         ):
-            # сколько реально оплатили по этому платежу
             applied_sum = sum(app.applied_amount for app in p.applications.all())
 
             if applied_sum >= p.amount_due:
@@ -75,14 +74,14 @@ def client_dashboard(request):
     }
     return render(request, "clientnew.html", context)
 
-
+@csrf_exempt
 def stage_detail(request, slug):
     stage = get_object_or_404(StageTemplate, slug=slug)
     return render(request, "stage_detail.html", {
         "stage": stage,
         "next_stage": stage.get_next()
     })
-
+@csrf_exempt
 @login_required
 def redirect_handler(request):
     if request.user.is_staff or request.user.is_superuser:
@@ -90,7 +89,7 @@ def redirect_handler(request):
     else:
         return redirect('client_dashboard')
 
-
+@csrf_exempt
 def referral_page(request):
     client = get_object_or_404(Client, user=request.user)
     return render(request, "referral.html", {"client": client})
