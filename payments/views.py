@@ -9,14 +9,22 @@ from django.views.decorators.http import require_POST
 from django.db import models
 from django.db.models.functions import Lower
 from django.db.models import Sum
+from django.views import View
+import time
 from clients.models import Client
+import requests
 from django.utils.timezone import now
+import json
+from django.utils.decorators import method_decorator
+from django.http import JsonResponse
 from django.db.models import Q
 from .models import Contract, InstallmentPlan, InstallmentPayment, ActualPayment, OtherPayment
 from django.contrib.auth.decorators import login_required
 from django.db.models.functions import Cast
 from django.db.models import CharField
 from django.db import connection
+import re
+from .utilities import get_deal_data_from_bitrix, russian_to_translit
 
 @csrf_exempt
 def calculate_payments(num_payments, total_amount, discount, start_date, first_payment, second_payment_day):
@@ -335,3 +343,158 @@ def add_actual_payment(request, client_id):
         messages.error(request, f"Ошибка при добавлении платежа: {e}")
 
     return redirect("client_admin_view", client_id=client.id)
+
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class BitrixWebhookCreateClientView(View):
+    
+    def post(self, request):
+        try:
+            post_data = request.POST.dict()
+
+            deal_data, error = get_deal_data_from_bitrix(post_data)
+            if error:
+                return JsonResponse({"error": error}, status=400)
+
+            # ------ Хелперы для парсинга ------
+            def safe_int(value, default=0):
+                """
+                Парсинг чисел из Bitrix:
+                - берет часть до '|' (например "20000|RUB" -> "20000")
+                - убирает незначащие пробелы и нецифровые символы (кроме разделителя дробной части)
+                - возвращает int (если дробная часть есть, приводим через float -> int)
+                """
+                if value is None:
+                    return default
+                s = str(value)
+                s = s.split("|")[0].strip()
+                if s == "":
+                    return default
+                s = s.replace("\u00A0", "").replace(" ", "")
+                m = re.search(r'-?\d+[\,\.\d]*', s)
+                if not m:
+                    try:
+                        return int(s)
+                    except Exception:
+                        return default
+                num = m.group(0).replace(',', '.')
+                try:
+                    return int(float(num))
+                except Exception:
+                    return default
+
+            def parse_bitrix_date(value):
+                """
+                Парсит даты вида:
+                  2025-09-01T03:00:00+03:00
+                Возвращает datetime.date или None.
+                """
+                if not value:
+                    return None
+                s = str(value).strip()
+                # если приходит уже просто yyyy-mm-dd
+                if "T" not in s and len(s) >= 10:
+                    try:
+                        return datetime.strptime(s[:10], "%Y-%m-%d").date()
+                    except Exception:
+                        pass
+                # попытка через fromisoformat (поддерживает +03:00)
+                try:
+                    return datetime.fromisoformat(s).date()
+                except Exception:
+                    pass
+                # fallback на явные форматы
+                for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S"):
+                    try:
+                        return datetime.strptime(s, fmt).date()
+                    except Exception:
+                        continue
+                return None
+
+            # ------ Маппинг полей Bitrix -> локальные переменные ------
+            # строки
+            first_name = (deal_data.get("UF_CRM_1754380684375") or "").strip()
+            last_name = (deal_data.get("UF_CRM_1754380678904") or "").strip()
+            middlename = (deal_data.get("UF_CRM_1754380692399") or "").strip()
+
+            # суммы / деньги (парсим через safe_int, как в старом коде)
+            total_amount = safe_int(deal_data.get("OPPORTUNITY"))
+            discount = safe_int(deal_data.get("UF_CRM_1742457148727"))
+            bonus = safe_int(deal_data.get("UF_CRM_1742457114242"))
+            first_payment = safe_int(deal_data.get("UF_CRM_1742468532579"))
+            number_of_payments = safe_int(deal_data.get("UF_CRM_1742480133860"))
+            preferred_payment_day = safe_int(deal_data.get("UF_CRM_1745893194511"))
+
+            # пример поля-даты из Bitrix (пример, который вы прислали)
+            some_date = parse_bitrix_date(deal_data.get("UF_CRM_1742468566169"))
+            # если нужно, можете логировать или передавать some_date в сервис (см. комментарий ниже)
+
+            # ------ Бизнес-логика суммы: скидка вычитается, бонус прибавляется ------
+            # (интеллигентно, чтобы не уйти в отрицательное значение)
+            total_with_bonus = int(max(total_amount - discount + bonus, 0))
+
+            # Генерация уникальных логина/пароля (как в вашем примере)
+            # --- Получаем контакт (для логина используем телефон) ---
+            external_id = deal_data.get("CONTACT_ID")
+            if not external_id:
+                return JsonResponse({"error": "External ID (CONTACT_ID) not found in deal data"}, status=400)
+
+            external_url = f"https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/crm.contact.get.json?ID={external_id}"
+            external_response = requests.get(external_url)
+            if external_response.status_code != 200:
+                return JsonResponse({"error": "Failed to fetch contact data from Bitrix"}, status=external_response.status_code)
+
+            try:
+                external_data = external_response.json()
+            except json.JSONDecodeError:
+                return JsonResponse({"error": "Invalid JSON response from Bitrix contact API"}, status=400)
+
+            username = external_data.get("result", {}).get("PHONE", [{}])[0].get("VALUE", None)
+            if not username:
+                return JsonResponse({"error": "Phone number not found in Bitrix contact"}, status=400)
+
+            # --- Генерация пароля: фамилия (транслитом) + текущий год ---
+            current_year = datetime.now().strftime("%Y")
+            password = str(russian_to_translit(last_name or "user") + current_year)
+
+            # ------ Передаем подготовленные значения в инкапсулированный сервис ------
+            # Обратите внимание: передаем те же параметры, что и раньше, но уже с распарсенными значениями.
+            from clients.services import ClientService
+            
+            client, contract, plan = ClientService.create_client_with_contract(
+                username=username,
+                password=password,
+                name=first_name,
+                surname=last_name,
+                middlename=middlename,
+                email="client@prav-buro.ru",
+                bitrix_id=str(deal_data.get("ID") or ""),
+                stage="1",
+                total_amount=total_with_bonus,
+                discount=discount,
+                first_payment=first_payment,
+                first_payment_date=parse_bitrix_date(deal_data.get("UF_CRM_1742468566169")),
+                number_of_payments=number_of_payments,
+                preferred_payment_day=preferred_payment_day,
+            )
+
+            # ---- (опционально) лог в Telegram как в старом коде ----
+            text = (
+                f"Новый клиент из Bitrix: {first_name} {middlename} {last_name}\n"
+                f"Логин: {username}\nПароль: {password}\n"
+                f"Сумма: {total_with_bonus} (сумма сделки={total_amount}, скидка={discount}, бонус={bonus})"
+            )
+            # Telegram_log(text)
+
+            return JsonResponse({
+                "client_id": client.id,
+                "contract_id": contract.id,
+                "plan_id": plan.id,
+                "username": client.user.username,
+                "bitrix_deal_id": deal_data.get("ID"),
+                "message": "Клиент успешно создан из Bitrix24"
+            })
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)

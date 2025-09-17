@@ -51,7 +51,6 @@ def client_dashboard(request):
                 "status": status,
             })
 
-    # стадии клиента
     current_stage = client.stage
     all_stages = StageTemplate.objects.all()
     total_stages = all_stages.count()
