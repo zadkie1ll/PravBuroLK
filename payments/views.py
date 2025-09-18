@@ -393,18 +393,15 @@ class BitrixWebhookCreateClientView(View):
                 if not value:
                     return None
                 s = str(value).strip()
-                # если приходит уже просто yyyy-mm-dd
                 if "T" not in s and len(s) >= 10:
                     try:
                         return datetime.strptime(s[:10], "%Y-%m-%d").date()
                     except Exception:
                         pass
-                # попытка через fromisoformat (поддерживает +03:00)
                 try:
                     return datetime.fromisoformat(s).date()
                 except Exception:
                     pass
-                # fallback на явные форматы
                 for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S"):
                     try:
                         return datetime.strptime(s, fmt).date()
@@ -426,16 +423,10 @@ class BitrixWebhookCreateClientView(View):
             number_of_payments = safe_int(deal_data.get("UF_CRM_1742480133860"))
             preferred_payment_day = safe_int(deal_data.get("UF_CRM_1745893194511"))
 
-            # пример поля-даты из Bitrix (пример, который вы прислали)
             some_date = parse_bitrix_date(deal_data.get("UF_CRM_1742468566169"))
-            # если нужно, можете логировать или передавать some_date в сервис (см. комментарий ниже)
 
-            # ------ Бизнес-логика суммы: скидка вычитается, бонус прибавляется ------
-            # (интеллигентно, чтобы не уйти в отрицательное значение)
             total_with_bonus = int(max(total_amount - discount + bonus, 0))
 
-            # Генерация уникальных логина/пароля (как в вашем примере)
-            # --- Получаем контакт (для логина используем телефон) ---
             external_id = deal_data.get("CONTACT_ID")
             if not external_id:
                 return JsonResponse({"error": "External ID (CONTACT_ID) not found in deal data"}, status=400)
@@ -454,12 +445,9 @@ class BitrixWebhookCreateClientView(View):
             if not username:
                 return JsonResponse({"error": "Phone number not found in Bitrix contact"}, status=400)
 
-            # --- Генерация пароля: фамилия (транслитом) + текущий год ---
             current_year = datetime.now().strftime("%Y")
             password = str(russian_to_translit(last_name or "user") + current_year)
 
-            # ------ Передаем подготовленные значения в инкапсулированный сервис ------
-            # Обратите внимание: передаем те же параметры, что и раньше, но уже с распарсенными значениями.
             from clients.services import ClientService
             
             client, contract, plan = ClientService.create_client_with_contract(
@@ -478,14 +466,12 @@ class BitrixWebhookCreateClientView(View):
                 number_of_payments=number_of_payments,
                 preferred_payment_day=preferred_payment_day,
             )
-
-            # ---- (опционально) лог в Telegram как в старом коде ----
+            # Логи в тг, нужно в последствии добавить, думаю на проде
             text = (
                 f"Новый клиент из Bitrix: {first_name} {middlename} {last_name}\n"
                 f"Логин: {username}\nПароль: {password}\n"
                 f"Сумма: {total_with_bonus} (сумма сделки={total_amount}, скидка={discount}, бонус={bonus})"
             )
-            # Telegram_log(text)
 
             return JsonResponse({
                 "client_id": client.id,

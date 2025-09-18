@@ -2,7 +2,6 @@ from django.db import models
 from django.utils import timezone
 
 
-
 class Contract(models.Model):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -64,36 +63,62 @@ class InstallmentPayment(models.Model):
 
 
 class ActualPayment(models.Model):
-    contract = models.ForeignKey(Contract, on_delete=models.CASCADE)
-    date = models.DateField(default=timezone.now)
+    plan = models.ForeignKey(
+        InstallmentPlan,
+        on_delete=models.CASCADE,
+        related_name="actual_payments",
+        blank=True,
+        null=True  # временно разрешаем NULL для миграции
+    )
+    payment_date = models.DateField(null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)  # сначала сохраняем платёж
+        super().save(*args, **kwargs)
+        self.apply_payment()
 
-        # распределяем сумму по ближайшим платежам рассрочки
-        plan = InstallmentPlan.objects.filter(contract=self.contract).first()
-        if not plan:
-            return
+    def apply_payment(self):
+        """
+        Распределяет платёж строго по порядку платежей (номер платежа),
+        игнорируя даты. Создаёт записи PaymentApplication.
+        """
+        if not self.plan:
+            return  # если нет плана, ничего не делаем
 
         remaining = self.amount
-        for payment in plan.payments.filter(status__in=['pending', 'partial']).order_by('due_date'):
+        payments = self.plan.payments.order_by("number")  # строго по номеру
+
+        for payment in payments:
             if remaining <= 0:
                 break
 
-            before = payment.amount_paid
-            remaining = payment.apply_payment(remaining)
-            applied = payment.amount_paid - before
+            to_pay = payment.amount_due - payment.amount_paid
+            if to_pay <= 0:
+                continue  # этот платёж уже закрыт
 
-            if applied > 0:
-                PaymentApplication.objects.create(
-                    payment=payment,
-                    actual_payment=self,
-                    applied_amount=applied
-                )
+            applied = min(remaining, to_pay)
 
-    def __str__(self):
-        return f"Факт. платёж {self.amount}₽ от {self.date}"
+            # фиксируем связь между фактическим платёжом и рассрочкой
+            PaymentApplication.objects.create(
+                payment=payment,
+                actual_payment=self,
+                applied_amount=applied,
+            )
+
+            # обновляем платёж по рассрочке
+            payment.amount_paid += applied
+            remaining -= applied
+
+            if payment.amount_paid >= payment.amount_due:
+                payment.status = "paid"
+                payment.amount_paid = payment.amount_due
+            else:
+                payment.status = "partial"
+
+            payment.save()
+
+        if remaining > 0:
+            print(f"⚠ Остаток {remaining} не распределён (все платежи закрыты)")
 
 
 class PaymentApplication(models.Model):
@@ -113,7 +138,8 @@ class PaymentApplication(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.applied_amount} ₽ → {self.payment} ({self.actual_payment.date})"
+        actual_date = getattr(self.actual_payment, 'payment_date', 'None')
+        return f"{self.applied_amount} ₽ → {self.payment} ({actual_date})"
 
 
 class OtherPayment(models.Model):

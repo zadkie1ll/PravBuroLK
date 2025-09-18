@@ -44,6 +44,16 @@ class Client(models.Model):
     stage = models.ForeignKey("StageTemplate", on_delete=models.SET_NULL, null=True, blank=True)
     referral_code = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     
+    # --- Метки показа попапа ---
+    need_stage_popup = models.BooleanField(
+        default=False,
+        help_text="Нужно ли показать попап при входе"
+    )
+    stage_popup_shown = models.BooleanField(
+        default=False,
+        help_text="Попап показан и закрыт пользователем"
+    )
+    
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -52,6 +62,16 @@ class Client(models.Model):
                 name='unique_bitrix_id_not_null'
             )
         ]
+    
+    def set_stage(self, new_stage: "StageTemplate"):
+        """
+        Перевод клиента на новую стадию
+        и сброс меток попапа.
+        """
+        self.stage = new_stage
+        self.need_stage_popup = True
+        self.stage_popup_shown = False
+        self.save(update_fields=['stage', 'need_stage_popup', 'stage_popup_shown'])
     
     def __str__(self):
         return f"{self.surname} {self.name} {self.middlename or ''}".strip()

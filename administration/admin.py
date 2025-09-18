@@ -119,10 +119,9 @@ class InstallmentPaymentAdmin(admin.ModelAdmin):
 
 @admin.register(ActualPayment)
 class ActualPaymentAdmin(admin.ModelAdmin):
-    list_display = ('id', 'contract', 'date', 'amount')
-    list_filter = ('date',)
-    ordering = ('-date',)
-    inlines = [PaymentApplicationInline]
+    list_display = ("id", "plan", "payment_date", "amount")  # ✅ заменил date → payment_date, contract → plan
+    ordering = ("-payment_date",)  # ✅ date → payment_date
+    list_filter = ("payment_date",)  # ✅ date → payment_date
 
 
 @admin.register(OtherPayment)

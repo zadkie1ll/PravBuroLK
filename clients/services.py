@@ -181,6 +181,7 @@ class ClientService:
             preferred_payment_day=preferred_payment_day,
         )
 
+        
        # --- Plan и расчёт платежей ------------------------------------------
         plan = InstallmentPlan.objects.create(contract=contract)
 
@@ -225,6 +226,15 @@ class ClientService:
 
         plan.calculated = True
         plan.save()
+        
+        # --- Теперь создаём ActualPayment ------------------------------------
+        if first_payment_d > 0:
+            ActualPayment = apps.get_model('payments', 'ActualPayment')
+            ActualPayment.objects.create(
+                plan=plan,  # привязываем к плану рассрочки
+                payment_date=first_payment_date_parsed,
+                amount=first_payment_d,
+            )
 
         return client, contract, plan
 
