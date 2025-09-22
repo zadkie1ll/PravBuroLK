@@ -14,6 +14,7 @@ from clients.models import (
     StageTemplate,
     ReferralClick,
     Application,
+    Employee,
 )
 
 
@@ -31,9 +32,14 @@ class OtherPaymentInline(admin.TabularInline):
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ('id', 'surname', 'name', 'middlename', 'bitrix_id', 'user', 'stage', 'referral_code')
+    list_display = (
+        'id', 'surname', 'name', 'middlename', 'bitrix_id', 'user',
+        'stage', 'referral_code',
+        'need_stage_popup',       # ➡️ добавляем в список
+        'stage_popup_shown',      # ➡️ добавляем в список
+    )
     search_fields = ('surname', 'name', 'middlename', 'bitrix_id', 'user__username', 'referral_code')
-    list_filter = ('bitrix_id', 'stage') 
+    list_filter = ('bitrix_id', 'stage')
     ordering = ('surname', 'name')
     readonly_fields = ('referral_code', 'installment_payments_list')
     inlines = [ContractInline, OtherPaymentInline]
@@ -41,7 +47,10 @@ class ClientAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {
             "fields": (
-                'surname', 'name', 'middlename', 'bitrix_id', 'user', 'stage', 'referral_code'
+                'surname', 'name', 'middlename', 'bitrix_id', 'user',
+                'stage', 'referral_code',
+                'need_stage_popup',      # ➡️ добавляем в форму
+                'stage_popup_shown',     # ➡️ добавляем в форму
             ),
         }),
         ("Платежи по рассрочке", {
@@ -50,7 +59,6 @@ class ClientAdmin(admin.ModelAdmin):
     )
 
     def installment_payments_list(self, obj):
-        """Кастомный блок для просмотра всех платежей клиента по рассрочке"""
         payments = InstallmentPayment.objects.filter(plan__contract__client=obj).select_related("plan")
         if not payments.exists():
             return "Нет платежей"
@@ -69,7 +77,7 @@ class ClientAdmin(admin.ModelAdmin):
 
 @admin.register(StageTemplate)
 class StageTemplateAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'slug', 'order', 'short_description')
+    list_display = ('id', 'name', 'slug', 'order', 'description')
     ordering = ('order',)
     search_fields = ('name', 'slug', 'description')
 
@@ -134,17 +142,24 @@ class OtherPaymentAdmin(admin.ModelAdmin):
 
 # --- Новые модели реферальной системы ---
 
-@admin.register(ReferralClick)
-class ReferralClickAdmin(admin.ModelAdmin):
-    list_display = ('id', 'client', 'ip_address', 'user_agent', 'timestamp')
-    list_filter = ('timestamp',)
-    search_fields = ('client__surname', 'client__bitrix_id', 'ip_address')
-    ordering = ('-timestamp',)
+# @admin.register(ReferralClick)
+# class ReferralClickAdmin(admin.ModelAdmin):
+#     list_display = ('id', 'client', 'ip_address', 'user_agent', 'timestamp')
+#     list_filter = ('timestamp',)
+#     search_fields = ('client__surname', 'client__bitrix_id', 'ip_address')
+#     ordering = ('-timestamp',)
 
 
-@admin.register(Application)
-class ApplicationAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'phone', 'client', 'referral_owner', 'created_at')
-    list_filter = ('created_at',)
-    search_fields = ('name', 'phone', 'client__surname', 'referral_owner__surname')
-    ordering = ('-created_at',)
+# @admin.register(Application)
+# class ApplicationAdmin(admin.ModelAdmin):
+#     list_display = ('id', 'name', 'phone', 'client', 'referral_owner', 'created_at')
+#     list_filter = ('created_at',)
+#     search_fields = ('name', 'phone', 'client__surname', 'referral_owner__surname')
+#     ordering = ('-created_at',)
+    
+@admin.register(Employee)
+class EmployeeAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "bitrix_id", "referral_code", "updated_at")
+    search_fields = ("name", "bitrix_id", "referral_code")
+    readonly_fields = ("referral_code", "updated_at")
+    ordering = ("name",)

@@ -3,7 +3,28 @@ from django.db import models
 import uuid
 from django.utils.text import slugify
 from django.db.models import Q
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
+
+
+class Employee(models.Model):
+    bitrix_id = models.CharField(max_length=255, unique=True) 
+    name = models.CharField(max_length=255)                     
+    referral_code = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def get_ref_link(self, request=None):
+        from django.urls import reverse
+        path = reverse("referral_landing", args=[str(self.referral_code)])
+        return request.build_absolute_uri(path) if request else path
 
 
 class StageTemplate(models.Model):
@@ -11,6 +32,7 @@ class StageTemplate(models.Model):
     order = models.PositiveIntegerField(default=0)
     slug = models.SlugField(max_length=100, unique=True, blank=True, null=True)
     description = models.TextField(blank=True, null=True)  # описание стадии
+    youtube_url = models.URLField(blank=True, null=True, help_text="Ссылка на видео YouTube")  # 👈 новое поле
 
     class Meta:
         ordering = ['order']
@@ -84,39 +106,34 @@ class Client(models.Model):
             return self.stage.get_next()
         return StageTemplate.objects.order_by('order').first()
 
-    # 👉 метод для ссылки
     def get_ref_link(self, request=None):
         from django.urls import reverse
         path = reverse("referral_landing", args=[str(self.referral_code)])
         return request.build_absolute_uri(path) if request else path
     
-    
-    # --- Статистика переходов по ссылке ---
+
 class ReferralClick(models.Model):
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="ref_clicks")
+    owner_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    owner_object_id = models.PositiveIntegerField(null=True, blank=True)
+    owner = GenericForeignKey("owner_content_type", "owner_object_id")
+
     ip_address = models.GenericIPAddressField(blank=True, null=True)
     user_agent = models.TextField(blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return f"Переход к {self.client} с {self.ip_address}"
+    class Meta:
+        unique_together = ("owner_content_type", "owner_object_id", "ip_address")   
 
 
-# --- Полноценная заявка ---
 class Application(models.Model):
-    client = models.ForeignKey(Client, on_delete=models.SET_NULL, null=True, blank=True)
+    client = models.ForeignKey("Client", on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=20)
     created_at = models.DateTimeField(auto_now_add=True)
-    
-    # если заявка пришла по рефералу
-    referral_owner = models.ForeignKey(
-        Client, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        related_name="applications_from_referral"
-    )
+
+    referral_owner_content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True)
+    referral_owner_object_id = models.PositiveIntegerField(null=True, blank=True)
+    referral_owner = GenericForeignKey("referral_owner_content_type", "referral_owner_object_id")
 
     def __str__(self):
         return f"Заявка {self.name} ({self.phone})"

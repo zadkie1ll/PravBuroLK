@@ -2,6 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
+from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from clients.models import Client, StageTemplate
 from django.contrib.auth.views import LoginView
@@ -11,6 +12,18 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from django.views import View
 from clients.services import ClientService
+from .models import Employee
+
+
+
+
+def employee_referral_view(request, employee_id):
+    employee = get_object_or_404(Employee, id=employee_id)
+    ref_link = employee.get_ref_link(request)  # генерируем тут
+    return render(request, "employee_referral.html", {
+        "employee": employee,
+        "ref_link": ref_link,
+    })
 
 
 
@@ -24,6 +37,11 @@ def client_dashboard(request):
 
     contract = Contract.objects.filter(client=client).first()
     installment_plan = InstallmentPlan.objects.filter(contract=contract).first() if contract else None
+
+    # 👉 сумма договора с учётом скидки
+    contract_final_amount = None
+    if contract:
+        contract_final_amount = contract.total_amount - contract.discount
 
     installment_payments = []
     if installment_plan:
@@ -59,17 +77,24 @@ def client_dashboard(request):
     passed_count = passed_stages.count() + (1 if current_stage else 0)
     progress_percent = int((passed_count / total_stages) * 100) if total_stages > 0 else 0
 
+    embed_url = None
+    if current_stage and current_stage.youtube_url:
+        embed_url = current_stage.youtube_url.replace("watch?v=", "embed/")
+
     context = {
         "client_name": str(client),
-        "current_stage": current_stage.name if current_stage else "Не определена",
+        "current_stage": current_stage,
         "current_stage_id": current_stage.id if current_stage else None,
         "current_stage_order": current_stage.order if current_stage else 0,
         "all_stages": all_stages,
         "passed_stages": passed_stages,
         "contract": contract,
+        "contract_final_amount": contract_final_amount,  # 👈 добавили
         "installment_plan": installment_plan,
         "installment_payments": installment_payments,
         "progress_percent": progress_percent,
+        "show_stage_popup": client.need_stage_popup and not client.stage_popup_shown,
+        "embed_url": embed_url,
     }
     return render(request, "clientnew.html", context)
 
@@ -87,6 +112,17 @@ def redirect_handler(request):
         return redirect('admin_dashboard')  
     else:
         return redirect('client_dashboard')
+    
+    
+@require_POST
+@login_required
+def mark_stage_popup_shown(request):
+    client = request.user.client
+    client.stage_popup_shown = True
+    client.need_stage_popup = False
+    client.save(update_fields=['stage_popup_shown', 'need_stage_popup'])
+    return JsonResponse({"status": "ok"})
+
 
 @csrf_exempt
 def referral_page(request):

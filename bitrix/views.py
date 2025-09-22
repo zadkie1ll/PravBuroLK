@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from clients.models import Client, Application
+from clients.models import Client, Application, Employee
 import telebot
 
 
@@ -8,12 +8,32 @@ CHAT_ID = "-4907127148"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-def referral_landing(request, referral_code):
-    client = get_object_or_404(Client, referral_code=referral_code)
-    
-    request.session["referral_client_id"] = client.id
 
-    return render(request, "referral_landing.html", {"client": client})
+def referral_landing(request, referral_code):
+    """
+    Общая реферальная страница:
+    - если referral_code принадлежит Client → сохраняем referral_client_id
+    - если referral_code принадлежит Employee → сохраняем referral_employee_id
+    """
+
+    client = Client.objects.filter(referral_code=referral_code).first()
+    employee = None
+
+    if client:
+        request.session["referral_client_id"] = client.id
+    else:
+        employee = Employee.objects.filter(referral_code=referral_code).first()
+        if employee:
+            request.session["referral_employee_id"] = employee.id
+        else:
+            # если вообще нет такого кода → 404
+            from django.http import Http404
+            raise Http404("Referral not found")
+
+    return render(request, "referral_landing.html", {
+        "client": client,
+        "employee": employee,
+    })
 
 
 def referral_submit(request):

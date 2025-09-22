@@ -23,44 +23,19 @@
       <img src="{% static 'img/logo1.svg' %}" alt="Логотип" class="w-56 h-auto">
     </div>
 
-    <!-- Блок 1 — Telegram канал -->
-    <section class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 space-y-6 text-center">
-      <h1 class="text-3xl md:text-4xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
-        Помогайте и зарабатывайте!<br>Реферальная программа
-      </h1>
-
-      <p class="text-lg text-slate-600">
-        Теперь вы можете не только сами избавиться от долгов, но и помочь своим близким, друзьям и коллегам сделать то же самое — и при этом заработать!
-      </p>
-      <p class="text-lg text-slate-600">
-        Расскажите о нас тем, кто также нуждается в нашей помощи, и получайте вознаграждение за каждого, кто заключит с нами договор.
-      </p>
-      <p class="text-slate-700 font-medium">
-        Подробнее о программе, условиях и размере выплат можно почитать в нашем Telegram-канале
-      </p>
-
-      <div class="flex justify-center">
-        <a href="https://t.me/yourchannel" target="_blank"
-           class="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-green-400 to-blue-400 text-white rounded-full shadow hover:from-green-500 hover:to-blue-500 transition text-lg font-semibold">
-          <img src="{% static 'img/Telegram.svg' %}" alt="TG" class="w-7 h-7">
-          Перейти в канал
-        </a>
-      </div>
-    </section>
-
-    <!-- Блок 2 — Генератор реферальной ссылки -->
+    <!-- Блок 1 — Генератор реферальной ссылки -->
     <section class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 space-y-6 text-center">
       <h2 class="text-2xl md:text-3xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
-        Генератор реферальной ссылки
+        Ваша персональная реферальная ссылка
       </h2>
 
       <p class="text-slate-600">
-        Ваша персональная ссылка для приглашений:
+        Сотрудник: <span class="font-semibold">{{ employee.name }}</span>
       </p>
 
       <!-- Кнопка генерации -->
       <button id="generateLinkBtn"
-              data-link="{% url 'referral_landing' referral_code=client.referral_code %}"
+              data-link="{% url 'referral_landing' referral_code=employee.referral_code %}"
               class="px-6 py-3 bg-gradient-to-r from-green-400 to-blue-400 text-white text-lg rounded-xl shadow hover:from-green-500 hover:to-blue-500 transition">
         Сгенерировать ссылку
       </button>
@@ -77,11 +52,19 @@
       </div>
 
       <p class="text-sm text-slate-500">
-        Скопируйте её и делитесь в соцсетях, мессенджерах или отправляйте напрямую тем, кому нужна помощь с долгами.
+        Скопируйте её и делитесь с клиентами в мессенджерах, соцсетях или лично.
       </p>
-      <p class="text-sm text-slate-500">
-        Совет: можно публиковать её в постах, стори или даже в чатах — так вы увеличите шансы, что кто-то воспользуется вашей рекомендацией.
-      </p>
+    </section>
+
+    <!-- Блок 2 — Статистика -->
+    <section class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 space-y-6">
+      <h2 class="text-2xl md:text-3xl font-bold text-slate-700 text-center" style="font-family: 'TT Norms Medium', sans-serif;">
+        Статистика по вашей ссылке
+      </h2>
+
+      <div class="text-center text-slate-600">
+        <p>🔹 Здесь позже будет блок статистики переходов и регистраций.</p>
+      </div>
     </section>
 
   </div>

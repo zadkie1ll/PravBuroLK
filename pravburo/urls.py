@@ -16,7 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from clients.views import client_dashboard, redirect_handler, referral_page
+from clients.views import client_dashboard, redirect_handler, referral_page, mark_stage_popup_shown, employee_referral_view
 from clients.views import CustomLoginView, TestCreateClientView, stage_detail
 from django.contrib.auth.views import LogoutView
 from payments.views import client_admin_view, recalculate_installment, update_custom_payments, client_search_view, BitrixWebhookCreateClientView, admin_dashboard
@@ -27,11 +27,13 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path("ref/<uuid:referral_code>/", referral_landing, name="referral_landing"),
     path('ref/success/', application_success, name='application_success'),
+    path("employee/<int:employee_id>/referral/", employee_referral_view, name="employee_referral"),
     path("referral", referral_page, name="referral_page"),
     path("bitrix/webhook/create-client/", BitrixWebhookCreateClientView.as_view(), name="bitrix_create_client"),
     path("ref/submit/", referral_submit, name="referral_submit"),
     path('dashboard/', client_dashboard, name='client_dashboard'),
     path('', redirect_handler, name='index'),
+    path("mark-stage-popup-shown/", mark_stage_popup_shown, name="mark_stage_popup_shown"),
     path('stages/<slug:slug>/', stage_detail, name='stage_detail'),
     path('accounts/login/', CustomLoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),

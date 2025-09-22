@@ -69,7 +69,16 @@
                   {% else %}
                     bg-gradient-to-r from-green-400 to-blue-400
                   {% endif %}">
-          <span class="text-xl sm:text-2xl">★</span>
+          
+          {% if stage.order < current_stage_order %}
+            <!-- Галочка для пройденных стадий -->
+            <span class="text-xl sm:text-2xl font-bold">✓</span>
+          {% else %}
+            <!-- Жирный круг для текущей и будущих -->
+            <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="8" />
+            </svg>
+          {% endif %}
         </a>
 
         <!-- Название стадии -->
@@ -88,6 +97,8 @@
     {% endfor %}
   </div>
 </section>
+
+
     <!-- График платежей -->
     <section id="installments" class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 space-y-6">
       <h2 class="text-2xl md:text-3xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
@@ -96,13 +107,12 @@
 
       {% if contract %}
         <div class="bg-white/70 p-4 rounded-lg shadow-sm text-sm text-gray-700 space-y-1">
-          <p><strong>Сумма договора:</strong> {{ contract.total_amount }} ₽</p>
+          <p><strong>Сумма договора:</strong> {{ contract_final_amount }} ₽</p>
           <p><strong>Первый платёж:</strong> {{ contract.first_payment }} ₽ ({{ contract.first_payment_date|rus_date  }})</p>
           <p><strong>Всего платежей:</strong> {{ contract.number_of_payments }}</p>
         </div>
 
         {% if installment_payments %}
-        <!-- Таблица (десктоп) -->
         <div class="hidden md:block overflow-x-auto">
           <table class="w-full text-sm text-left border rounded-lg shadow bg-white/80">
             <thead class="bg-blue-100 text-gray-700">
@@ -138,7 +148,6 @@
           </table>
         </div>
 
-        <!-- Мобильная версия -->
         <div class="block md:hidden space-y-3">
           {% for payment in installment_payments %}
           <div class="border rounded-lg p-4 shadow bg-white/80 {% if payment.status == 'paid' %}bg-green-50{% endif %}">
@@ -174,7 +183,6 @@
       {% endif %}
     </section>
 
- <!-- Реферальная программа -->
     <section id="referral" class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 space-y-6 text-center">
       <h1 class="text-3xl md:text-4xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
         Помогайте и зарабатывайте!<br>Реферальная программа

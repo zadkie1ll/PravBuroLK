@@ -198,7 +198,144 @@
   </ul>
 </nav>
 
+
+
+
+{% if show_stage_popup %}
+<!-- Модальное окно стадий -->
+<div id="stage-popup" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" style="font-family: 'SF Pro Display', sans-serif;">
+  <div class="relative w-full max-w-3xl max-h-[90vh] bg-gradient-to-tr from-white to-blue-100 text-slate-700 rounded-2xl shadow-2xl animate-fade-in overflow-y-auto">
+    
+    <!-- Кнопка закрытия -->
+    <button id="close-popup-btn" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-3xl leading-none z-10">
+      &times;
+    </button>
+
+    <div class="p-8 space-y-6 flex flex-col items-center text-center">
+      
+      <!-- Поздравление -->
+      <h2 class="text-2xl md:text-3xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
+        🎉 Поздравляем с переходом на следующую стадию!
+      </h2>
+
+      <!-- Название стадии + кнопка -->
+      <div class="flex flex-wrap justify-center items-center gap-3">
+        <p class="text-2xl md:text-3xl font-bold text-slate-700"
+           style="text-shadow: 0 0 10px rgba(56,189,248,0.6), 0 0 20px rgba(56,189,248,0.4);">
+          {{ current_stage.name }}
+        </p>
+        {% if current_stage.slug %}
+        <a href="{% url 'stage_detail' current_stage.slug %}"
+           id="stage-detail-btn"
+           class="px-4 py-2 bg-gradient-to-r from-green-400 to-blue-400 text-white text-sm md:text-base rounded-full shadow hover:from-green-500 hover:to-blue-500 transition font-semibold">
+          Подробнее про стадию
+        </a>
+        {% endif %}
+      </div>
+
+      <!-- Видео -->
+      {% if embed_url %}
+      <div class="w-full max-w-2xl h-[45vh] bg-black rounded-lg shadow-md overflow-hidden">
+        <iframe id="stage-video" src="{{ embed_url }}?autoplay=0&rel=0"
+          frameborder="0"
+          allow="autoplay; encrypted-media"
+          allowfullscreen
+          class="w-full h-full"></iframe>
+      </div>
+      {% endif %}
+
+      <!-- Реферальная программа -->
+      <div class="w-full flex flex-col sm:flex-row justify-between items-center mt-6 gap-3 text-left">
+        <p class="text-sm text-slate-600">
+          Зарабатывайте вместе с нами! Приглашайте друзей и получайте бонусы.
+        </p>
+        <a href="{% url 'referral_page' %}"
+           id="referral-btn"
+           class="px-4 py-2 bg-gradient-to-r from-green-400 to-blue-400 text-white text-sm md:text-base rounded-full shadow hover:from-green-500 hover:to-blue-500 transition font-semibold">
+          Подробнее
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const popup = document.getElementById("stage-popup");
+  const closeBtn = document.getElementById("close-popup-btn");
+  const stageBtn = document.getElementById("stage-detail-btn");
+  const referralBtn = document.getElementById("referral-btn");
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== "") {
+      const cookies = document.cookie.split(";");
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + "=")) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  const csrftoken = getCookie("csrftoken");
+
+  function markPopupShown(action, callback) {
+    fetch("{% url 'mark_stage_popup_shown' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrftoken,
+      },
+      body: JSON.stringify({ action: action })
+    })
+    .then(resp => resp.json())
+    .then(data => {
+      console.log("Ответ сервера:", data);
+      if (callback) callback();
+    })
+    .catch(err => {
+      console.error("Ошибка:", err);
+      if (callback) callback();
+    });
+  }
+
+  if (popup && closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      popup.style.display = "none";
+      console.log("✅ Попап закрыт");
+      markPopupShown("close");
+    });
+  }
+
+  if (stageBtn) {
+    stageBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      console.log("➡ Переход по кнопке стадии");
+      markPopupShown("stage_button", () => {
+        window.location.href = stageBtn.href;
+      });
+    });
+  }
+
+  if (referralBtn) {
+    referralBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      console.log("➡ Переход по кнопке рефералки");
+      markPopupShown("referral_button", () => {
+        window.location.href = referralBtn.href;
+      });
+    });
+  }
+});
+</script>
+
   <!-- Скрипты -->
+  <script src="{% static 'js/show_popup.js' %}"></script>
   <script src="{% static 'js/base.js' %}" defer></script>
 </body>
 </html>
