@@ -1,0 +1,57 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Статистика посещений ЛК</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <!-- Шапка -->
+    <header class="bg-white shadow p-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <h1 class="text-2xl font-bold text-gray-800">Статистика</h1>
+            <div class="flex items-center gap-4">
+                <a href="{% url 'admin_dashboard' %}" 
+                   class="px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-full shadow hover:from-blue-500 hover:to-blue-700 transition text-sm font-semibold">
+                    Назад в меню
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Контент -->
+    <main class="flex-1 max-w-7xl mx-auto p-6">
+        <div class="bg-white p-8 rounded-lg shadow">
+            <h2 class="text-xl font-semibold mb-6">Общая статистика по посещениям</h2>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div class="p-6 bg-gray-50 border border-gray-200 rounded-xl shadow text-center">
+                    <p class="text-gray-500 mb-2">Сегодня</p>
+                    <p class="text-3xl font-bold">{{ stats.today }}</p>
+                </div>
+                <div class="p-6 bg-gray-50 border border-gray-200 rounded-xl shadow text-center">
+                    <p class="text-gray-500 mb-2">Неделя</p>
+                    <p class="text-3xl font-bold">{{ stats.week }}</p>
+                </div>
+                <div class="p-6 bg-gray-50 border border-gray-200 rounded-xl shadow text-center">
+                    <p class="text-gray-500 mb-2">Месяц</p>
+                    <p class="text-3xl font-bold">{{ stats.month }}</p>
+                </div>
+                <div class="p-6 bg-gray-50 border border-gray-200 rounded-xl shadow text-center">
+                    <p class="text-gray-500 mb-2">Всё время</p>
+                    <p class="text-3xl font-bold">{{ stats.all_time }}</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Подвал -->
+    <footer class="bg-white shadow p-4 text-center text-gray-500 text-sm">
+        © {{ now|date:"Y" }} CRM
+    </footer>
+
+</body>
+</html>

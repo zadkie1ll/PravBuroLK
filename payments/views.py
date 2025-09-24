@@ -9,10 +9,13 @@ from django.views.decorators.http import require_POST
 from django.db import models
 from django.db.models.functions import Lower
 from django.db.models import Sum
+from django.utils import timezone
 from django.views import View
+from datetime import date, timedelta
 import time
 from clients.models import Client
 import requests
+from django.core.paginator import Paginator
 from django.utils.timezone import now
 import json
 from django.utils.decorators import method_decorator
@@ -25,6 +28,7 @@ from django.db.models import CharField
 from django.db import connection
 import re
 from .utilities import get_deal_data_from_bitrix, russian_to_translit
+
 
 @csrf_exempt
 def calculate_payments(num_payments, total_amount, discount, start_date, first_payment, second_payment_day):
@@ -67,23 +71,79 @@ def calculate_payments(num_payments, total_amount, discount, start_date, first_p
 
     return table_data
 
+
+
+
+def payments_dashboard(request):
+    """Статистика фактических платежей и список последних с ФИО клиента"""
+    today = timezone.now().date()
+
+    # Диапазоны дат
+    start_of_week = today - timedelta(days=today.weekday())
+    start_of_month = today.replace(day=1)
+    start_of_year = today.replace(month=1, day=1)
+
+    def total_amount(qs):
+        return qs.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+
+    stats = {
+        "day": total_amount(ActualPayment.objects.filter(payment_date=today)),
+        "week": total_amount(ActualPayment.objects.filter(payment_date__gte=start_of_week)),
+        "month": total_amount(ActualPayment.objects.filter(payment_date__gte=start_of_month)),
+        "year": total_amount(ActualPayment.objects.filter(payment_date__gte=start_of_year)),
+    }
+
+    # Последние платежи с подгрузкой клиента через contract
+    payments_qs = (
+        ActualPayment.objects
+        .select_related("plan__contract__client")  # <-- правильная цепочка
+        .order_by("-payment_date", "-id")
+    )
+
+    paginator = Paginator(payments_qs, 10)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(
+        request,
+        "payments_stats.html",
+        {
+            "stats": stats,
+            "page_obj": page_obj,
+        },
+    )
+
+
 @csrf_exempt
 @login_required
 def client_admin_view(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
+
+    # Получаем контракт клиента
     contract = Contract.objects.filter(client=client).first()
+
+    # Рассрочка по контракту
     plan = InstallmentPlan.objects.filter(contract=contract).first() if contract else None
+
+    # Платежи по рассрочке
     payments = plan.payments.all() if plan else []
 
+    # Сумма уже оплаченная по рассрочке (по amount_due, т.е. что должно было быть оплачено)
     paid_sum = (
         plan.payments.filter(status='paid').aggregate(total=Sum('amount_due'))['total']
         if plan else 0
     )
 
-    actual_payments = ActualPayment.objects.filter(contract=contract)
+    # Фактические платежи (правильно через plan__contract)
+    actual_payments = ActualPayment.objects.filter(plan__contract=contract) if contract else []
+
+    # Прочие платежи (депозиты, публикации и т.п.)
     other_payments = client.other_payments.all()
+
+    # Сумма, которую должен оплатить клиент (с учётом скидки)
     expected_total = contract.total_amount - contract.discount if contract else 0
 
+    # Собираем данные по каждому платежу рассрочки
     payments_data = []
     for p in payments:
         applications = p.applications.all()
@@ -94,6 +154,7 @@ def client_admin_view(request, client_id):
             "total_paid": total_paid,
         })
 
+    # POST-запрос → обновление данных клиента и контракта
     if request.method == "POST":
         client.name = request.POST.get("name", client.name)
         client.surname = request.POST.get("surname", client.surname)
@@ -113,7 +174,7 @@ def client_admin_view(request, client_id):
         "client": client,
         "contract": contract,
         "plan": plan,
-        "payments_data": payments_data,   
+        "payments_data": payments_data,
         "actual_payments": actual_payments,
         "paid_sum": paid_sum,
         "expected_total": expected_total,

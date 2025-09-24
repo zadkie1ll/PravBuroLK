@@ -1,0 +1,141 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель | Статистика рефералок</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <!-- Шапка -->
+    <header class="bg-white shadow p-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <h1 class="text-2xl font-bold text-gray-800">Статистика</h1>
+            <div class="flex items-center gap-4">
+                <a href="{% url 'admin_dashboard' %}" 
+                   class="px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-full shadow hover:from-blue-500 hover:to-blue-700 transition text-sm font-semibold">
+                    Назад в меню
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Контент -->
+    <main class="flex-1 max-w-7xl mx-auto p-6 w-full">
+        <div class="bg-white p-8 rounded-lg shadow">
+
+            <h2 class="text-2xl font-bold mb-6">📊 Статистика по реферальным ссылкам</h2>
+
+            <!-- Фильтры и сортировка -->
+            <div class="flex flex-wrap items-center gap-4 mb-6">
+                <!-- Фильтры -->
+                <div class="space-x-2">
+                    <a href="?filter=all&sort={{ sort }}"
+                       class="px-4 py-2 rounded-lg font-medium transition
+                              {% if filter == 'all' %}
+                                bg-blue-600 text-white shadow
+                              {% else %}
+                                bg-gray-200 text-gray-700 hover:bg-gray-300
+                              {% endif %}">
+                        Все
+                    </a>
+                    <a href="?filter=clients&sort={{ sort }}"
+                       class="px-4 py-2 rounded-lg font-medium transition
+                              {% if filter == 'clients' %}
+                                bg-blue-600 text-white shadow
+                              {% else %}
+                                bg-gray-200 text-gray-700 hover:bg-gray-300
+                              {% endif %}">
+                        Клиенты
+                    </a>
+                    <a href="?filter=employees&sort={{ sort }}"
+                       class="px-4 py-2 rounded-lg font-medium transition
+                              {% if filter == 'employees' %}
+                                bg-blue-600 text-white shadow
+                              {% else %}
+                                bg-gray-200 text-gray-700 hover:bg-gray-300
+                              {% endif %}">
+                        Сотрудники
+                    </a>
+                </div>
+
+                <!-- Сортировка -->
+                <div class="ml-auto">
+                    <label for="sort" class="mr-2 font-medium">Сортировать по:</label>
+                    <select id="sort" class="border rounded-lg px-3 py-2 bg-white shadow-sm"
+                            onchange="location = '?filter={{ filter }}&sort=' + this.value;">
+                        <option value="applications" {% if sort == "applications" %}selected{% endif %}>Заявкам</option>
+                        <option value="clicks" {% if sort == "clicks" %}selected{% endif %}>Кликам</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Таблица -->
+            <div class="overflow-x-auto bg-white rounded-xl shadow">
+                <table class="min-w-full text-left border-collapse">
+                    <thead class="bg-gray-100 text-gray-700 text-sm uppercase tracking-wider">
+                        <tr>
+                            <th class="p-3">Тип</th>
+                            <th class="p-3">Имя</th>
+                            <th class="p-3">Реферальная ссылка</th>
+                            <th class="p-3 text-center">Клики</th>
+                            <th class="p-3 text-center">Заявки</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for row in stats %}
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="p-3 font-medium text-gray-600">{{ row.type }}</td>
+                            <td class="p-3">{{ row.name }}</td>
+                            <td class="p-3">
+                                <button onclick="copyToClipboard('{{ row.ref_link }}', this)"
+                                        class="px-3 py-1 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition text-sm">
+                                    Скопировать
+                                </button>
+                            </td>
+                            <td class="p-3 text-center font-semibold">{{ row.clicks }}</td>
+                            <td class="p-3 text-center font-semibold">{{ row.applications }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="p-6 text-center text-gray-500">
+                                Нет данных для отображения
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Подвал -->
+    <footer class="bg-white shadow p-4 text-center text-gray-500 text-sm">
+        © {{ now|date:"Y" }} CRM
+    </footer>
+
+    <!-- Toast уведомление -->
+    <div id="toast"
+         class="hidden fixed bottom-6 right-6 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg">
+      ✅ Ссылка скопирована!
+    </div>
+
+    <script>
+    function copyToClipboard(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById("toast");
+        toast.classList.remove("hidden");
+        btn.textContent = "Скопировано!";
+        setTimeout(() => {
+          toast.classList.add("hidden");
+          btn.textContent = "Скопировать";
+        }, 2000);
+      }).catch(err => {
+        alert("Ошибка копирования: " + err);
+      });
+    }
+    </script>
+</body>
+</html>

@@ -65,6 +65,17 @@ DATABASES = {
 }
 
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'bd',
+#         'USER': 'admin',
+#         'PASSWORD': 'Werty2345!',
+#         'HOST': '127.0.0.1',
+#         'PORT': '5432',
+#     }
+# }
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -85,7 +96,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'client_dashboard'  # куда перенаправить после логина
+LOGIN_REDIRECT_URL = '/'  # куда перенаправить после логина
 LOGOUT_REDIRECT_URL = 'login'           # куда перенаправить после выхода
 
 # Internationalization

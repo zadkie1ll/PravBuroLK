@@ -1,0 +1,119 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель — Фактические платежи</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+    <!-- Шапка -->
+    <header class="bg-white shadow p-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <h1 class="text-2xl font-bold text-gray-800">Статистика посещений ЛК</h1>
+            <div class="flex items-center gap-4">
+                <a href="{% url 'admin_dashboard' %}" 
+                   class="px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-full shadow hover:from-blue-500 hover:to-blue-700 transition text-sm font-semibold">
+                    Назад в меню
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Контент -->
+    <main class="flex-1 max-w-7xl mx-auto p-6">
+        <div class="bg-white p-8 rounded-lg shadow">
+            <h2 class="text-2xl font-semibold mb-8 text-gray-800">📊 Статистика фактических платежей</h2>
+
+            <!-- Карточки статистики -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                <div class="bg-gradient-to-tr from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 text-center shadow">
+                    <p class="text-sm text-gray-500 mb-1">Сегодня</p>
+                    <p class="text-2xl font-bold text-gray-800">{{ stats.day }} ₽</p>
+                </div>
+                <div class="bg-gradient-to-tr from-green-50 to-green-100 border border-green-200 rounded-xl p-6 text-center shadow">
+                    <p class="text-sm text-gray-500 mb-1">Неделя</p>
+                    <p class="text-2xl font-bold text-gray-800">{{ stats.week }} ₽</p>
+                </div>
+                <div class="bg-gradient-to-tr from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-6 text-center shadow">
+                    <p class="text-sm text-gray-500 mb-1">Месяц</p>
+                    <p class="text-2xl font-bold text-gray-800">{{ stats.month }} ₽</p>
+                </div>
+                <div class="bg-gradient-to-tr from-orange-50 to-orange-100 border border-orange-200 rounded-xl p-6 text-center shadow">
+                    <p class="text-sm text-gray-500 mb-1">Год</p>
+                    <p class="text-2xl font-bold text-gray-800">{{ stats.year }} ₽</p>
+                </div>
+            </div>
+
+            <!-- Таблица последних платежей -->
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">🧾 Последние платежи</h3>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 border rounded-lg shadow">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Дата</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">Сумма</th>
+                            <th class="px-4 py-3 text-left text-sm font-semibold text-gray-600">План</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for p in page_obj %}
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="px-4 py-3 text-sm text-gray-700">{{ p.payment_date|date:"d.m.Y" }}</td>
+                                <td class="px-4 py-3 text-sm font-medium text-gray-800">{{ p.amount }} ₽</td>
+                                <td class="px-4 py-3 text-sm text-gray-700">
+                                    {% if p.plan and p.plan.contract and p.plan.contract.client %}
+                                        {{ p.plan.contract.client.surname }} {{ p.plan.contract.client.name }}{% if p.plan.contract.client.middlename %} {{ p.plan.contract.client.middlename }}{% endif %}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="px-4 py-4 text-center text-gray-500">Нет фактических платежей</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Пагинация -->
+            {% if page_obj.paginator.num_pages > 1 %}
+            <div class="flex justify-between items-center mt-6">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}"
+                       class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition text-sm">
+                       « Предыдущая
+                    </a>
+                {% else %}
+                    <span class="px-4 py-2 text-gray-400 text-sm">« Предыдущая</span>
+                {% endif %}
+
+                <span class="text-sm text-gray-600">
+                    Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}
+                </span>
+
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}"
+                       class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition text-sm">
+                       Следующая »
+                    </a>
+                {% else %}
+                    <span class="px-4 py-2 text-gray-400 text-sm">Следующая »</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- Подвал -->
+    <footer class="bg-white shadow p-4 text-center text-gray-500 text-sm">
+        © {{ now|date:"Y" }} CRM
+    </footer>
+
+</body>
+</html>

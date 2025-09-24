@@ -4,6 +4,7 @@ import uuid
 from django.utils.text import slugify
 from django.db.models import Q
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
 
 
@@ -123,6 +124,31 @@ class ReferralClick(models.Model):
 
     class Meta:
         unique_together = ("owner_content_type", "owner_object_id", "ip_address")   
+
+
+class DashboardVisit(models.Model):
+    owner_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
+    owner_object_id = models.PositiveIntegerField(null=True, blank=True)
+    owner = GenericForeignKey("owner_content_type", "owner_object_id")
+
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True, null=True)
+    visits = models.JSONField(default=list)  # массив визитов
+
+    class Meta:
+        unique_together = ("owner_content_type", "owner_object_id", "ip_address")
+        ordering = ["-id"]
+
+    def add_visit(self):
+        self.visits.append(timezone.now().isoformat())
+        self.save()
+
+    @property
+    def visits_count(self):
+        return len(self.visits)
+
+    def __str__(self):
+        return f"{self.owner} - {self.ip_address} ({len(self.visits)} visits)"
 
 
 class Application(models.Model):

@@ -52,30 +52,39 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
   <!-- Хедер -->
-  <header class="bg-white shadow-md flex items-center justify-between px-4 py-3 md:px-6 fixed top-0 w-full z-50">
-    <div class="flex items-center space-x-3">
-      <!-- Лого -->
-      <img src="{% static 'img/logo.svg' %}" alt="Logo" class="h-16 w-auto">
+<header class="bg-white shadow-md flex items-center justify-between px-4 py-3 md:px-6 fixed top-0 w-full z-50">
+  <div class="flex items-center space-x-3">
+    <!-- Лого -->
+    <img src="{% static 'img/logo.svg' %}" alt="Logo" class="h-16 w-auto">
 
-      <!-- Текст рядом с логотипом -->
-      <span class="text-lg text-gray-800 hidden sm:block menu-text">
-        Личный кабинет
-      </span>
-    </div>
+    <!-- Текст рядом с логотипом -->
+    <span class="text-lg text-gray-800 hidden sm:block menu-text">
+      Личный кабинет
+    </span>
+  </div>
 
-    <!-- Кнопка бургера -->
-    <button id="menu-toggle" class="md:hidden text-gray-700 focus:outline-none text-2xl">
-      ☰
-    </button>
+  <!-- Кнопка бургера -->
+  <button id="menu-toggle" class="md:hidden text-gray-700 focus:outline-none text-2xl">
+    ☰
+  </button>
 
-    <!-- Десктопное меню -->
-    <nav class="hidden md:flex space-x-6">
-      <a href="{% url 'client_dashboard' %}#stages" class="py-2 px-3 font-medium text-[#365C80]">Стадии</a>
-      <a href="{% url 'client_dashboard' %}#contract" class="py-2 px-3 font-medium text-[#365C80]">Договор</a>
-      <a href="{% url 'client_dashboard' %}#installment" class="py-2 px-3 font-medium text-[#365C80]">Рассрочка</a>
-      <a href="{% url 'client_dashboard' %}#referral" class="py-2 px-3 font-medium text-[#365C80]">Реферальная программа</a>
-    </nav>
-  </header>
+  <!-- Десктопное меню -->
+  <nav class="hidden md:flex items-center space-x-6">
+    <a href="{% url 'client_dashboard' %}#stages" class="py-2 px-3 font-medium text-[#365C80]">Стадии</a>
+    <a href="{% url 'client_dashboard' %}#contract" class="py-2 px-3 font-medium text-[#365C80]">Договор</a>
+    <a href="{% url 'client_dashboard' %}#installment" class="py-2 px-3 font-medium text-[#365C80]">Рассрочка</a>
+    <a href="{% url 'client_dashboard' %}#referral" class="py-2 px-3 font-medium text-[#365C80]">Реферальная программа</a>
+
+    <!-- Кнопка выхода (десктоп) -->
+<form method="post" action="{% url 'logout' %}">
+  {% csrf_token %}
+  <button type="submit"
+          class="ml-4 px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-full shadow hover:from-blue-500 hover:to-blue-700 transition text-sm font-semibold">
+    Сменить аккаунт
+  </button>
+</form>
+  </nav>
+</header>
 
   <!-- Контент -->
   <main class="flex-1 p-4 relative z-10">
@@ -195,6 +204,15 @@
     <li><a href="{% url 'client_dashboard' %}#contract" class="px-3 text-[#365C80]">➜ Договор</a></li>
     <li><a href="{% url 'client_dashboard' %}#installment" class="px-3 text-[#365C80]">➜ Рассрочка</a></li>
     <li><a href="{% url 'client_dashboard' %}#referral" class="px-3 text-[#365C80]">➜ Реферальная программа</a></li>
+    <li>
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button type="submit"
+              class="ml-4 px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-full shadow hover:from-blue-500 hover:to-blue-700 transition text-sm font-semibold">
+        Сменить аккаунт
+      </button>
+    </form>
+    </li>
   </ul>
 </nav>
 
