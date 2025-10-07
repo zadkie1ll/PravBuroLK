@@ -46,32 +46,35 @@ def get_client_ip(request):
 @login_required
 def client_dashboard(request):
     client = request.user.client
+
+    # --- Логирование посещения дашборда ---
     content_type = ContentType.objects.get_for_model(client)
-    ip_address = get_client_ip(request)
+    ip_address = request.META.get('REMOTE_ADDR')
     user_agent = request.META.get('HTTP_USER_AGENT', '')
 
-    visit_obj, created = DashboardVisit.objects.get_or_create(
+    visit, _ = DashboardVisit.objects.get_or_create(
         owner_content_type=content_type,
         owner_object_id=client.id,
         ip_address=ip_address,
-        defaults={"user_agent": user_agent}
+        defaults={'user_agent': user_agent},
     )
-    visit_obj.add_visit()
+    visit.add_visit()
 
+    # --- Контракт и рассрочка ---
     contract = Contract.objects.filter(client=client).first()
-    installment_plan = InstallmentPlan.objects.filter(contract=contract).first() if contract else None
+    installment_plan = (
+        InstallmentPlan.objects.filter(contract=contract).first()
+        if contract else None
+    )
 
     contract_final_amount = None
     if contract:
         contract_final_amount = contract.total_amount - contract.discount
 
+    # --- Платежи по рассрочке ---
     installment_payments = []
     if installment_plan:
-        for p in (
-            installment_plan.payments
-            .prefetch_related("applications__actual_payment")
-            .order_by("number")
-        ):
+        for p in installment_plan.payments.prefetch_related("applications__actual_payment").order_by("number"):
             applied_sum = sum(app.applied_amount for app in p.applications.all())
 
             if applied_sum >= p.amount_due:
@@ -91,33 +94,48 @@ def client_dashboard(request):
                 "status": status,
             })
 
+    # --- Стадии работы ---
+    all_stages = StageTemplate.objects.all().order_by("order")
     current_stage = client.stage
-    all_stages = StageTemplate.objects.all()
-    total_stages = all_stages.count()
+    stages_data = []
 
-    passed_stages = StageTemplate.objects.filter(order__lt=current_stage.order) if current_stage else StageTemplate.objects.none()
-    passed_count = passed_stages.count() + (1 if current_stage else 0)
-    progress_percent = int((passed_count / total_stages) * 100) if total_stages > 0 else 0
+    for stage in all_stages:
+        if current_stage and stage.order < current_stage.order:
+            status = "done"
+        elif current_stage and stage.id == current_stage.id:
+            status = "current"
+        else:
+            status = "future"
 
+        stages_data.append({
+            "id": stage.id,
+            "order": stage.order,
+            "name": stage.name,
+            "status": status,
+        })
+
+    # --- Прогресс по стадиям ---
+    total_stages = len(all_stages)
+    passed_stages = sum(1 for s in stages_data if s["status"] in ("done", "current"))
+    progress_percent = int((passed_stages / total_stages) * 100) if total_stages > 0 else 0
+
+    # --- Видео стадии (если есть YouTube ссылка) ---
     embed_url = None
     if current_stage and current_stage.youtube_url:
         embed_url = current_stage.youtube_url.replace("watch?v=", "embed/")
 
+    # --- Контекст для шаблона ---
     context = {
-        "client_name": str(client),
-        "current_stage": current_stage,
-        "current_stage_id": current_stage.id if current_stage else None,
-        "current_stage_order": current_stage.order if current_stage else 0,
-        "all_stages": all_stages,
-        "passed_stages": passed_stages,
+        "client": client,
         "contract": contract,
         "contract_final_amount": contract_final_amount,
         "installment_plan": installment_plan,
         "installment_payments": installment_payments,
+        "stages": stages_data,
         "progress_percent": progress_percent,
-        "show_stage_popup": client.need_stage_popup and not client.stage_popup_shown,
         "embed_url": embed_url,
     }
+
     return render(request, "clientnew.html", context)
 
 @csrf_exempt
@@ -227,6 +245,4 @@ class CustomLogoutView(DjangoLogoutView):
         else:
             self.next_page = 'client_dashboard'
 
-        # 2️⃣ вызываем обычный dispatch,
-        #     который уже внутри post() сделает auth_logout()
         return super().dispatch(request, *args, **kwargs)

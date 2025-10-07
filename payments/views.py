@@ -311,7 +311,9 @@ def update_custom_payments(request, client_id):
     for payment in plan.payments.all():  
         amount_field = f"amount_{payment.id}"
         status_field = f"status_{payment.id}"
+        due_date_field = f"due_date_{payment.id}"
 
+        # --- Сумма платежа ---
         new_amount_str = request.POST.get(amount_field)
         if new_amount_str is not None:
             try:
@@ -325,11 +327,21 @@ def update_custom_payments(request, client_id):
         else:
             total_amount_due += payment.amount_due
 
+        # --- Статус платежа ---
         new_status = request.POST.get(status_field)
         if new_status in dict(InstallmentPayment.STATUS_CHOICES):
             payment.status = new_status
         else:
             errors.append(f"Неверный статус для платежа #{payment.number}")
+
+        # --- Дата платежа ---
+        new_due_date_str = request.POST.get(due_date_field)
+        if new_due_date_str:
+            try:
+                new_due_date = datetime.strptime(new_due_date_str, "%Y-%m-%d").date()
+                payment.due_date = new_due_date
+            except Exception:
+                errors.append(f"Некорректная дата для платежа #{payment.number}")
 
         payment.save()
 
@@ -344,6 +356,8 @@ def update_custom_payments(request, client_id):
         messages.success(request, "Платежи успешно обновлены.")
 
     return redirect("client_admin_view", client_id=client.id)
+
+
 @csrf_exempt
 def client_search_view(request):
     q = (request.GET.get('q') or '').strip().lower() 

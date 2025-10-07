@@ -23,64 +23,56 @@
 
     <!-- Контракт -->
     {% if contract %}
-      <section class="bg-white rounded-2xl shadow p-6">
-        <h2 class="text-xl font-semibold mb-4">📄 Контракт</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <p><span class="font-medium">Сумма:</span> {{ contract.total_amount }} ₽</p>
-          <p><span class="font-medium">Скидка:</span> {{ contract.discount }} ₽</p>
-          <p><span class="font-medium">Первый платеж:</span> {{ contract.first_payment }} ₽ ({{ contract.first_payment_date }})</p>
-          <p><span class="font-medium">Кол-во платежей:</span> {{ contract.number_of_payments }}</p>
-        </div>
-      </section>
-
-      <!-- Перерасчёт рассрочки -->
-      <section class="bg-white rounded-2xl shadow p-6">
-        <h3 class="text-lg font-medium mb-4">🔄 Перерасчёт рассрочки</h3>
-        <form method="post" action="{% url 'recalculate_installment' client.id %}" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {% csrf_token %}
-          <div>
-            <label class="block text-sm font-medium">Дата первого платежа</label>
-            <input type="date" name="first_payment_date" value="{{ contract.first_payment_date|date:'Y-m-d' }}" class="mt-1 block w-full border rounded-lg p-2">
-          </div>
-          <div>
-            <label class="block text-sm font-medium">Первый платёж (₽)</label>
-            <input type="number" name="first_payment" value="{{ contract.first_payment|stringformat:'f' }}" step="0.01" class="mt-1 block w-full border rounded-lg p-2">
-          </div>
-          <div>
-            <label class="block text-sm font-medium">Общая сумма (₽)</label>
-            <input type="hidden" id="base-amount" value="{{ contract.total_amount|stringformat:'f' }}">
-            <input type="number" name="total_amount" value="{{ contract.total_amount|stringformat:'f' }}" step="0.01"
-                   class="mt-1 block w-full border rounded-lg p-2" id="total-amount">
-          </div>
-          <div>
-            <label class="block text-sm font-medium">Скидка (₽)</label>
-            <input type="number" name="discount" value="{{ contract.discount|stringformat:'f' }}" step="0.01" class="mt-1 block w-full border rounded-lg p-2">
-          </div>
-          <div>
-            <label class="block text-sm font-medium">Кол-во платежей</label>
-            <input type="number" name="number_of_payments" value="{{ contract.number_of_payments }}" class="mt-1 block w-full border rounded-lg p-2">
-          </div>
-          <div>
-            <label class="block text-sm font-medium">День месяца платежей</label>
-            <input type="number" name="second_payment_day" value="{{ contract.preferred_payment_day|default_if_none:15 }}" min="1" max="28" class="mt-1 block w-full border rounded-lg p-2">
-          </div>
-          <div class="col-span-3 space-y-2">
-            <label class="inline-flex items-center">
-              <input type="checkbox" name="deposit" class="form-checkbox h-5 w-5 text-blue-600" {% if contract.deposit %}checked{% endif %}>
-              <span class="ml-2">Депозит (+25,000 ₽)</span>
-            </label>
-            <label class="inline-flex items-center">
-              <input type="checkbox" name="publication" class="form-checkbox h-5 w-5 text-blue-600" {% if contract.publication %}checked{% endif %}>
-              <span class="ml-2">Публикация (+16,500 ₽)</span>
-            </label>
-          </div>
-          <div class="col-span-3">
-            <button type="submit" class="px-5 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 shadow">
-              Перерасчитать
-            </button>
-          </div>
-        </form>
-      </section>
+  <!-- Перерасчёт рассрочки -->
+  <section class="bg-white rounded-2xl shadow p-6">
+    <h3 class="text-lg font-medium mb-4">🔄 Перерасчёт рассрочки</h3>
+    <form method="post" action="{% url 'recalculate_installment' client.id %}" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-sm font-medium">Дата первого платежа</label>
+        <input type="date" name="first_payment_date" value="{{ contract.first_payment_date|date:'Y-m-d' }}" class="mt-1 block w-full border rounded-lg p-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Первый платёж (₽)</label>
+        <input type="number" name="first_payment" value="{{ contract.first_payment|stringformat:'f' }}"
+               step="0.01" class="mt-1 block w-full border rounded-lg p-2 bg-gray-100 cursor-not-allowed" readonly>
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Общая сумма (₽)</label>
+        <input type="hidden" id="base-amount" value="{{ contract.total_amount|stringformat:'f' }}">
+        <input type="number" name="total_amount" value="{{ contract.total_amount|stringformat:'f' }}" step="0.01"
+               class="mt-1 block w-full border rounded-lg p-2" id="total-amount">
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Скидка (₽)</label>
+        <input type="number" name="discount" value="{{ contract.discount|stringformat:'f' }}" step="0.01" class="mt-1 block w-full border rounded-lg p-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium">Кол-во платежей</label>
+        <input type="number" name="number_of_payments" value="{{ contract.number_of_payments }}" class="mt-1 block w-full border rounded-lg p-2">
+      </div>
+      <div>
+        <label class="block text-sm font-medium">День месяца платежей</label>
+        <input type="number" name="second_payment_day" value="{{ contract.preferred_payment_day|default_if_none:15 }}" min="1" max="28" class="mt-1 block w-full border rounded-lg p-2">
+      </div>
+      <div class="col-span-3 space-y-2">
+        <label class="inline-flex items-center">
+          <input type="checkbox" name="deposit" class="form-checkbox h-5 w-5 text-blue-600" {% if contract.deposit %}checked{% endif %}>
+          <span class="ml-2">Депозит</span>
+        </label>
+        <label class="inline-flex items-center">
+          <input type="checkbox" name="publication" class="form-checkbox h-5 w-5 text-blue-600" {% if contract.publication %}checked{% endif %}>
+          <span class="ml-2">Публикация (+16,500 ₽)</span>
+        </label>
+      </div>
+      <div class="col-span-3">
+        <button type="submit" class="px-5 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 shadow">
+          Перерасчитать
+        </button>
+      </div>
+    </form>
+  </section>
+{% endif %}
 
 <!-- Платежи по рассрочке -->
 {% if payments_data %}
@@ -201,9 +193,9 @@
         {% endif %}
       </section>
 
-    {% else %}
+    {% comment %} {% else %}
       <p class="text-gray-500">У клиента нет контракта.</p>
-    {% endif %}
+    {% endif %} {% endcomment %}
 
   </div>
 </body>

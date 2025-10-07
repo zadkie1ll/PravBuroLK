@@ -37,43 +37,48 @@
       </p>
     </section>
 
-    <!-- Стадии работы -->
-    <section id="stages" class="relative bg-white shadow-xl rounded-2xl p-8">
-      <div class="absolute inset-0 rounded-2xl border-4 border-transparent pointer-events-none"
-           style="background: linear-gradient(to right, #3F8FE2, #6FABD6) border-box;
-                  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-                  -webkit-mask-composite: destination-out; mask-composite: exclude;">
-      </div>
-      <h2 class="relative text-2xl font-bold text-gray-800 mb-6">
-        Стадии работы над вашим делом
-      </h2>
+<!-- Стадии работы -->
+<section id="stages" class="relative bg-white rounded-2xl shadow-lg overflow-hidden py-10 px-8">
+  
+  <!-- Синий полукруг -->
+  <div class="absolute left-0 top-0 h-full w-1/3 bg-blue-600 rounded-r-full"></div>
 
-      <!-- SVG линии -->
-      <svg id="roadmap-lines" class="absolute top-0 left-0 w-full h-full pointer-events-none z-0"></svg>
+  <!-- Заголовок -->
+  <h2 class="relative z-10 text-2xl md:text-3xl font-bold text-white mb-8 pl-6">
+    Стадии работы над вашим делом
+  </h2>
 
-      <!-- Grid с этапами -->
-      <div id="roadmap" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-8 gap-y-16 relative z-10">
-        {% for stage in all_stages %}
-        <div class="stage relative flex flex-col items-center w-24 sm:w-28
-                    {% if forloop.last %} last-stage col-span-full justify-self-center {% endif %}"
-             style="transform: translateY({{ forloop.counter|divisibleby:2|yesno:'20px,-20px' }});">
-          <!-- Кружок -->
-          <div class="circle w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full text-white shadow-lg z-10
-                      {% if stage.id == current_stage_id %} bg-blue-600 ring-4 ring-blue-200
-                      {% elif stage.order < current_stage_order %} bg-green-600 ring-4 ring-green-200
-                      {% else %} bg-gray-300 {% endif %}">
-            {{ forloop.counter }}
-          </div>
-          <span class="mt-2 text-xs sm:text-sm text-center w-20 sm:w-24
-                       {% if stage.id == current_stage_id %} font-bold text-blue-600
-                       {% elif stage.order < current_stage_order %} text-green-700
-                       {% else %} text-gray-500 {% endif %}">
-            {{ stage.name }}
-          </span>
+  <!-- Контейнер со стадиями -->
+  <div class="relative z-10 mx-auto max-w-5xl h-[500px]">
+
+    {% for stage in stages %}
+      <div class="absolute flex flex-col items-center text-center"
+           style="left: {{ stage.x }}%; top: {{ stage.y }}%; transform: translate(-50%, -50%);">
+        
+        <!-- Круг стадии -->
+        <div class="flex items-center justify-center rounded-full w-12 h-12 font-bold text-lg
+                    {% if stage.is_current %}bg-blue-600 text-white
+                    {% elif stage.is_passed %}bg-blue-400 text-white
+                    {% else %}border-2 border-blue-500 text-blue-500{% endif %}">
+          {{ stage.order }}
         </div>
-        {% endfor %}
+
+        <!-- Название стадии -->
+        <span class="mt-2 text-sm font-medium
+                     {% if stage.is_current %}text-blue-700{% else %}text-gray-800{% endif %}">
+          {{ stage.name }}
+        </span>
+
       </div>
-    </section>
+    {% endfor %}
+
+    <!-- Надпись "ДОЛГ СПИСАН!" -->
+    <div class="absolute bottom-[20px] left-[65%] text-blue-700 font-bold text-xl">
+      ДОЛГ<br>СПИСАН!
+    </div>
+
+  </div>
+</section>
 
     <!-- График платежей -->
     <section id="installments" class="relative bg-white shadow-xl rounded-2xl p-8 mt-6">
