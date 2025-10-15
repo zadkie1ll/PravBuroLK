@@ -559,3 +559,124 @@ class BitrixWebhookCreateClientView(View):
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+#--------------migrations------------------------------------
+
+@method_decorator(csrf_exempt, name="dispatch")
+class BitrixCreateClientFromDealView(View):
+    """
+    Принимает JSON всей сделки из Bitrix (crm.deal.get) и создаёт клиента.
+    """
+
+    def post(self, request):
+        try:
+            # Получаем JSON с полной сделкой
+            deal_data = request.POST.dict() or request.body
+            if isinstance(deal_data, bytes):
+                import json
+                deal_data = json.loads(deal_data)
+
+            # ------ Хелперы для парсинга ------
+            def safe_int(value, default=0):
+                if value is None:
+                    return default
+                s = str(value).split("|")[0].strip()
+                s = s.replace("\u00A0", "").replace(" ", "")
+                m = re.search(r'-?\d+[\,\.\d]*', s)
+                if not m:
+                    try:
+                        return int(s)
+                    except:
+                        return default
+                num = m.group(0).replace(",", ".")
+                try:
+                    return int(float(num))
+                except:
+                    return default
+
+            def parse_bitrix_date(value):
+                if not value:
+                    return None
+                s = str(value).strip()
+                for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+                    try:
+                        return datetime.strptime(s[:10], "%Y-%m-%d").date()
+                    except:
+                        continue
+                try:
+                    return datetime.fromisoformat(s).date()
+                except:
+                    return None
+
+            # ------ Маппинг полей ------
+            first_name = (deal_data.get("UF_CRM_1754380684375") or "").strip()
+            last_name = (deal_data.get("UF_CRM_1754380678904") or "").strip()
+            middlename = (deal_data.get("UF_CRM_1754380692399") or "").strip()
+
+            total_amount = safe_int(deal_data.get("OPPORTUNITY"))
+            discount = safe_int(deal_data.get("UF_CRM_1742457148727"))
+            bonus = safe_int(deal_data.get("UF_CRM_1742457114242"))
+            first_payment = safe_int(deal_data.get("UF_CRM_1742468532579"))
+            number_of_payments = safe_int(deal_data.get("UF_CRM_1742480133860"))
+            preferred_payment_day = safe_int(deal_data.get("UF_CRM_1745893194511"))
+
+            total_with_bonus = max(total_amount - discount + bonus, 0)
+
+            # Получаем телефон из контакта
+            external_id = deal_data.get("CONTACT_ID")
+            if not external_id:
+                return JsonResponse({"error": "CONTACT_ID not found"}, status=400)
+
+            external_url = f"https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/crm.contact.get.json?ID={external_id}"
+            contact_resp = requests.get(external_url)
+            if contact_resp.status_code != 200:
+                return JsonResponse({"error": "Failed to fetch contact"}, status=contact_resp.status_code)
+
+            external_data = contact_resp.json()
+            username = external_data.get("result", {}).get("PHONE", [{}])[0].get("VALUE")
+            if not username:
+                return JsonResponse({"error": "Phone number not found"}, status=400)
+
+            password = russian_to_translit(last_name or "user") + datetime.now().strftime("%Y")
+
+            from clients.services import ClientService
+            
+            # Создаём клиента
+            client, contract, plan = ClientService.create_client_with_contract(
+                username=username,
+                password=password,
+                name=first_name,
+                surname=last_name,
+                middlename=middlename,
+                email="client@prav-buro.ru",
+                bitrix_id=str(deal_data.get("ID") or ""),
+                stage="1",
+                total_amount=total_with_bonus,
+                discount=discount,
+                first_payment=first_payment,
+                first_payment_date=parse_bitrix_date(deal_data.get("UF_CRM_1742468566169")),
+                number_of_payments=number_of_payments,
+                preferred_payment_day=preferred_payment_day,
+            )
+
+            return JsonResponse({
+                "client_id": client.id,
+                "contract_id": contract.id,
+                "plan_id": plan.id,
+                "username": client.user.username,
+                "bitrix_deal_id": deal_data.get("ID"),
+                "message": "Клиент успешно создан"
+            })
+
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)

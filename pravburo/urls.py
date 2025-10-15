@@ -19,7 +19,7 @@ from django.urls import path
 from clients.views import client_dashboard, redirect_handler, referral_page, mark_stage_popup_shown, employee_referral_view
 from clients.views import CustomLoginView, TestCreateClientView, stage_detail, dashboard_stats
 from django.contrib.auth.views import LogoutView
-from payments.views import client_admin_view, recalculate_installment, update_custom_payments, payments_dashboard, client_search_view, BitrixWebhookCreateClientView, admin_dashboard
+from payments.views import client_admin_view, BitrixCreateClientFromDealView, recalculate_installment, update_custom_payments, payments_dashboard, client_search_view, BitrixWebhookCreateClientView, admin_dashboard
 from bitrix.views import referral_landing, referral_submit, application_success, referral_stats
 
 
@@ -35,8 +35,9 @@ urlpatterns = [
     path('', redirect_handler, name='index'),
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
     path("mark-stage-popup-shown/", mark_stage_popup_shown, name="mark_stage_popup_shown"),
-    path('stages/<slug:slug>/', stage_detail, name='stage_detail'),
+    path('dashboard/stages/<slug:slug>/', stage_detail, name='stage_detail'),
     path('accounts/login/', CustomLoginView.as_view(), name='login'),
+    path("bitrix/webhook/create-client-from-deal/", BitrixCreateClientFromDealView.as_view(), name="bitrix_create_client_from_deal"),
     path("payments/dashboard/", payments_dashboard, name="payments_dashboard"),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('admin-panel/referrals/', referral_stats, name='referral_stats'),

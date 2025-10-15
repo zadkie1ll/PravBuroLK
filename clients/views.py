@@ -123,6 +123,7 @@ def client_dashboard(request):
     embed_url = None
     if current_stage and current_stage.youtube_url:
         embed_url = current_stage.youtube_url.replace("watch?v=", "embed/")
+    print(current_stage.order)
 
     # --- Контекст для шаблона ---
     context = {
@@ -134,6 +135,7 @@ def client_dashboard(request):
         "stages": stages_data,
         "progress_percent": progress_percent,
         "embed_url": embed_url,
+        "current_stage_order": current_stage.order
     }
 
     return render(request, "clientnew.html", context)

@@ -67,6 +67,15 @@ class Client(models.Model):
     stage = models.ForeignKey("StageTemplate", on_delete=models.SET_NULL, null=True, blank=True)
     referral_code = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     
+    old_id = models.PositiveIntegerField(
+    null=True,
+    blank=True,
+    unique=True,
+    db_index=True,
+    help_text="ID клиента в старой системе"
+    )
+    #Старый айди для миграции
+    
     # --- Метки показа попапа ---
     need_stage_popup = models.BooleanField(
         default=False,
