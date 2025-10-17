@@ -142,7 +142,7 @@ class DashboardVisit(models.Model):
 
     ip_address = models.GenericIPAddressField(blank=True, null=True)
     user_agent = models.TextField(blank=True, null=True)
-    visits = models.JSONField(default=list)  # массив визитов
+    visits = models.JSONField(default=list)  
 
     class Meta:
         unique_together = ("owner_content_type", "owner_object_id", "ip_address")

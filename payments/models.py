@@ -4,15 +4,21 @@ from django.utils import timezone
 
 class Contract(models.Model):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE)
+
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     first_payment = models.DecimalField(max_digits=10, decimal_places=2)
     first_payment_date = models.DateField()
     number_of_payments = models.PositiveIntegerField()
     preferred_payment_day = models.PositiveIntegerField(default=15)
+
+    # --- Служебные поля ---
     created_at = models.DateTimeField(auto_now_add=True)
-    deposit = models.BooleanField(default=False)
-    publication = models.BooleanField(default=False)
+
+    # --- Показательные флаги ---
+    deposit = models.BooleanField(default=False, help_text="Оплачен судебный депозит")
+    publication = models.BooleanField(default=False, help_text="Оплачена публикация")
+    extra_court_costs = models.BooleanField(default=False, help_text="Оплачены доп. судебные расходы")
 
     def __str__(self):
         return f"Contract #{self.id} — {self.client}"

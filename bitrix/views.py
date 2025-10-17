@@ -105,7 +105,7 @@ def referral_stats(request):
     Статистика по реферальным ссылкам с фильтром и сортировкой.
     """
     filter_type = request.GET.get("filter", "all")
-    sort_type = request.GET.get("sort", "applications")  # сортировка по умолчанию
+    sort_type = request.GET.get("sort", "applications")
 
     stats = []
 

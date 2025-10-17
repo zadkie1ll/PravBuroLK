@@ -56,15 +56,19 @@
         <input type="number" name="second_payment_day" value="{{ contract.preferred_payment_day|default_if_none:15 }}" min="1" max="28" class="mt-1 block w-full border rounded-lg p-2">
       </div>
       <div class="col-span-3 space-y-2">
-        <label class="inline-flex items-center">
-          <input type="checkbox" name="deposit" class="form-checkbox h-5 w-5 text-blue-600" {% if contract.deposit %}checked{% endif %}>
-          <span class="ml-2">Депозит</span>
-        </label>
-        <label class="inline-flex items-center">
-          <input type="checkbox" name="publication" class="form-checkbox h-5 w-5 text-blue-600" {% if contract.publication %}checked{% endif %}>
-          <span class="ml-2">Публикация (+16,500 ₽)</span>
-        </label>
-      </div>
+  <label class="inline-flex items-center">
+    <input type="checkbox" name="deposit" class="form-checkbox h-5 w-5 text-blue-600" {% if contract.deposit %}checked{% endif %}>
+    <span class="ml-2">Депозит</span>
+  </label>
+  <label class="inline-flex items-center">
+    <input type="checkbox" name="publication" class="form-checkbox h-5 w-5 text-blue-600" {% if contract.publication %}checked{% endif %}>
+    <span class="ml-2">Публикация</span>
+  </label>
+  <label class="inline-flex items-center">
+    <input type="checkbox" name="extra_court_costs" class="form-checkbox h-5 w-5 text-blue-600" {% if contract.extra_court_costs %}checked{% endif %}>
+    <span class="ml-2">Доп. судебные расходы</span>
+  </label>
+</div>
       <div class="col-span-3">
         <button type="submit" class="px-5 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 shadow">
           Перерасчитать

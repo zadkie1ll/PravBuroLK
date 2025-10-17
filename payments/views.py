@@ -11,6 +11,7 @@ from django.db.models.functions import Lower
 from django.db.models import Sum
 from django.utils import timezone
 from django.views import View
+from .sync_payments_service import sync_client_to_bitrix
 from datetime import date, timedelta
 import time
 from clients.models import Client
@@ -196,6 +197,7 @@ def recalculate_installment(request, client_id):
     try:
         deposit_checked = request.POST.get("deposit") == "on"
         publication_checked = request.POST.get("publication") == "on"
+        extra_costs_checked = request.POST.get("extra_court_costs") == "on"  # новое поле
 
         total_amount = Decimal(request.POST.get("total_amount", "0"))
         discount = Decimal(request.POST.get("discount", "0"))
@@ -206,16 +208,17 @@ def recalculate_installment(request, client_id):
 
         base_total = contract.total_amount
 
+        # Обновляем флаги
         if deposit_checked != contract.deposit:
             contract.deposit = deposit_checked
 
         if publication_checked != contract.publication:
-            if publication_checked:
-                total_amount += Decimal("16500")
-            else:
-                total_amount -= Decimal("16500")
             contract.publication = publication_checked
 
+        if extra_costs_checked != getattr(contract, "extra_court_costs", False):
+            contract.extra_court_costs = extra_costs_checked
+
+        # Основные данные договора
         contract.total_amount = total_amount
         contract.discount = discount
         contract.first_payment = first_payment
@@ -228,6 +231,7 @@ def recalculate_installment(request, client_id):
         messages.error(request, f"Ошибка чтения данных из формы: {e}")
         return redirect("client_admin_view", client_id=client.id)
 
+    # === Пересчёт рассрочки ===
     paid_payments = plan.payments.filter(status='paid').order_by('number')
     paid_amount = paid_payments.aggregate(total=Sum('amount_due'))['total'] or Decimal('0')
 
@@ -291,6 +295,13 @@ def recalculate_installment(request, client_id):
 
     plan.calculated = True
     plan.save()
+
+    # === После обновления рассрочки — отправляем данные в Bitrix ===
+    try:
+        sync_client_to_bitrix(client)
+        messages.success(request, "Рассрочка пересчитана и данные успешно обновлены в Bitrix24.")
+    except Exception as e:
+        messages.warning(request, f"Рассрочка пересчитана, но не удалось обновить данные в Bitrix: {e}")
 
     return redirect("client_admin_view", client_id=client.id)
 
@@ -575,24 +586,39 @@ class BitrixWebhookCreateClientView(View):
 @method_decorator(csrf_exempt, name="dispatch")
 class BitrixCreateClientFromDealView(View):
     """
-    Принимает JSON всей сделки из Bitrix (crm.deal.get) и создаёт клиента.
+    Принимает webhook от Bitrix (POST с document_id[2]), достаёт сделку через get_deal_data_from_bitrix и создаёт клиента.
     """
 
     def post(self, request):
-        try:
-            # Получаем JSON с полной сделкой
-            deal_data = request.POST.dict() or request.body
-            if isinstance(deal_data, bytes):
-                import json
-                deal_data = json.loads(deal_data)
+        import json, re, requests
+        from datetime import datetime
+        from decimal import Decimal
+        from django.http import JsonResponse
+        from clients.services import ClientService
 
-            # ------ Хелперы для парсинга ------
+        try:
+            post_data = request.POST.dict()
+            if not post_data:
+                try:
+                    body = request.body.decode("utf-8")
+                    post_data = json.loads(body)
+                except Exception:
+                    post_data = {}
+
+            # --- Получаем данные сделки через твою функцию ---
+            deal_data, error = get_deal_data_from_bitrix(post_data)
+            if error:
+                return JsonResponse({"error": error, "payload_keys": list(post_data.keys())}, status=400)
+            if not deal_data:
+                return JsonResponse({"error": "Empty deal data"}, status=400)
+
+            # --- Хелперы ---
             def safe_int(value, default=0):
                 if value is None:
                     return default
                 s = str(value).split("|")[0].strip()
                 s = s.replace("\u00A0", "").replace(" ", "")
-                m = re.search(r'-?\d+[\,\.\d]*', s)
+                m = re.search(r"-?\d+[\,\.\d]*", s)
                 if not m:
                     try:
                         return int(s)
@@ -618,7 +644,7 @@ class BitrixCreateClientFromDealView(View):
                 except:
                     return None
 
-            # ------ Маппинг полей ------
+            # --- Извлекаем данные клиента ---
             first_name = (deal_data.get("UF_CRM_1754380684375") or "").strip()
             last_name = (deal_data.get("UF_CRM_1754380678904") or "").strip()
             middlename = (deal_data.get("UF_CRM_1754380692399") or "").strip()
@@ -632,13 +658,13 @@ class BitrixCreateClientFromDealView(View):
 
             total_with_bonus = max(total_amount - discount + bonus, 0)
 
-            # Получаем телефон из контакта
+            # --- Получаем контакт ---
             external_id = deal_data.get("CONTACT_ID")
             if not external_id:
                 return JsonResponse({"error": "CONTACT_ID not found"}, status=400)
 
-            external_url = f"https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/crm.contact.get.json?ID={external_id}"
-            contact_resp = requests.get(external_url)
+            contact_url = f"https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/crm.contact.get.json?ID={external_id}"
+            contact_resp = requests.get(contact_url)
             if contact_resp.status_code != 200:
                 return JsonResponse({"error": "Failed to fetch contact"}, status=contact_resp.status_code)
 
@@ -649,9 +675,7 @@ class BitrixCreateClientFromDealView(View):
 
             password = russian_to_translit(last_name or "user") + datetime.now().strftime("%Y")
 
-            from clients.services import ClientService
-            
-            # Создаём клиента
+            # --- Создание клиента ---
             client, contract, plan = ClientService.create_client_with_contract(
                 username=username,
                 password=password,
@@ -669,14 +693,16 @@ class BitrixCreateClientFromDealView(View):
                 preferred_payment_day=preferred_payment_day,
             )
 
-            return JsonResponse({
-                "client_id": client.id,
-                "contract_id": contract.id,
-                "plan_id": plan.id,
-                "username": client.user.username,
-                "bitrix_deal_id": deal_data.get("ID"),
-                "message": "Клиент успешно создан"
-            })
+            return JsonResponse(
+                {
+                    "client_id": client.id,
+                    "contract_id": contract.id,
+                    "plan_id": plan.id,
+                    "username": client.user.username,
+                    "bitrix_deal_id": deal_data.get("ID"),
+                    "message": "Клиент успешно создан",
+                }
+            )
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
