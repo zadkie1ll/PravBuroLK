@@ -80,7 +80,6 @@ class Command(BaseCommand):
                     surname=client_data.get("middlename", ""),
                     middlename=client_data.get("lastname", ""),
                     email=client_data.get("email", "client@prav-buro.ru"),
-                    bitrix_id=str(client_data.get("id")),
                     stage="1",
                     total_amount=client_data.get("sumall"),
                     discount=0,

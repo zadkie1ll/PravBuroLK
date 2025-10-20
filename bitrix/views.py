@@ -5,7 +5,7 @@ from clients.models import Client, Employee, Application, ReferralClick
 import telebot
 
 
-# 🔑 Telegram настройки
+
 BOT_TOKEN = "8208949436:AAEIzi6eP5R04crpwpIchWnpqCCFv8TROvY"
 CHAT_ID = "-4907127148"
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -43,7 +43,6 @@ def referral_landing(request, referral_code):
         else:
             raise Http404("Referral not found")
 
-    # ✅ Логируем клик
     if owner:
         ReferralClick.objects.get_or_create(
             owner_content_type=ContentType.objects.get_for_model(owner),
@@ -82,7 +81,6 @@ def referral_submit(request):
             referral_owner=referral_owner,
         )
 
-        # ✅ Уведомление в Telegram
         try:
             text = f"📩 Новая заявка!\n\n👤 Имя: {name}\n📞 Телефон: {phone}"
             if referral_owner:
@@ -94,7 +92,6 @@ def referral_submit(request):
         return redirect("application_success")
 
     return redirect("referral_landing_home")
-
 
 def application_success(request):
     """Страница успеха"""
@@ -109,7 +106,6 @@ def referral_stats(request):
 
     stats = []
 
-    # --- Клиенты ---
     if filter_type in ["all", "clients"]:
         client_ct = ContentType.objects.get_for_model(Client)
         for client in Client.objects.all():
@@ -129,7 +125,6 @@ def referral_stats(request):
                 "applications": apps,
             })
 
-    # --- Сотрудники ---
     if filter_type in ["all", "employees"]:
         employee_ct = ContentType.objects.get_for_model(Employee)
         for emp in Employee.objects.all():
@@ -149,7 +144,6 @@ def referral_stats(request):
                 "applications": apps,
             })
 
-    # --- Сортировка ---
     if sort_type == "clicks":
         stats.sort(key=lambda x: x["clicks"], reverse=True)
     else:
