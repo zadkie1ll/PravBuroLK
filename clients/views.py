@@ -20,6 +20,10 @@ from .models import Employee
 
 
 
+def confident_police(request):
+    return render(request, "policy.html")
+
+
 
 def employee_referral_view(request, employee_id):
     employee = get_object_or_404(Employee, id=employee_id)

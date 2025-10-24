@@ -35,8 +35,8 @@ class ClientAdmin(admin.ModelAdmin):
     list_display = (
         'id', 'surname', 'name', 'middlename', 'bitrix_id', 'user',
         'stage', 'referral_code',
-        'need_stage_popup',       # ➡️ добавляем в список
-        'stage_popup_shown',      # ➡️ добавляем в список
+        'need_stage_popup',       
+        'stage_popup_shown',      
     )
     search_fields = ('surname', 'name', 'middlename', 'bitrix_id', 'user__username', 'referral_code')
     list_filter = ('bitrix_id', 'stage')
@@ -49,8 +49,8 @@ class ClientAdmin(admin.ModelAdmin):
             "fields": (
                 'surname', 'name', 'middlename', 'bitrix_id', 'user',
                 'stage', 'referral_code',
-                'need_stage_popup',      # ➡️ добавляем в форму
-                'stage_popup_shown',     # ➡️ добавляем в форму
+                'need_stage_popup',      
+                'stage_popup_shown',
             ),
         }),
         ("Платежи по рассрочке", {
@@ -114,15 +114,30 @@ class InstallmentPlanAdmin(admin.ModelAdmin):
     inlines = [InstallmentPaymentInline]
     list_filter = ('calculated',)
     ordering = ('-created_at',)
+    search_fields = (
+        'id',
+        'contract__client__surname',
+        'contract__client__name',
+        'contract__client__bitrix_id',
+        'contract__id',
+    )
 
 
 @admin.register(InstallmentPayment)
 class InstallmentPaymentAdmin(admin.ModelAdmin):
     list_display = ('id', 'plan', 'number', 'due_date', 'amount_due', 'amount_paid', 'status')
     list_filter = ('status', 'due_date')
-    search_fields = ('plan__contract__client__surname',)
     ordering = ('due_date',)
     inlines = [PaymentApplicationInline]
+    search_fields = (
+        'id',
+        'plan__id',
+        'plan__contract__id',
+        'plan__contract__client__surname',
+        'plan__contract__client__name',
+        'plan__contract__client__bitrix_id',
+        'number',
+    )
 
 
 @admin.register(ActualPayment)

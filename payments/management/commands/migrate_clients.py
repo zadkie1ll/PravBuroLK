@@ -9,6 +9,27 @@ from payments.models import ActualPayment, OtherPayment, InstallmentPlan
 from clients.services import ClientService
 
 
+
+def russian_to_translit(text):
+    translit_dict = {
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 
+        'е': 'e', 'ё': 'yo', 'ж': 'zh', 'з': 'z', 'и': 'i', 
+        'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 
+        'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 
+        'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 
+        'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 
+        'э': 'e', 'ю': 'yu', 'я': 'ya',
+        'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 
+        'Е': 'E', 'Ё': 'Yo', 'Ж': 'Zh', 'З': 'Z', 'И': 'I', 
+        'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N', 
+        'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 
+        'У': 'U', 'Ф': 'F', 'Х': 'Kh', 'Ц': 'Ts', 'Ч': 'Ch', 
+        'Ш': 'Sh', 'Щ': 'Shch', 'Ъ': '', 'Ы': 'Y', 'Ь': '', 
+        'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya'
+    }
+    translit_text = ''.join(translit_dict.get(char, char) for char in text)
+    return translit_text
+
 class Command(BaseCommand):
     help = "Мигрирует клиентов и их платежи из старого приложения в новое"
 
@@ -26,6 +47,9 @@ class Command(BaseCommand):
             help="Начать миграцию с определённого клиента (для возобновления)"
         )
 
+    
+    
+    
     def handle(self, *args, **options):
         base_url = options["source_url"].rstrip("/")
         start_id = options["start_id"]
@@ -75,7 +99,7 @@ class Command(BaseCommand):
                 # === Создаём клиента через сервис ===
                 client, contract, plan = ClientService.create_client_with_contract(
                     username=client_data.get("username"),
-                    password="temp_password",
+                    password=russian_to_translit(client_data.get("lastname", "Правбюро")),
                     name=client_data.get("name", ""),
                     surname=client_data.get("middlename", ""),
                     middlename=client_data.get("lastname", ""),

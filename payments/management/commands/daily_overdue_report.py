@@ -10,7 +10,6 @@ class Command(BaseCommand):
         today = date.today()
         report = {}
 
-        # Получаем все планы рассрочек с просроченными платежами
         overdue_plans = InstallmentPlan.objects.filter(
             payments__due_date__lt=today,
             payments__status__in=['pending', 'partial']
@@ -33,7 +32,6 @@ class Command(BaseCommand):
                 lines.append(line)
             report[client.id] = "\n".join(lines)
 
-        # Выводим отчёт в консоль (можно заменить на отправку в телеграм/Bitrix)
         for client_id, summary in report.items():
             client = Client.objects.get(id=client_id)
             self.stdout.write(f"Клиент: {client}\n{summary}\n{'-'*50}")
