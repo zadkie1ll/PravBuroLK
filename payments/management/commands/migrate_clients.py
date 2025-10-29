@@ -95,11 +95,12 @@ class Command(BaseCommand):
                 payments_resp = requests.get(f"{base_url}/api/client/{client_id}/payments/")
                 payments_resp.raise_for_status()
                 payments_data = payments_resp.json()
+                
 
                 # === Создаём клиента через сервис ===
                 client, contract, plan = ClientService.create_client_with_contract(
                     username=client_data.get("username"),
-                    password=russian_to_translit(client_data.get("lastname", "Правбюро")),
+                    password=f"Temp{client_data.get('id', '')}",
                     name=client_data.get("name", ""),
                     surname=client_data.get("middlename", ""),
                     middlename=client_data.get("lastname", ""),

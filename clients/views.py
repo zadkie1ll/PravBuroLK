@@ -51,7 +51,7 @@ def get_client_ip(request):
 def client_dashboard(request):
     client = request.user.client
 
-    # --- Логирование посещения дашборда ---
+    # --- Запись визита ---
     content_type = ContentType.objects.get_for_model(client)
     ip_address = request.META.get('REMOTE_ADDR')
     user_agent = request.META.get('HTTP_USER_AGENT', '')
@@ -64,7 +64,7 @@ def client_dashboard(request):
     )
     visit.add_visit()
 
-    # --- Контракт и рассрочка ---
+    # --- Данные по договору и рассрочке ---
     contract = Contract.objects.filter(client=client).first()
     installment_plan = (
         InstallmentPlan.objects.filter(contract=contract).first()
@@ -75,7 +75,6 @@ def client_dashboard(request):
     if contract:
         contract_final_amount = contract.total_amount - contract.discount
 
-    # --- Платежи по рассрочке ---
     installment_payments = []
     if installment_plan:
         for p in installment_plan.payments.prefetch_related("applications__actual_payment").order_by("number"):
@@ -91,6 +90,7 @@ def client_dashboard(request):
                 status = "pending"
 
             installment_payments.append({
+                "id": p.id,
                 "number": p.number,
                 "due_date": p.due_date,
                 "amount_due": p.amount_due,
@@ -98,7 +98,7 @@ def client_dashboard(request):
                 "status": status,
             })
 
-    # --- Стадии работы ---
+    # --- Этапы клиента ---
     all_stages = StageTemplate.objects.all().order_by("order")
     current_stage = client.stage
     stages_data = []
@@ -118,18 +118,24 @@ def client_dashboard(request):
             "status": status,
         })
 
-    # --- Прогресс по стадиям ---
     total_stages = len(all_stages)
     passed_stages = sum(1 for s in stages_data if s["status"] in ("done", "current"))
     progress_percent = int((passed_stages / total_stages) * 100) if total_stages > 0 else 0
 
-    # --- Видео стадии (если есть YouTube ссылка) ---
+    # --- Видео текущей стадии ---
     embed_url = None
     if current_stage and current_stage.youtube_url:
         embed_url = current_stage.youtube_url.replace("watch?v=", "embed/")
-    print(current_stage.order)
 
-    # --- Контекст для шаблона ---
+    # --- Логика показа попапа ---
+    show_stage_popup = False
+    if client.need_stage_popup and not client.stage_popup_shown:
+        show_stage_popup = True
+        # Отмечаем, что попап был показан (чтобы не показывать при следующем входе)
+        client.stage_popup_shown = True
+        client.save(update_fields=["stage_popup_shown"])
+
+    # --- Контекст шаблона ---
     context = {
         "client": client,
         "contract": contract,
@@ -139,7 +145,9 @@ def client_dashboard(request):
         "stages": stages_data,
         "progress_percent": progress_percent,
         "embed_url": embed_url,
-        "current_stage_order": current_stage.order
+        "current_stage": current_stage,  # 🔹 сам объект StageTemplate
+        "current_stage_order": current_stage.order if current_stage else None,
+        "show_stage_popup": show_stage_popup,  # 🔹 флаг показа модалки
     }
 
     return render(request, "clientnew.html", context)
@@ -151,6 +159,8 @@ def stage_detail(request, slug):
         "stage": stage,
         "next_stage": stage.get_next()
     })
+    
+    
 @csrf_exempt
 @login_required
 def redirect_handler(request):

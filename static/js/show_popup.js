@@ -13,7 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
             popup.style.display = "none";
         }, { once: true });
 
-        // говорим серверу что попап уже показан
         fetch("/mark-stage-popup-shown/", {
             method: "POST",
             headers: {

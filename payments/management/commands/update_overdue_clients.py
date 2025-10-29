@@ -12,11 +12,10 @@ class Command(BaseCommand):
         today = timezone.now().date()
         self.stdout.write("🔄 Обновляем статусы платежей...")
 
-        # 1️⃣ Находим платежи, которые должны стать просроченными
         to_overdue = InstallmentPayment.objects.filter(
-            due_date__lt=today,          # срок истёк
+            due_date__lt=today,
         ).exclude(
-            status__in=['paid', 'overdue']  # не оплачены и ещё не просрочены
+            status__in=['paid', 'overdue']
         )
 
         overdue_ids = list(to_overdue.values_list('id', flat=True))

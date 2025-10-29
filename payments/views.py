@@ -4,6 +4,8 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth.decorators import user_passes_test
 from decimal import Decimal
+from django.urls import reverse
+from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.db import models
@@ -571,30 +573,156 @@ class BitrixWebhookCreateClientView(View):
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
         
+#AlfaAPI payments-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+
+ALFA_API_URL = "https://payment.alfabank.ru/payment/rest/register.do"
+ALFA_USER_NAME = "r-prav_0-api"      # prod логин
+ALFA_PASSWORD = "Qwasdcvbgh243567!@"        # prod пароль
+    
+
+
+def create_payment(request, payment_id):
+    payment = get_object_or_404(InstallmentPayment, id=payment_id)
+
+    amount = int(float(payment.amount_due) * 100)
+    order_number = f"{payment.__class__.__name__}-{payment.id}-{int(time.time())}"
+
+    return_url = "http://217.149.31.38/"
+    fail_url = "http://217.149.31.38/"
+    description = f"Оплата по рассрочке №{payment.number}"
+
+    payload = {
+        "userName": ALFA_USER_NAME,
+        "password": ALFA_PASSWORD,
+        "orderNumber": order_number,
+        "amount": amount,
+        "description": description,
+        "returnUrl": return_url,
+        "failUrl": fail_url,
+    }
+
+    try:
+        response = requests.post(ALFA_API_URL, data=payload, timeout=15)
+        print("Альфа-Банк ответил:", response.status_code, response.text)
+    except requests.RequestException as e:
+        print("Ошибка соединения с Альфа-Банк API:", e)
+        return redirect(f"{return_url}?payment_status=error")
+
+    if response.status_code != 200:
+        print("Ошибка HTTP:", response.status_code, response.text)
+        return redirect(f"{return_url}?payment_status=error")
+
+    data = response.json()
+    print("Ответ JSON от Альфа-Банка:", data)
+
+    if data.get("errorCode") and data["errorCode"] != "0":
+        print("Ошибка при создании платежа:", data)
+        return redirect(f"{return_url}?payment_status=error")
+
+    form_url = data.get("formUrl")
+    order_id = data.get("orderId")
+
+    if not form_url:
+        print("Не удалось получить ссылку на оплату:", data)
+        return redirect(f"{return_url}?payment_status=error")
+
+    payment.order_id = order_id
+    payment.save(update_fields=["order_id"])
+
+    return redirect(form_url)
+        
+        
+
+
+@csrf_exempt
+def payment_callback(request):
+    """
+    Обработка уведомления от Альфа-Банка об оплате
+    """
+    order_id = request.GET.get("orderId") or request.POST.get("orderId")
+    if not order_id:
+        return JsonResponse({"error": "orderId required"}, status=400)
+
+    # Проверяем, не создавали ли уже фактический платёж с этим order_id
+    if ActualPayment.objects.filter(order_id=order_id).exists():
+        return JsonResponse({"status": "duplicate"}, status=200)
+
+    payload = {
+        "userName": settings.ALFA_USER,
+        "password": settings.ALFA_PASS,
+        "orderId": order_id,
+    }
+
+    try:
+        response = requests.post(
+            f"{settings.ALFA_API_URL}/getOrderStatusExtended.do",
+            data=payload,
+            timeout=10
+        )
+        data = response.json()
+    except Exception as e:
+        return JsonResponse({"error": f"connection error: {e}"}, status=500)
+
+    # --- Проверка на успешный статус ---
+    if str(data.get("ErrorCode")) != "0" or str(data.get("OrderStatus")) != "2":
+        return JsonResponse({"status": "not paid", "details": data}, status=200)
+
+    # --- Находим плановый платёж ---
+    payment = InstallmentPayment.objects.filter(order_id=order_id).first()
+    if not payment:
+        return JsonResponse({"error": "payment not found"}, status=404)
+
+    # --- Проверяем, не был ли он уже оплачен ---
+    if payment.status == "paid":
+        return JsonResponse({"status": "already paid"}, status=200)
+
+    # --- Создаём фактический платёж ---
+    actual_payment = ActualPayment.objects.create(
+        plan=payment.plan,
+        payment_date=timezone.now().date(),
+        amount=payment.amount_due,
+        order_id=order_id,  # сохраняем orderId для уникальности
+    )
+
+    # После распределения платежей обновим статус планового платежа
+    payment.refresh_from_db()
+
+    return JsonResponse({
+        "status": "success",
+        "payment_id": payment.id,
+        "actual_payment_id": actual_payment.id,
+        "installment_status": payment.status,
+        "amount_paid": str(payment.amount_paid),
+    })
         
         
         
         
         
         
-        
-        
-        
-        
-#--------------migrations------------------------------------
+#--------------migrations-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 @method_decorator(csrf_exempt, name="dispatch")
 class BitrixCreateClientFromDealView(View):
     """
     Принимает webhook от Bitrix (POST с document_id[2]), достаёт сделку через get_deal_data_from_bitrix и создаёт клиента.
+    После создания — генерирует пароль и отправляет логин/пароль обратно в Битрикс.
     """
 
     def post(self, request):
-        import json, re, requests
+        import json, re, requests, random, string
         from datetime import datetime
-        from decimal import Decimal
         from django.http import JsonResponse
+        from django.db import transaction
         from clients.services import ClientService
+        from clients.models import Client
+
+        BITRIX_WEBHOOK = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
+
+        def generate_password(length=8):
+            """Генерация простого пароля"""
+            chars = string.ascii_letters + string.digits
+            return ''.join(random.choice(chars) for _ in range(length))
 
         try:
             post_data = request.POST.dict()
@@ -605,7 +733,7 @@ class BitrixCreateClientFromDealView(View):
                 except Exception:
                     post_data = {}
 
-            # --- Получаем данные сделки через твою функцию ---
+            # --- Получаем данные сделки ---
             deal_data, error = get_deal_data_from_bitrix(post_data)
             if error:
                 return JsonResponse({"error": error, "payload_keys": list(post_data.keys())}, status=400)
@@ -673,25 +801,44 @@ class BitrixCreateClientFromDealView(View):
             if not username:
                 return JsonResponse({"error": "Phone number not found"}, status=400)
 
-            password = russian_to_translit(last_name or "user") + datetime.now().strftime("%Y")
+            # --- Генерация пароля ---
+            new_password = generate_password()
 
             # --- Создание клиента ---
-            client, contract, plan = ClientService.create_client_with_contract(
-                username=username,
-                password=password,
-                name=first_name,
-                surname=last_name,
-                middlename=middlename,
-                email="client@prav-buro.ru",
-                bitrix_id=str(deal_data.get("ID") or ""),
-                stage="1",
-                total_amount=total_with_bonus,
-                discount=discount,
-                first_payment=first_payment,
-                first_payment_date=parse_bitrix_date(deal_data.get("UF_CRM_1742468566169")),
-                number_of_payments=number_of_payments,
-                preferred_payment_day=preferred_payment_day,
-            )
+            with transaction.atomic():
+                client, contract, plan = ClientService.create_client_with_contract(
+                    username=username,
+                    password=new_password,
+                    name=first_name,
+                    surname=last_name,
+                    middlename=middlename,
+                    email="client@prav-buro.ru",
+                    bitrix_id=str(deal_data.get("ID") or ""),
+                    stage="1",
+                    total_amount=total_with_bonus,
+                    discount=discount,
+                    first_payment=first_payment,
+                    first_payment_date=parse_bitrix_date(deal_data.get("UF_CRM_1742468566169")),
+                    number_of_payments=number_of_payments,
+                    preferred_payment_day=preferred_payment_day,
+                )
+
+                # --- Отправляем логин/пароль обратно в Битрикс ---
+                deal_id = str(deal_data.get("ID") or "")
+                bitrix_url = f"{BITRIX_WEBHOOK}crm.deal.update.json"
+                auth_text = f"{username}\n{new_password}"
+
+                payload = {
+                    "id": deal_id,
+                    "fields": {
+                        "UF_CRM_1745888913952": auth_text  # Поле в Битриксе
+                    }
+                }
+
+                response = requests.post(bitrix_url, json=payload)
+                resp_data = response.json()
+                if resp_data.get("error"):
+                    raise Exception(f"Bitrix error: {resp_data.get('error_description', resp_data.get('error'))}")
 
             return JsonResponse(
                 {
@@ -700,7 +847,7 @@ class BitrixCreateClientFromDealView(View):
                     "plan_id": plan.id,
                     "username": client.user.username,
                     "bitrix_deal_id": deal_data.get("ID"),
-                    "message": "Клиент успешно создан",
+                    "message": "Клиент успешно создан и данные отправлены в Битрикс",
                 }
             )
 

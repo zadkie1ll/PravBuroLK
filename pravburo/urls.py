@@ -1,25 +1,9 @@
-"""
-URL configuration for pravburo project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path
 from clients.views import client_dashboard, redirect_handler, referral_page, mark_stage_popup_shown, employee_referral_view
 from clients.views import CustomLoginView, TestCreateClientView, stage_detail, dashboard_stats, confident_police
 from django.contrib.auth.views import LogoutView
-from payments.views import client_admin_view, BitrixCreateClientFromDealView, recalculate_installment, update_custom_payments, payments_dashboard, client_search_view, BitrixWebhookCreateClientView, admin_dashboard
+from payments.views import client_admin_view, create_payment, payment_callback, BitrixCreateClientFromDealView, recalculate_installment, update_custom_payments, payments_dashboard, client_search_view, BitrixWebhookCreateClientView, admin_dashboard
 from bitrix.views import referral_landing, referral_submit, application_success, referral_stats
 
 
@@ -33,6 +17,8 @@ urlpatterns = [
     path("ref/submit/", referral_submit, name="referral_submit"),
     path('dashboard/', client_dashboard, name='client_dashboard'),
     path('', redirect_handler, name='index'),
+    path('payment/<int:payment_id>/', create_payment, name='create_payment'),
+    path("callback/", payment_callback, name="payment_callback"),
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
     path("mark-stage-popup-shown/", mark_stage_popup_shown, name="mark_stage_popup_shown"),
     path('dashboard/stages/<slug:slug>/', stage_detail, name='stage_detail'),

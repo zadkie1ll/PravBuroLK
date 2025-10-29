@@ -47,6 +47,7 @@ class InstallmentPayment(models.Model):
     amount_due = models.DecimalField(max_digits=10, decimal_places=2)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    order_id = models.CharField(max_length=100, blank=True, null=True)
 
     def apply_payment(self, amount):
         """Применяем платёж к этому месяцу"""
@@ -62,7 +63,7 @@ class InstallmentPayment(models.Model):
             self.status = "pending"
             extra = 0
         self.save()
-        return extra  # если переплата → вернём остаток
+        return extra
 
     def __str__(self):
         return f"Платеж #{self.number} — {self.get_status_display()} — {self.amount_due}₽"
@@ -74,10 +75,11 @@ class ActualPayment(models.Model):
         on_delete=models.CASCADE,
         related_name="actual_payments",
         blank=True,
-        null=True  # временно разрешаем NULL для миграции
+        null=True  
     )
     payment_date = models.DateField(null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    order_id = models.CharField(max_length=100, blank=True, null=True)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

@@ -36,7 +36,7 @@
 <!-- Блок приветствия -->
 <section id="welcome" class="p-8 text-center space-y-4 mt-12">
   <h1 class="text-3xl md:text-4xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
-    Здравствуйте, {{ client_name }}
+    Здравствуйте, {{ client.name }}
   </h1>
   <p class="text-lg text-slate-600">
     Прогресс по вашему делу:
@@ -204,56 +204,56 @@
   <div class="relative w-96 h-[537px] flex justify-center items-center">
 
     <!-- 🟢 КРУГИ С ССЫЛКАМИ -->
-    <a href="stages/newdogovor" data-stage="1" class="left-[31.75px] top-[155px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
+    <a href="stages/newdogovor" data-stage="1" class="left-[-20px] top-[155px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
       <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="18.3094" cy="17.5628" r="16.7792" stroke="#365C80" stroke-width="1.56723"/>
       </svg>
       <span class="absolute">1</span>
     </a>
 
-    <a href="stages/sbor" data-stage="2" class="left-[158.89px] top-[155px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
+    <a href="stages/sbor" data-stage="2" class="left-[110px] top-[155px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
       <svg width="37" height="36" viewBox="0 0 37 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="18.4544" cy="17.5628" r="16.7792" stroke="#365C80" stroke-width="1.56723"/>
       </svg>
       <span class="absolute">2</span>
     </a>
 
-    <a href="stages/analiz" data-stage="3" class="left-[286.04px] top-[155px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
+    <a href="stages/analiz" data-stage="3" class="left-[240px] top-[155px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
       <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="17.5995" cy="17.5628" r="16.7792" stroke="#365C80" stroke-width="1.56723"/>
       </svg>
       <span class="absolute">3</span>
     </a>
 
-    <a href="stages/deposit_wait" data-stage="4" class="left-[286.04px] top-[257.41px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
+    <a href="stages/deposit_wait" data-stage="4" class="left-[240px] top-[257.41px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
       <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="17.5995" cy="17.9715" r="16.7792" stroke="#365C80" stroke-width="1.56723"/>
       </svg>
       <span class="absolute">4</span>
     </a>
 
-    <a href="stages/prepare_declaration" data-stage="5" class="left-[158.89px] top-[257.41px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
+    <a href="stages/prepare_declaration" data-stage="5" class="left-[110px] top-[257.41px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
       <svg width="37" height="36" viewBox="0 0 37 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="18.4544" cy="17.9715" r="16.7792" stroke="#365C80" stroke-width="1.56723"/>
       </svg>
       <span class="absolute">5</span>
     </a>
 
-    <a href="stages/declaration_in_sud" data-stage="6" class="left-[158.89px] top-[359.82px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
+    <a href="stages/declaration_in_sud" data-stage="6" class="left-[110px] top-[359.82px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
       <svg width="37" height="36" viewBox="0 0 37 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="18.4544" cy="18.3802" r="16.7792" stroke="#365C80" stroke-width="1.56723"/>
       </svg>
       <span class="absolute">6</span>
     </a>
 
-    <a href="stages/bankrot" data-stage="7" class="left-[286.04px] top-[359.82px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
+    <a href="stages/bankrot" data-stage="7" class="left-[240px] top-[359.82px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
       <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="17.5995" cy="18.3802" r="16.7792" stroke="#365C80" stroke-width="1.56723"/>
       </svg>
       <span class="absolute">7</span>
     </a>
 
-    <a href="stages/dolgspisan" data-stage="8" class="left-[286.04px] top-[462.23px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
+    <a href="stages/dolgspisan" data-stage="8" class="left-[240px] top-[462.23px] absolute flex items-center justify-center text-slate-600 text-xl font-semibold font-['Montserrat']">
       <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="17.5995" cy="17.7889" r="16.7792" fill="#365C80" stroke="#365C80" stroke-width="1.56723"/>
       </svg>
@@ -266,38 +266,38 @@
 
 
 <!-- 🔶 СОЕДИНИТЕЛЬНЫЕ ЛИНИИ -->
-<div data-stage="2" class="w-[94px] h-0 left-[67px] top-[173.28px] absolute outline outline-[1.57px] outline-offset-[-0.78px] outline-slate-600">
+<div data-stage="2" class="w-[94px] h-0 left-[17px] top-[173.28px] absolute outline outline-[1.57px] outline-offset-[-0.78px] outline-slate-600">
   <div class="triangle absolute left-[44px] top-[-5px]" style="transform: rotate(270deg);"></div>
 </div>
 
-<div data-stage="3" class="w-[94px] h-0 left-[194.22px] top-[173.28px] absolute outline outline-[1.57px] outline-offset-[-0.78px] outline-slate-600">
+<div data-stage="3" class="w-[94px] h-0 left-[146px] top-[173.28px] absolute outline outline-[1.57px] outline-offset-[-0.78px] outline-slate-600">
   <div class="triangle absolute left-[44px] top-[-5px]" style="transform: rotate(270deg);"></div>
 </div>
 
-<div data-stage="5" class="w-[94px] h-0 left-[194.22px] top-[275.15px] absolute outline outline-[1.57px] outline-offset-[-0.78px] outline-slate-600">
+<div data-stage="5" class="w-[94px] h-0 left-[146px] top-[275.15px] absolute outline outline-[1.57px] outline-offset-[-0.78px] outline-slate-600">
   <div class="triangle absolute left-[44px] top-[-6px]" style="transform: rotate(90deg);"></div>
 </div>
 
-<div data-stage="7" class="w-[94px] h-0 left-[193.69px] top-[377.55px] absolute outline outline-[1.57px] outline-offset-[-0.78px] outline-slate-600">
+<div data-stage="7" class="w-[94px] h-0 left-[146px] top-[377.55px] absolute outline outline-[1.57px] outline-offset-[-0.78px] outline-slate-600">
   <div class="triangle absolute left-[44px] top-[-5px]" style="transform: rotate(270deg);"></div>
 </div>
 
 <!-- 🔵 ДУГИ -->
-<div data-stage="4" data-svg-wrapper class="left-[320.64px] top-[172.76px] absolute">
+<div data-stage="4" data-svg-wrapper class="left-[273px] top-[172.76px] absolute">
   <svg width="39" height="104" viewBox="0 0 39 104" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M0.866539 0.0119678C0.715157 0.511963 0.56377 1.01196 0.412384 1.51195C2.48198 2.18767 4.56035 3.09914 6.55196 4.08369C25.1448 12.8764 37.8331 32.5756 37.1978 53.2643C37.2719 64.962 33.8539 76.7406 26.3508 85.7218C21.1511 92.0401 14.2809 96.9359 6.73364 100.192C4.68963 101.066 2.56065 101.853 0.461765 102.391C0.580226 102.9 0.698688 103.409 0.817149 103.918C3.10881 103.329 5.23429 102.535 7.35272 101.631C15.1101 98.2843 22.1816 93.2523 27.5606 86.7181C35.325 77.4306 38.8463 65.226 38.7651 53.2643C39.446 32.081 26.296 11.6472 7.24903 2.68001C5.18974 1.6647 3.11661 0.746959 0.866539 0.0119678Z" fill="#365C80"/>
   </svg>
   <div class="triangle absolute left-[32px] top-[46px]" style="transform: rotate(0deg);"></div>
 </div>
 
-<div data-stage="6" data-svg-wrapper class="left-[122.12px] top-[275.15px] absolute">
+<div data-stage="6" data-svg-wrapper class="left-[74px] top-[275.15px] absolute">
   <svg width="39" height="105" viewBox="0 0 39 105" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M38.2384 104.297C38.3898 103.797 38.5412 103.297 38.6926 102.797C36.623 102.121 34.5446 101.21 32.553 100.225C13.9602 91.4324 1.27185 71.7332 1.90715 51.0446C1.83303 39.3468 5.25113 27.5683 12.7541 18.5871C17.9538 12.2687 24.8241 7.37299 32.3713 4.11723C34.4153 3.24274 36.5443 2.45618 38.6432 1.9175C38.5248 1.4087 38.4063 0.899895 38.2878 0.391091C35.9962 0.979645 33.8707 1.77406 31.7523 2.67745C23.9949 6.02457 16.9234 11.0565 11.5444 17.5907C3.77995 26.8782 0.258671 39.0828 0.339919 51.0446C-0.341069 72.2278 12.809 92.6616 31.856 101.629C33.9152 102.644 35.9884 103.562 38.2384 104.297Z" fill="#365C80"/>
   </svg>
   <div class="triangle absolute left-[-4px] top-[46px]" style="transform: rotate(0deg);"></div>
 </div>
 
-<div data-stage="8" data-svg-wrapper class="left-[320.64px] top-[377.55px] absolute">
+<div data-stage="8" data-svg-wrapper class="left-[273px] top-[377.55px] absolute">
   <svg width="39" height="105" viewBox="0 0 39 105" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M0.866539 0.79688C0.715157 1.29688 0.56377 1.79687 0.412384 2.29687C2.48198 2.97258 4.56035 3.88405 6.55196 4.8686C25.1448 13.6613 37.8331 33.3605 37.1978 54.0492C37.2719 65.7469 33.8539 77.5255 26.3508 86.5067C21.1511 92.825 14.2809 97.7208 6.73364 100.977C4.68963 101.851 2.56065 102.638 0.461765 103.176C0.580226 103.685 0.698688 104.194 0.817149 104.703C3.10881 104.114 5.23429 103.32 7.35272 102.416C15.1101 99.0692 22.1816 94.0372 27.5606 87.5031C35.325 78.2156 38.8463 66.0109 38.7651 54.0492C39.446 32.866 26.296 12.4321 7.24903 3.46492C5.18974 2.44962 3.11661 1.53187 0.866539 0.79688Z" fill="#365C80"/>
   </svg>
@@ -361,48 +361,43 @@
 
 
 
-    <div class="left-[26px] top-[193.66px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
+    <div class="left-[-25px] top-[193.66px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
       Договор<br/>заключен
     </div>
 
-    <div class="left-[147.72px] top-[193.66px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
+    <div class="left-[100px] top-[193.66px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
       Сбор<br/>документов
     </div>
 
-    <div class="left-[280.41px] top-[193.66px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
+    <div class="left-[235px] top-[193.66px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
       Анализ<br/>ситуации
     </div>
 
-    <div class="left-[280.41px] top-[296.05px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
+    <div class="left-[105px] top-[296.05px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
       Ожидаем<br/>депозит
     </div>
 
-    <div class="left-[137.27px] top-[296.05px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
+    <div class="left-[235px] top-[296.05px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
       Готовим<br/>заявление в суд
     </div>
 
-    <div class="left-[145.11px] top-[398.44px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
+    <div class="left-[100px] top-[398.44px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
       Заявление<br/>подано в суд
     </div>
 
-    <div class="left-[276.23px] top-[398.44px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
+    <div class="left-[233px] top-[398.44px] absolute text-center text-black text-[9.02px] font-semibold font-['Montserrat']">
       Признание<br/>банкротом
     </div>
 
-    <div class="left-[204.14px] top-[463.74px] absolute text-center text-slate-600 text-sm font-bold font-['Montserrat']">
+    <div class="left-[160px] top-[463.74px] absolute text-center text-slate-600 text-sm font-bold font-['Montserrat']">
       ДОЛГ<br/>СПИСАН!
     </div>
 
-
-
     <div class="w-48 h-24 left-[97px] top-[30px] absolute opacity-75 bg-sky-100 rounded-xl"></div>
 
-    <div class="left-[116.60px] top-[59.40px] absolute text-center text-slate-600 text-sm font-semibold font-['Montserrat']">
+    <div class="left-[60px] top-[59.40px] absolute text-center text-slate-600 text-sm font-semibold font-['Montserrat']">
       СТАДИИ РАБОТЫ<br/>НАД ВАШИМ ДЕЛОМ
     </div>
-
-
-
   </div>
 </div>
 
@@ -445,12 +440,24 @@
                   {% endif %}
                 </td>
                 <td class="px-3 py-2 text-center">
-                  <button class="px-3 py-1 rounded-lg text-white text-sm
-                                 {% if payment.status == 'paid' %}bg-gray-400 cursor-not-allowed
-                                 {% else %}bg-gradient-to-r from-green-400 to-blue-400 hover:from-green-500 hover:to-blue-500{% endif %}"
-                          {% if payment.status == 'paid' %}disabled{% endif %}>
-                    {% if payment.status == 'paid' %}Оплачено{% else %}Оплатить{% endif %}
-                  </button>
+                <button
+                  class="px-3 py-1 rounded-lg text-white text-sm
+                        {% if payment.status == 'paid' %}
+                          bg-gray-400 cursor-not-allowed
+                        {% else %}
+                          bg-gradient-to-r from-green-400 to-blue-400 hover:from-green-500 hover:to-blue-500
+                        {% endif %}"
+                  {% if payment.status != 'paid' %}
+                    onclick="window.location.href='{% url 'create_payment' payment.id %}'"
+                  {% else %}
+                    disabled
+                  {% endif %}>
+                  {% if payment.status == 'paid' %}
+                    Оплачено
+                  {% else %}
+                    Оплатить
+                  {% endif %}
+                </button>
                 </td>
               </tr>
               {% endfor %}
@@ -473,12 +480,22 @@
                 </p>
               </div>
               <div>
-                <button class="px-3 py-1 rounded-lg text-white text-sm
-                               {% if payment.status == 'paid' %}bg-gray-400 cursor-not-allowed
-                               {% else %}bg-gradient-to-r from-green-400 to-blue-400 hover:from-green-500 hover:to-blue-500{% endif %}"
-                        {% if payment.status == 'paid' %}disabled{% endif %}>
-                  {% if payment.status == 'paid' %}Оплачено{% else %}Оплатить{% endif %}
-                </button>
+                {% if payment.id %}
+                  <button onclick="window.location.href='{% url 'create_payment' payment.id %}'"
+                          class="px-3 py-1 rounded-lg text-white text-sm
+                                {% if payment.status == 'paid' %}
+                                    bg-gray-400 cursor-not-allowed
+                                {% else %}
+                                    bg-gradient-to-r from-green-400 to-blue-400 hover:from-green-500 hover:to-blue-500
+                                {% endif %}"
+                          {% if payment.status == 'paid' %}disabled{% endif %}>
+                      {% if payment.status == 'paid' %}Оплачено{% else %}Оплатить{% endif %}
+                  </button>
+                {% else %}
+                  <button class="px-3 py-1 rounded-lg bg-gray-300 text-gray-500 cursor-not-allowed">
+                    Недоступно
+                  </button>
+                {% endif %}
               </div>
             </div>
           </div>

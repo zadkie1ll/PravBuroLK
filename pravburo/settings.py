@@ -65,6 +65,10 @@ DATABASES = {
 }
 
 
+ALFA_API_URL_PROD = "ALFA_API_URL_PROD"
+ALFA_USER_PROD = "ALFA_USER_PROD"
+ALFA_PASS_PROD = "ALFA_PASS_PROD"
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
