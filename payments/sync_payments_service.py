@@ -15,6 +15,11 @@ class BitrixSyncService:
 
         self.plan = getattr(self.contract, "installmentplan", None) if self.contract else None
 
+    def get_admin_url(self):
+        """Формирует URL на страницу администрирования клиента"""
+        base_url = getattr(settings, "SITE_BASE_URL", "http://127.0.0.1:8000")
+        return f"{base_url}/client_admin/{self.client.id}/"
+
     def build_payments_table(self):
         if not self.plan:
             return "Нет данных по рассрочке"
@@ -100,7 +105,7 @@ class BitrixSyncService:
                 "UF_CRM_1760618180": self.get_next_payment_date().strftime("%Y-%m-%d")
                 if self.get_next_payment_date() else None,
                 "UF_CRM_IS_DEBTOR": 1 if self.has_overdue_payments() else 0,
-                #TODO СДЕЛАТЬ УРЛ
+                "UF_CRM_1762350803092": self.get_admin_url(),
             },
         }
         return payload

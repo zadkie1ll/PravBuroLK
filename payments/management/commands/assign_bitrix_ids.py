@@ -5,13 +5,13 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import models, IntegrityError
 from clients.models import Client
-
+from sync_payments_service import sync_client_to_bitrix 
 
 BITRIX_API_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/crm.deal.list.json"
 
 
 class Command(BaseCommand):
-    help = "Присваивает клиентам bitrix_id по сделкам из канбана C2, сверяя ФИО (гибкий поиск)"
+    help = "Присваивает клиентам bitrix_id по сделкам из канбана C2, сверяя ФИО (гибкий поиск) и синхронизирует их с Bitrix"
 
     def handle(self, *args, **options):
         log_dir = os.path.join(settings.BASE_DIR, "logs")
@@ -64,9 +64,17 @@ class Command(BaseCommand):
                     client.bitrix_id = str(deal_id)
                     client.save(update_fields=["bitrix_id"])
 
-                    msg = f"✅ {full_name} → {deal_title} (ID {deal_id})"
-                    self.stdout.write(self.style.SUCCESS(msg))
-                    logging.info(msg)
+                    # ✅ Сразу после обновления — синхронизируем с Bitrix
+                    try:
+                        sync_client_to_bitrix(client)
+                        msg = f"✅ {full_name} → {deal_title} (ID {deal_id}) — синхронизировано с Bitrix"
+                        self.stdout.write(self.style.SUCCESS(msg))
+                        logging.info(msg)
+                    except Exception as sync_error:
+                        msg = f"⚠ Ошибка синхронизации для {full_name} (ID {deal_id}): {sync_error}"
+                        self.stdout.write(self.style.WARNING(msg))
+                        logging.warning(msg)
+
                     updated += 1
 
                 except IntegrityError as e:

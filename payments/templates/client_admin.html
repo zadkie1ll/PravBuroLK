@@ -78,6 +78,35 @@
   </section>
 {% endif %}
 
+<!-- Новый фактический платеж -->
+<section class="bg-white rounded-2xl shadow p-6 mt-6">
+  <h2 class="text-xl font-semibold mb-4">➕ Добавить фактический платёж</h2>
+  <form id="add-actual-payment-form" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+    {% csrf_token %}
+    <input type="hidden" name="client_id" value="{{ client.id }}">
+
+    <div>
+      <label class="block text-sm font-medium">Сумма платежа (₽)</label>
+      <input type="number" name="amount" step="0.01" placeholder="0.00"
+             class="mt-1 block w-full border rounded-lg p-2">
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Дата платежа</label>
+      <input type="date" name="payment_date" value="{{ today|date:'Y-m-d' }}" 
+             class="mt-1 block w-full border rounded-lg p-2">
+    </div>
+    <div>
+      <button type="submit" 
+              class="px-5 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 w-full">
+        💰 Добавить платеж
+      </button>
+    </div>
+  </form>
+
+  <div id="actual-payment-message" class="mt-2 text-sm text-gray-700"></div>
+</section>
+
+
 <!-- Платежи по рассрочке -->
 {% if payments_data %}
   <section class="bg-white rounded-2xl shadow p-6">
@@ -249,6 +278,42 @@ document.addEventListener("DOMContentLoaded", function () {
       e.preventDefault();
       alert("Сумма всех платежей (включая уже оплаченные) должна быть равна ожидаемой сумме по договору.");
     }
+  });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const form = document.getElementById("add-actual-payment-form");
+  const msg = document.getElementById("actual-payment-message");
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    const formData = new FormData(form);
+
+    fetch("{% url 'create_actual_payment' %}", {
+      method: "POST",
+      headers: { "X-CSRFToken": formData.get('csrfmiddlewaretoken') },
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        msg.textContent = `Платёж ${data.message}`;
+        msg.classList.remove("text-red-600");
+        msg.classList.add("text-green-600");
+        form.reset();
+      } else if (data.error) {
+        msg.textContent = `Ошибка: ${data.error}`;
+        msg.classList.remove("text-green-600");
+        msg.classList.add("text-red-600");
+      }
+    })
+    .catch(err => {
+      msg.textContent = `Ошибка: ${err}`;
+      msg.classList.remove("text-green-600");
+      msg.classList.add("text-red-600");
+    });
   });
 });
 </script>

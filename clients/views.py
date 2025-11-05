@@ -34,7 +34,6 @@ def employee_referral_view(request, employee_id):
     })
 
 
-
 class CustomLoginView(LoginView):
     template_name = 'login.html'
 
@@ -131,7 +130,6 @@ def client_dashboard(request):
     show_stage_popup = False
     if client.need_stage_popup and not client.stage_popup_shown:
         show_stage_popup = True
-        # Отмечаем, что попап был показан (чтобы не показывать при следующем входе)
         client.stage_popup_shown = True
         client.save(update_fields=["stage_popup_shown"])
 
@@ -145,9 +143,9 @@ def client_dashboard(request):
         "stages": stages_data,
         "progress_percent": progress_percent,
         "embed_url": embed_url,
-        "current_stage": current_stage,  # 🔹 сам объект StageTemplate
+        "current_stage": current_stage,  
         "current_stage_order": current_stage.order if current_stage else None,
-        "show_stage_popup": show_stage_popup,  # 🔹 флаг показа модалки
+        "show_stage_popup": show_stage_popup,  
     }
 
     return render(request, "clientnew.html", context)

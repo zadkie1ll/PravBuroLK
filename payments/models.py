@@ -1,6 +1,7 @@
-from django.db import models
+from decimal import Decimal
+from django.db import models, transaction
 from django.utils import timezone
-
+from .sync_payments_service import sync_client_to_bitrix
 
 class Contract(models.Model):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE)
@@ -71,73 +72,120 @@ class InstallmentPayment(models.Model):
 
 class ActualPayment(models.Model):
     plan = models.ForeignKey(
-        InstallmentPlan,
+        "InstallmentPlan",
         on_delete=models.CASCADE,
         related_name="actual_payments",
         blank=True,
-        null=True  
+        null=True
     )
     payment_date = models.DateField(null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     order_id = models.CharField(max_length=100, blank=True, null=True)
 
+    # флаг, чтобы не применять платёж дважды
+    is_applied = models.BooleanField(default=False, editable=False)
+
     def save(self, *args, **kwargs):
+        """
+        Сохраняем. При создании (is_new) запускаем apply_payment один раз.
+        Флаг is_applied защищает от повторного применения.
+        """
+        is_new = self.pk is None
         super().save(*args, **kwargs)
-        self.apply_payment()
+
+        if is_new and not self.is_applied:
+            try:
+                # apply_payment установит is_applied через update, чтобы не вызывать рекурсивный save
+                self.apply_payment()
+            except Exception as e:
+                # логируем, но не ломаем сохранение
+                print(f"[ActualPayment] Ошибка при применении платежа: {e}")
 
     def apply_payment(self):
         """
-        Распределяет платёж строго по порядку платежей (номер платежа),
-        игнорируя даты. Создаёт записи PaymentApplication.
+        Распределяет фактический платёж по платежам плана строго по порядку (number),
+        распределение продолжается пока есть remaining, создаются PaymentApplication записи.
+        После успешного применения помечает self.is_applied = True (через queryset.update).
+        Все изменения в транзакции.
         """
         if not self.plan:
-            return  # если нет плана, ничего не делаем
+            print("[ActualPayment] Нет плана — пропуск распределения")
+            return
 
-        remaining = self.amount
-        payments = self.plan.payments.order_by("number")  # строго по номеру
+        # защитимся от повторного запуска
+        if self.is_applied:
+            print("[ActualPayment] Уже применён — выходим")
+            return
 
-        for payment in payments:
-            if remaining <= 0:
-                break
+        remaining = Decimal(self.amount or 0)
+        if remaining <= 0:
+            # пометим как применён, чтобы не пытаться снова
+            ActualPayment.objects.filter(pk=self.pk).update(is_applied=True)
+            print("[ActualPayment] Нулевая сумма — пометили как применённый")
+            return
 
-            to_pay = payment.amount_due - payment.amount_paid
-            if to_pay <= 0:
-                continue  # этот платёж уже закрыт
+        # Начнём транзакцию — все изменения должны быть атомарны
+        with transaction.atomic():
+            payments_qs = self.plan.payments.select_for_update().order_by("number")
+            # Перебираем по порядку и распределяем
+            for inst_payment in payments_qs:
+                if remaining <= Decimal("0.00"):
+                    break
 
-            applied = min(remaining, to_pay)
+                to_pay = (inst_payment.amount_due or Decimal("0.00")) - (inst_payment.amount_paid or Decimal("0.00"))
+                # если этот платёж уже оплачен — пропускаем
+                if to_pay <= Decimal("0.00"):
+                    continue
 
-            # фиксируем связь между фактическим платёжом и рассрочкой
-            PaymentApplication.objects.create(
-                payment=payment,
-                actual_payment=self,
-                applied_amount=applied,
-            )
+                applied = min(remaining, to_pay)
 
-            # обновляем платёж по рассрочке
-            payment.amount_paid += applied
-            remaining -= applied
+                # Создаём связь ActualPayment -> InstallmentPayment
+                PaymentApplication.objects.create(
+                    payment=inst_payment,
+                    actual_payment=self,
+                    applied_amount=applied,
+                )
 
-            if payment.amount_paid >= payment.amount_due:
-                payment.status = "paid"
-                payment.amount_paid = payment.amount_due
-            else:
-                payment.status = "partial"
+                # Обновляем платёж рассрочки
+                inst_payment.amount_paid = (inst_payment.amount_paid or Decimal("0.00")) + applied
+                if inst_payment.amount_paid >= inst_payment.amount_due:
+                    inst_payment.status = "paid"
+                    inst_payment.amount_paid = inst_payment.amount_due
+                else:
+                    inst_payment.status = "partial"
+                inst_payment.save()
 
-            payment.save()
+                remaining -= applied
 
-        if remaining > 0:
-            print(f"⚠ Остаток {remaining} не распределён (все платежи закрыты)")
+            # Пометим ActualPayment как применённый (через queryset, чтобы не вызвать save() и рекурсию)
+            ActualPayment.objects.filter(pk=self.pk).update(is_applied=True)
+
+        # Логирование остатка
+        if remaining > Decimal("0.00"):
+            print(f"[ActualPayment] Остаток {remaining} ₽ не распределён (все платежи закрыты)")
+        else:
+            print(f"[ActualPayment] Платёж {self.amount} ₽ полностью распределён")
+        
+        # После успешного распределения — синхронизируем клиента (вне транзакции)
+        try:
+            if self.plan and getattr(self.plan, 'contract', None) and getattr(self.plan.contract, 'client', None):
+                client = self.plan.contract.client
+                sync_client_to_bitrix(client)
+                print(f"[ActualPayment] Синхронизация клиента {client.id} завершена")
+        except Exception as e:
+            # не откатываем транзакцию из-за ошибок синхронизации
+            print(f"[ActualPayment] Ошибка при синхронизации: {e}")
 
 
 class PaymentApplication(models.Model):
     """Связь между фактическим платёжом и платежом по рассрочке"""
     payment = models.ForeignKey(
-        InstallmentPayment,
+        'InstallmentPayment',
         on_delete=models.CASCADE,
         related_name='applications'
     )
     actual_payment = models.ForeignKey(
-        ActualPayment,
+        'ActualPayment',
         on_delete=models.CASCADE,
         related_name='applications'
     )
@@ -148,7 +196,6 @@ class PaymentApplication(models.Model):
     def __str__(self):
         actual_date = getattr(self.actual_payment, 'payment_date', 'None')
         return f"{self.applied_amount} ₽ → {self.payment} ({actual_date})"
-
 
 class OtherPayment(models.Model):
     PAYMENT_TYPES = [

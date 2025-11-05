@@ -3,7 +3,7 @@ from django.urls import path
 from clients.views import client_dashboard, redirect_handler, referral_page, mark_stage_popup_shown, employee_referral_view
 from clients.views import CustomLoginView, TestCreateClientView, stage_detail, dashboard_stats, confident_police
 from django.contrib.auth.views import LogoutView
-from payments.views import client_admin_view, create_payment, payment_callback, BitrixCreateClientFromDealView, recalculate_installment, update_custom_payments, payments_dashboard, client_search_view, BitrixWebhookCreateClientView, admin_dashboard
+from payments.views import client_admin_view, payment_callback_debug, create_actual_payment, create_payment, payment_callback, BitrixCreateClientFromDealView, recalculate_installment, update_custom_payments, payments_dashboard, client_search_view, BitrixWebhookCreateClientView, admin_dashboard
 from bitrix.views import referral_landing, referral_submit, application_success, referral_stats
 
 
@@ -17,6 +17,7 @@ urlpatterns = [
     path("ref/submit/", referral_submit, name="referral_submit"),
     path('dashboard/', client_dashboard, name='client_dashboard'),
     path('', redirect_handler, name='index'),
+    path("create-actual-payment/", create_actual_payment, name="create_actual_payment"),
     path('payment/<int:payment_id>/', create_payment, name='create_payment'),
     path("callback/", payment_callback, name="payment_callback"),
     path('dashboard/stats/', dashboard_stats, name='dashboard_stats'),
@@ -34,4 +35,5 @@ urlpatterns = [
     path('client_search/', client_search_view, name='client_search'),
     path('client_admin/<int:client_id>/recalculate/', recalculate_installment, name='recalculate_installment'),
     path('client/<int:client_id>/update_custom_payments/', update_custom_payments, name='update_custom_payments'),
+    path("payment-callback/", payment_callback_debug, name="payment_callback_debug"),
 ]

@@ -632,67 +632,96 @@ def create_payment(request, payment_id):
     return redirect(form_url)
         
         
+@csrf_exempt
+def create_actual_payment(request):
+    """
+    Создаёт фактический платёж и полагается на логику внутри модели для распределения.
+    POST:
+      - client_id
+      - amount
+      - payment_date (optional, YYYY-MM-DD)
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Только POST запросы разрешены"}, status=405)
+
+    try:
+        client_id = request.POST.get("client_id")
+        amount = request.POST.get("amount")
+        payment_date = request.POST.get("payment_date")
+
+        if not client_id or not amount:
+            return JsonResponse({"error": "Необходимо передать client_id и amount"}, status=400)
+
+        client = get_object_or_404(Client, id=client_id)
+        contract = Contract.objects.filter(client=client).first()
+        if not contract:
+            return JsonResponse({"error": "У клиента нет контракта"}, status=400)
+
+        plan = getattr(contract, "installmentplan", None)
+        if not plan:
+            return JsonResponse({"error": "У клиента нет плана рассрочки"}, status=400)
+
+        payment = ActualPayment.objects.create(
+            plan=plan,
+            amount=Decimal(amount),
+            payment_date=payment_date or timezone.now().date(),
+        )
+
+        return JsonResponse({
+            "success": True,
+            "message": f"Платёж {payment.amount} ₽ создан и попытка распределения выполнена.",
+            "payment_id": payment.id,
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 @csrf_exempt
 def payment_callback(request):
     """
-    Обработка уведомления от Альфа-Банка об оплате
+    Callback от Альфа-Банка — уведомление об оплате
     """
-    order_id = request.GET.get("orderId") or request.POST.get("orderId")
+    data = request.POST or request.GET
+    order_id = data.get("orderId")
+    order_status = str(data.get("orderStatus", ""))
+    error_code = str(data.get("errorCode", ""))
+
     if not order_id:
         return JsonResponse({"error": "orderId required"}, status=400)
 
-    # Проверяем, не создавали ли уже фактический платёж с этим order_id
     if ActualPayment.objects.filter(order_id=order_id).exists():
         return JsonResponse({"status": "duplicate"}, status=200)
 
-    payload = {
-        "userName": settings.ALFA_USER,
-        "password": settings.ALFA_PASS,
-        "orderId": order_id,
-    }
+    if error_code != "0" or order_status != "2":
+        return JsonResponse({
+            "status": "not paid",
+            "orderStatus": order_status,
+            "errorCode": error_code,
+        }, status=200)
 
-    try:
-        response = requests.post(
-            f"{settings.ALFA_API_URL}/getOrderStatusExtended.do",
-            data=payload,
-            timeout=10
-        )
-        data = response.json()
-    except Exception as e:
-        return JsonResponse({"error": f"connection error: {e}"}, status=500)
-
-    # --- Проверка на успешный статус ---
-    if str(data.get("ErrorCode")) != "0" or str(data.get("OrderStatus")) != "2":
-        return JsonResponse({"status": "not paid", "details": data}, status=200)
-
-    # --- Находим плановый платёж ---
     payment = InstallmentPayment.objects.filter(order_id=order_id).first()
     if not payment:
         return JsonResponse({"error": "payment not found"}, status=404)
 
-    # --- Проверяем, не был ли он уже оплачен ---
     if payment.status == "paid":
         return JsonResponse({"status": "already paid"}, status=200)
 
-    # --- Создаём фактический платёж ---
     actual_payment = ActualPayment.objects.create(
         plan=payment.plan,
         payment_date=timezone.now().date(),
         amount=payment.amount_due,
-        order_id=order_id,  # сохраняем orderId для уникальности
+        order_id=order_id,
     )
 
-    # После распределения платежей обновим статус планового платежа
     payment.refresh_from_db()
 
     return JsonResponse({
         "status": "success",
         "payment_id": payment.id,
         "actual_payment_id": actual_payment.id,
-        "installment_status": payment.status,
         "amount_paid": str(payment.amount_paid),
+        "order_id": order_id,
     })
         
         
@@ -823,7 +852,6 @@ class BitrixCreateClientFromDealView(View):
                     preferred_payment_day=preferred_payment_day,
                 )
 
-                # --- Отправляем логин/пароль обратно в Битрикс ---
                 deal_id = str(deal_data.get("ID") or "")
                 bitrix_url = f"{BITRIX_WEBHOOK}crm.deal.update.json"
                 auth_text = f"{username}\n{new_password}"
@@ -831,7 +859,7 @@ class BitrixCreateClientFromDealView(View):
                 payload = {
                     "id": deal_id,
                     "fields": {
-                        "UF_CRM_1745888913952": auth_text  # Поле в Битриксе
+                        "UF_CRM_1745888913952": auth_text  
                     }
                 }
 
@@ -853,3 +881,151 @@ class BitrixCreateClientFromDealView(View):
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+#TEMP LOGS-----------------------------------------------------------
+
+
+# payments/debug_views.py
+import json
+import threading
+from datetime import datetime
+from pathlib import Path
+
+from django.conf import settings
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+# потокобезопасный lock для записи в файл
+_log_lock = threading.Lock()
+
+# Путь к файлу лога — можно переопределить в settings.ALFA_CALLBACK_LOG_PATH
+DEFAULT_LOG_PATH = Path(getattr(settings, "ALFA_CALLBACK_LOG_PATH", settings.BASE_DIR)) / "alfa_callbacks.log"
+
+
+def _ensure_log_path(path: Path):
+    parent = path.parent
+    parent.mkdir(parents=True, exist_ok=True)
+
+
+def _pretty_json(obj):
+    try:
+        return json.dumps(obj, ensure_ascii=False, indent=2)
+    except Exception:
+        return str(obj)
+
+
+@csrf_exempt
+def payment_callback_debug(request):
+    """
+    Временный хендлер для тестирования: записывает тела всех входящих запросов в текстовый файл.
+    Формат записи:
+    === [TIMESTAMP] ===
+    Remote IP: ...
+    Method: POST
+    Path: /api/alfa/payment-callback/
+    --- HEADERS ---
+    { ... }
+    --- QUERY / GET ---
+    { ... }
+    --- FORM ---
+    { ... }
+    --- JSON BODY ---
+    { ... }
+    --- RAW BODY ---
+    <raw body as decoded utf-8 with replacement>
+    === END ===
+
+    Возвращает {"status": "logged"} чтобы внешняя система (банк) видела 200.
+    """
+    log_path = Path(getattr(settings, "ALFA_CALLBACK_LOG_PATH", DEFAULT_LOG_PATH))
+    _ensure_log_path(log_path)
+
+    # Сбор данных
+    timestamp = datetime.utcnow().isoformat(timespec="seconds") + "Z"  # UTC timestamp
+    remote_addr = request.META.get("REMOTE_ADDR", "unknown")
+    method = request.method
+    path = request.get_full_path()
+
+    # Заголовки
+    try:
+        headers = {k: v for k, v in request.headers.items()}
+    except Exception:
+        # Старые версии Django могут не иметь request.headers
+        headers = {}
+        for k, v in request.META.items():
+            if k.startswith("HTTP_"):
+                headers[k[5:].replace("_", "-").title()] = v
+
+    # Query params
+    query_params = dict(request.GET)
+
+    # Form data (POST form-encoded / multipart)
+    form_params = dict(request.POST)
+
+    # Raw body (попытка декодировать)
+    try:
+        raw_body = request.body.decode("utf-8")
+    except Exception:
+        raw_body = request.body.decode("utf-8", errors="replace")
+
+    # JSON body (если возможно)
+    json_body = None
+    if raw_body:
+        try:
+            json_body = json.loads(raw_body)
+        except Exception:
+            json_body = None
+
+    # Собираем красивую запись
+    sep = "\n" + ("=" * 80) + "\n"
+    parts = [
+        sep,
+        f"[{timestamp}]\n",
+        f"Remote IP: {remote_addr}\n",
+        f"Method: {method}\n",
+        f"Path: {path}\n\n",
+        "--- HEADERS ---\n",
+        _pretty_json(headers) + "\n\n",
+        "--- QUERY / GET ---\n",
+        _pretty_json(query_params) + "\n\n",
+        "--- FORM (POST) ---\n",
+        _pretty_json(form_params) + "\n\n",
+        "--- JSON BODY (parsed) ---\n",
+        (_pretty_json(json_body) if json_body is not None else "null") + "\n\n",
+        "--- RAW BODY (utf-8, errors=replacement) ---\n",
+        raw_body + "\n\n",
+        "--- META (selected) ---\n",
+        _pretty_json({
+            "CONTENT_TYPE": request.META.get("CONTENT_TYPE"),
+            "CONTENT_LENGTH": request.META.get("CONTENT_LENGTH"),
+            "HTTP_USER_AGENT": request.META.get("HTTP_USER_AGENT"),
+            "HTTP_HOST": request.META.get("HTTP_HOST"),
+        }) + "\n",
+        ("=" * 80) + "\n\n",
+    ]
+
+    entry = "".join(parts)
+
+    # Запись в файл с блокировкой
+    try:
+        with _log_lock:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(entry)
+                f.flush()
+    except Exception as e:
+        # Если лог записать не удалось — возвращаем ошибку 500, но для webhook теста можно вернуть 200.
+        return JsonResponse({"status": "log_error", "error": str(e)}, status=500)
+
+    # Вернём 200, чтобы внешняя система считала callback доставленным.
+    return JsonResponse({"status": "logged"})

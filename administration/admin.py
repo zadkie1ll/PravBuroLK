@@ -144,7 +144,13 @@ class InstallmentPaymentAdmin(admin.ModelAdmin):
 class ActualPaymentAdmin(admin.ModelAdmin):
     list_display = ("id", "plan", "payment_date", "amount")  
     ordering = ("-payment_date",)  
-    list_filter = ("payment_date",)  
+    list_filter = ("payment_date",)
+    search_fields = (
+        'plan__contract__client__surname',
+        'plan__contract__client__name',
+        'plan__contract__client__middlename',
+        'plan__contract__client__bitrix_id',
+    ) 
 
 
 @admin.register(OtherPayment)
