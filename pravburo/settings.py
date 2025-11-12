@@ -82,6 +82,7 @@ ALFA_PASS_PROD = "ALFA_PASS_PROD"
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+SITE_BASE_URL = "https://prav-buro.ru"
 
 AUTH_PASSWORD_VALIDATORS = [
     {

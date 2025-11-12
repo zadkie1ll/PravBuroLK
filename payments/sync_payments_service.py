@@ -17,7 +17,7 @@ class BitrixSyncService:
 
     def get_admin_url(self):
         """Формирует URL на страницу администрирования клиента"""
-        base_url = getattr(settings, "SITE_BASE_URL", "http://127.0.0.1:8000")
+        base_url = getattr(settings, "SITE_BASE_URL", "https://prav-buro.ru")
         return f"{base_url}/client_admin/{self.client.id}/"
 
     def build_payments_table(self):

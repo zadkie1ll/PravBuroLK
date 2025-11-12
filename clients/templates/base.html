@@ -71,9 +71,9 @@
   <!-- Десктопное меню -->
   <nav class="hidden md:flex items-center space-x-6">
     <a href="{% url 'client_dashboard' %}#stages" class="py-2 px-3 font-medium text-[#365C80]">Стадии</a>
-    <a href="{% url 'client_dashboard' %}#contract" class="py-2 px-3 font-medium text-[#365C80]">Договор</a>
-    <a href="{% url 'client_dashboard' %}#installment" class="py-2 px-3 font-medium text-[#365C80]">Рассрочка</a>
-    <a href="{% url 'client_dashboard' %}#referral" class="py-2 px-3 font-medium text-[#365C80]">Реферальная программа</a>
+    <a href="{% url 'client_dashboard' %}#contract" class="py-2 px-3 font-medium text-[#365C80]">Таблица платежей</a>
+    <a href="{% url 'client_dashboard' %}#installment" class="py-2 px-3 font-medium text-[#365C80]">Реферальная программа</a>
+    <a href="{% url 'client_dashboard' %}#referral" class="py-2 px-3 font-medium text-[#365C80]">Чат поддержки</a>
 
     <!-- Кнопка выхода (десктоп) -->
 <form method="post" action="{% url 'logout' %}">
@@ -104,9 +104,9 @@
         <!-- Меню футера для десктопа -->
         <nav class="hidden sm:flex space-x-6 ml-6 flex-1">
           <a href="{% url 'client_dashboard' %}#stages" class="text-[#365C80] hover:underline">Стадии</a>
-          <a href="{% url 'client_dashboard' %}#contract" class="text-[#365C80] hover:underline">Договор</a>
-          <a href="{% url 'client_dashboard' %}#installment" class="text-[#365C80] hover:underline">Рассрочка</a>
-          <a href="{% url 'client_dashboard' %}#referral" class="text-[#365C80] hover:underline">Реферальная программа</a>
+          <a href="{% url 'client_dashboard' %}#contract" class="text-[#365C80] hover:underline">Таблица платежей</a>
+          <a href="{% url 'client_dashboard' %}#installment" class="text-[#365C80] hover:underline">Реферальная программа</a>
+          <a href="{% url 'client_dashboard' %}#referral" class="text-[#365C80] hover:underline">Чат поддержки</a>
         </nav>
 
         <!-- Мобильная версия: логотип и меню -->
@@ -115,10 +115,10 @@
             <img src="{% static 'img/logo.svg' %}" alt="Логотип" class="h-20 w-auto">
           </div>
           <div class="flex flex-col items-start space-y-2">
-            <a href="{% url 'client_dashboard' %}#stages" class="text-[#365C80] hover:underline">Стадии</a>
-            <a href="{% url 'client_dashboard' %}#contract" class="text-[#365C80] hover:underline">Договор</a>
-            <a href="{% url 'client_dashboard' %}#installment" class="text-[#365C80] hover:underline">Рассрочка</a>
-            <a href="{% url 'client_dashboard' %}#referral" class="text-[#365C80] hover:underline">Реферальная программа</a>
+          <a href="{% url 'client_dashboard' %}#stages" class="text-[#365C80] hover:underline">Стадии</a>
+          <a href="{% url 'client_dashboard' %}#contract" class="text-[#365C80] hover:underline">Таблица платежей</a>
+          <a href="{% url 'client_dashboard' %}#installment" class="text-[#365C80] hover:underline">Реферальная программа</a>
+          <a href="{% url 'client_dashboard' %}#referral" class="text-[#365C80] hover:underline">Чат поддержки</a>
           </div>
         </div>
       </div>
@@ -200,10 +200,10 @@
   </div>
 
   <ul class="flex flex-col p-6 space-y-4">
-    <li><a href="{% url 'client_dashboard' %}#stages" class="px-3 text-[#365C80]">➜ Стадии</a></li>
-    <li><a href="{% url 'client_dashboard' %}#contract" class="px-3 text-[#365C80]">➜ Договор</a></li>
-    <li><a href="{% url 'client_dashboard' %}#installment" class="px-3 text-[#365C80]">➜ Рассрочка</a></li>
-    <li><a href="{% url 'client_dashboard' %}#referral" class="px-3 text-[#365C80]">➜ Реферальная программа</a></li>
+    <li><a href="{% url 'client_dashboard' %}#stages-mobile" class="px-3 text-[#365C80]">➜ Стадии</a></li>
+    <li><a href="{% url 'client_dashboard' %}#contract" class="px-3 text-[#365C80]">➜ Таблица платежей</a></li>
+    <li><a href="{% url 'client_dashboard' %}#installment" class="px-3 text-[#365C80]">➜ Реферальная программа</a></li>
+    <li><a href="{% url 'client_dashboard' %}#referral" class="px-3 text-[#365C80]">➜ Чат поддержки</a></li>
     <li>
     <form method="post" action="{% url 'logout' %}">
       {% csrf_token %}

@@ -16,8 +16,9 @@ from django.utils import timezone
 from datetime import timedelta
 from django.views import View
 from clients.services import ClientService
+from django.db import transaction
 from .models import Employee
-
+from payments.utilities import get_deal_data_from_bitrix
 
 
 def confident_police(request):
@@ -178,6 +179,56 @@ def mark_stage_popup_shown(request):
     return JsonResponse({"status": "ok"})
 
 
+
+@csrf_exempt
+def bitrix_deal_webhook(request):
+    """
+    Обрабатывает входящий вебхук от Битрикс24 при изменении сделки.
+    Меняет стадию клиента на основании bitrix_stage_id.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST allowed"}, status=405)
+
+    try:
+        post_data = request.POST.dict() or {}
+        deal_data, error = get_deal_data_from_bitrix(post_data)
+
+        if error:
+            return JsonResponse({"status": "error", "message": error}, status=400)
+
+        bitrix_id = deal_data.get("ID")
+        bitrix_stage_id = deal_data.get("STAGE_ID")
+
+        if not bitrix_id or not bitrix_stage_id:
+            return JsonResponse({"status": "error", "message": "Missing bitrix_id or bitrix_stage_id"}, status=400)
+
+        try:
+            client = Client.objects.get(bitrix_id=bitrix_id)
+        except Client.DoesNotExist:
+            return JsonResponse({"status": "error", "message": f"Client with bitrix_id={bitrix_id} not found"}, status=404)
+
+        try:
+            stage = StageTemplate.objects.get(bitrix_stage_id=bitrix_stage_id)
+        except StageTemplate.DoesNotExist:
+            return JsonResponse({"status": "error", "message": f"Stage with bitrix_stage_id={bitrix_stage_id} not found"}, status=404)
+
+        # Обновляем стадию клиента
+        with transaction.atomic():
+            client.set_stage(stage)
+
+        return JsonResponse({
+            "status": "success",
+            "message": f"Stage updated to '{stage.name}' for client '{client}'",
+            "client_id": client.id,
+            "new_stage": stage.name,
+        })
+
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+
+
+
 @csrf_exempt
 def referral_page(request):
     client = get_object_or_404(Client, user=request.user)
@@ -253,7 +304,6 @@ class CustomLogoutView(DjangoLogoutView):
     Logout с редиректом по ролям.
     """
     def dispatch(self, request, *args, **kwargs):
-        # 1️⃣ пока пользователь ещё авторизован — определяем, куда редиректить
         if request.user.is_staff or request.user.is_superuser:
             self.next_page = 'admin_dashboard'
         else:

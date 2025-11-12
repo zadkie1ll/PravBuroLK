@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import models, IntegrityError
 from clients.models import Client
-from sync_payments_service import sync_client_to_bitrix 
+from payments.sync_payments_service import sync_client_to_bitrix 
 
 BITRIX_API_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/crm.deal.list.json"
 

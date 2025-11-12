@@ -133,17 +133,25 @@ class ClientService:
 
         # --- User -------------------------------------------------------------
         username_unique = _ensure_username(username)
-        if not password:
-            # безопасная автогенерация простым способом (можно заменить на полноценную генерацию)
-            password = User.objects.make_random_password()
 
-        user = User.objects.create_user(
+        user = User(
             username=username_unique,
-            password=password,
             first_name=name,
             last_name=surname,
             email=email or "",
         )
+
+        if password:
+            # проверяем, пришёл ли уже хэш
+            if password.startswith(('pbkdf2_', 'argon2$', 'bcrypt$')):
+                user.password = password  # старый хэш
+            else:
+                user.set_password(password)  # обычный пароль
+        else:
+            # генерация случайного пароля
+            user.set_password(User.objects.make_random_password())
+
+        user.save()
 
         # --- Client -----------------------------------------------------------
         client_kwargs = {

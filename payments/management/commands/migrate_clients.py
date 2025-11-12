@@ -97,10 +97,10 @@ class Command(BaseCommand):
                 payments_data = payments_resp.json()
                 
 
-                # === Создаём клиента через сервис ===
+                # === Создаём клиента через сервис с уже существующим хэшем пароля ===
                 client, contract, plan = ClientService.create_client_with_contract(
                     username=client_data.get("username"),
-                    password=f"Temp{client_data.get('id', '')}",
+                    password=client_data.get("password_hash"),  # <- передаём хэш!
                     name=client_data.get("name", ""),
                     surname=client_data.get("middlename", ""),
                     middlename=client_data.get("lastname", ""),

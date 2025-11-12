@@ -32,8 +32,15 @@ class StageTemplate(models.Model):
     name = models.CharField(max_length=100, unique=True)
     order = models.PositiveIntegerField(default=0)
     slug = models.SlugField(max_length=100, unique=True, blank=True, null=True)
-    description = models.TextField(blank=True, null=True)  # описание стадии
-    youtube_url = models.URLField(blank=True, null=True, help_text="Ссылка на видео YouTube")  # 👈 новое поле
+    description = models.TextField(blank=True, null=True, help_text="Описание стадии")
+    youtube_url = models.URLField(blank=True, null=True, help_text="Ссылка на видео YouTube")
+    bitrix_stage_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        unique=True,
+        help_text="ID стадии сделки в Битрикс24 (например, 'C1:NEW' или 'C2:WON')"
+    )
 
     class Meta:
         ordering = ['order']

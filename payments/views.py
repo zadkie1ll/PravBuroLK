@@ -3,7 +3,9 @@ from django.contrib import messages
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth.decorators import user_passes_test
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from django.http import JsonResponse, HttpResponseForbidden
+from django.db import transaction
 from django.urls import reverse
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
@@ -30,7 +32,13 @@ from django.db.models.functions import Cast
 from django.db.models import CharField
 from django.db import connection
 import re
-from .utilities import get_deal_data_from_bitrix, russian_to_translit
+from .utilities import get_deal_data_from_bitrix, russian_to_translit, recreate_actual_payment
+import telebot
+
+
+
+BOT_TOKEN = "8208949436:AAEIzi6eP5R04crpwpIchWnpqCCFv8TROvY"
+CHAT_ID = "-4907127148"
 
 
 @csrf_exempt
@@ -122,31 +130,23 @@ def payments_dashboard(request):
 def client_admin_view(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
 
-    # Получаем контракт клиента
     contract = Contract.objects.filter(client=client).first()
 
-    # Рассрочка по контракту
     plan = InstallmentPlan.objects.filter(contract=contract).first() if contract else None
 
-    # Платежи по рассрочке
-    payments = plan.payments.all() if plan else []
+    payments = plan.payments.all().order_by('due_date', 'id') if plan else []
 
-    # Сумма уже оплаченная по рассрочке (по amount_due, т.е. что должно было быть оплачено)
     paid_sum = (
         plan.payments.filter(status='paid').aggregate(total=Sum('amount_due'))['total']
         if plan else 0
     )
 
-    # Фактические платежи (правильно через plan__contract)
     actual_payments = ActualPayment.objects.filter(plan__contract=contract) if contract else []
 
-    # Прочие платежи (депозиты, публикации и т.п.)
     other_payments = client.other_payments.all()
 
-    # Сумма, которую должен оплатить клиент (с учётом скидки)
     expected_total = contract.total_amount - contract.discount if contract else 0
 
-    # Собираем данные по каждому платежу рассрочки
     payments_data = []
     for p in payments:
         applications = p.applications.all()
@@ -157,7 +157,6 @@ def client_admin_view(request, client_id):
             "total_paid": total_paid,
         })
 
-    # POST-запрос → обновление данных клиента и контракта
     if request.method == "POST":
         client.name = request.POST.get("name", client.name)
         client.surname = request.POST.get("surname", client.surname)
@@ -183,6 +182,46 @@ def client_admin_view(request, client_id):
         "expected_total": expected_total,
         "other_payments": other_payments,
     })
+
+
+
+@csrf_exempt
+@login_required
+def save_actual_payment(request, payment_id):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Только POST"}, status=405)
+
+    payment = ActualPayment.objects.filter(pk=payment_id).first()
+    if not payment:
+        return JsonResponse({"success": False, "error": "Платёж не найден"}, status=404)
+
+    payment_date = request.POST.get("payment_date")
+    amount_str = request.POST.get("amount", "").replace(",", ".").strip()
+
+    if not payment_date or not amount_str:
+        return JsonResponse({"success": False, "error": "Не указана дата или сумма"}, status=400)
+
+    try:
+        amount_decimal = Decimal(amount_str)
+    except InvalidOperation:
+        return JsonResponse({"success": False, "error": f"Неверная сумма: {amount_str}"}, status=400)
+
+    try:
+        payment_date_obj = datetime.strptime(payment_date, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"success": False, "error": f"Неверная дата: {payment_date}"}, status=400)
+
+    try:
+        new_payment = recreate_actual_payment(payment, amount_decimal, payment_date_obj)
+        return JsonResponse({
+            "success": True,
+            "new_id": new_payment.id,
+            "payment_date": new_payment.payment_date.strftime("%Y-%m-%d"),
+            "amount": str(new_payment.amount)
+        })
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+    
 
 @csrf_exempt
 @require_POST
@@ -210,7 +249,6 @@ def recalculate_installment(request, client_id):
 
         base_total = contract.total_amount
 
-        # Обновляем флаги
         if deposit_checked != contract.deposit:
             contract.deposit = deposit_checked
 
@@ -220,7 +258,6 @@ def recalculate_installment(request, client_id):
         if extra_costs_checked != getattr(contract, "extra_court_costs", False):
             contract.extra_court_costs = extra_costs_checked
 
-        # Основные данные договора
         contract.total_amount = total_amount
         contract.discount = discount
         contract.first_payment = first_payment
@@ -233,7 +270,6 @@ def recalculate_installment(request, client_id):
         messages.error(request, f"Ошибка чтения данных из формы: {e}")
         return redirect("client_admin_view", client_id=client.id)
 
-    # === Пересчёт рассрочки ===
     paid_payments = plan.payments.filter(status='paid').order_by('number')
     paid_amount = paid_payments.aggregate(total=Sum('amount_due'))['total'] or Decimal('0')
 
@@ -298,7 +334,6 @@ def recalculate_installment(request, client_id):
     plan.calculated = True
     plan.save()
 
-    # === После обновления рассрочки — отправляем данные в Bitrix ===
     try:
         sync_client_to_bitrix(client)
         messages.success(request, "Рассрочка пересчитана и данные успешно обновлены в Bitrix24.")
@@ -326,7 +361,6 @@ def update_custom_payments(request, client_id):
         status_field = f"status_{payment.id}"
         due_date_field = f"due_date_{payment.id}"
 
-        # --- Сумма платежа ---
         new_amount_str = request.POST.get(amount_field)
         if new_amount_str is not None:
             try:
@@ -340,14 +374,12 @@ def update_custom_payments(request, client_id):
         else:
             total_amount_due += payment.amount_due
 
-        # --- Статус платежа ---
         new_status = request.POST.get(status_field)
         if new_status in dict(InstallmentPayment.STATUS_CHOICES):
             payment.status = new_status
         else:
             errors.append(f"Неверный статус для платежа #{payment.number}")
 
-        # --- Дата платежа ---
         new_due_date_str = request.POST.get(due_date_field)
         if new_due_date_str:
             try:
@@ -576,20 +608,25 @@ class BitrixWebhookCreateClientView(View):
 #AlfaAPI payments-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
 
 ALFA_API_URL = "https://payment.alfabank.ru/payment/rest/register.do"
-ALFA_USER_NAME = "r-prav_0-api"      # prod логин
-ALFA_PASSWORD = "Qwasdcvbgh243567!@"        # prod пароль
+ALFA_USER_NAME = "r-prav_0-api" 
+ALFA_PASSWORD = "Qwasdcvbgh243567!@"        
     
 
 
 def create_payment(request, payment_id):
     payment = get_object_or_404(InstallmentPayment, id=payment_id)
 
-    amount = int(float(payment.amount_due) * 100)
-    order_number = f"{payment.__class__.__name__}-{payment.id}-{int(time.time())}"
+    remaining = Decimal(payment.amount_due) - Decimal(payment.amount_paid or 0)
+    if remaining <= 0:
+        messages.error(request, f"Платёж №{payment.number} уже полностью оплачен.")
+        return redirect(request.META.get("HTTP_REFERER", "/"))
 
-    return_url = "http://217.149.31.38/"
-    fail_url = "http://217.149.31.38/"
-    description = f"Оплата по рассрочке №{payment.number}"
+    amount = int(remaining * 100)  
+    order_number = f"InstallmentPayment-{payment.id}-{int(time.time())}"
+
+    return_url = "https://prav-buro.ru"
+    fail_url = "https://prav-buro.ru"
+    description = f"Оплата по рассрочке №{payment.number} (остаток {remaining} ₽)"
 
     payload = {
         "userName": ALFA_USER_NAME,
@@ -603,31 +640,30 @@ def create_payment(request, payment_id):
 
     try:
         response = requests.post(ALFA_API_URL, data=payload, timeout=15)
-        print("Альфа-Банк ответил:", response.status_code, response.text)
     except requests.RequestException as e:
-        print("Ошибка соединения с Альфа-Банк API:", e)
+        messages.error(request, "Не удалось подключиться к Альфа-Банк API. Повторите попытку позже.")
         return redirect(f"{return_url}?payment_status=error")
 
     if response.status_code != 200:
-        print("Ошибка HTTP:", response.status_code, response.text)
+        messages.error(request, "Ошибка при обращении к Альфа-Банк API.")
         return redirect(f"{return_url}?payment_status=error")
 
     data = response.json()
-    print("Ответ JSON от Альфа-Банка:", data)
 
     if data.get("errorCode") and data["errorCode"] != "0":
-        print("Ошибка при создании платежа:", data)
+        messages.error(request, "Ошибка при создании платежа. Попробуйте позже.")
         return redirect(f"{return_url}?payment_status=error")
 
     form_url = data.get("formUrl")
-    order_id = data.get("orderId")
+    bank_order_id = data.get("orderId")
 
     if not form_url:
-        print("Не удалось получить ссылку на оплату:", data)
+        messages.error(request, "Не удалось получить ссылку на оплату.")
         return redirect(f"{return_url}?payment_status=error")
 
-    payment.order_id = order_id
-    payment.save(update_fields=["order_id"])
+    payment.order_id = order_number
+    payment.bank_order_id = bank_order_id
+    payment.save(update_fields=["order_id", "bank_order_id"])
 
     return redirect(form_url)
         
@@ -682,47 +718,71 @@ def payment_callback(request):
     """
     Callback от Альфа-Банка — уведомление об оплате
     """
-    data = request.POST or request.GET
-    order_id = data.get("orderId")
-    order_status = str(data.get("orderStatus", ""))
-    error_code = str(data.get("errorCode", ""))
+    data = request.GET or request.POST
 
-    if not order_id:
-        return JsonResponse({"error": "orderId required"}, status=400)
+    order_number = data.get("orderNumber")
+    status = str(data.get("status", ""))
+    operation = str(data.get("operation", ""))
+    amount_str = data.get("amount", "0")
 
-    if ActualPayment.objects.filter(order_id=order_id).exists():
-        return JsonResponse({"status": "duplicate"}, status=200)
+    if not order_number:
+        return JsonResponse({"error": "orderNumber required"}, status=400)
 
-    if error_code != "0" or order_status != "2":
+    if not (status == "1" and operation == "deposited"):
         return JsonResponse({
-            "status": "not paid",
-            "orderStatus": order_status,
-            "errorCode": error_code,
+            "status": "ignored",
+            "reason": f"operation={operation}, status={status}"
         }, status=200)
 
-    payment = InstallmentPayment.objects.filter(order_id=order_id).first()
+    payment = InstallmentPayment.objects.filter(order_id=order_number).first()
     if not payment:
-        return JsonResponse({"error": "payment not found"}, status=404)
+        return JsonResponse({"error": f"InstallmentPayment not found for {order_number}"}, status=404)
 
-    if payment.status == "paid":
-        return JsonResponse({"status": "already paid"}, status=200)
+    if ActualPayment.objects.filter(order_id=order_number).exists():
+        return JsonResponse({"status": "duplicate"}, status=200)
+
+    try:
+        amount = Decimal(amount_str) / Decimal("100")
+    except Exception:
+        amount = payment.amount_due
 
     actual_payment = ActualPayment.objects.create(
         plan=payment.plan,
         payment_date=timezone.now().date(),
-        amount=payment.amount_due,
-        order_id=order_id,
+        amount=amount,
+        order_id=order_number,
     )
 
-    payment.refresh_from_db()
+    # --- логирование в Telegram ---
+    try:
+        import telebot
+        from django.conf import settings
+
+        chat_id = CHAT_ID 
+        bot = telebot.TeleBot(BOT_TOKEN)
+
+        client = payment.plan.contract.client
+        fio = f"{client.name} {client.surname} {client.middlename or ''}".strip()
+        date_str = timezone.now().strftime("%d.%m.%Y")
+
+        log_message = (
+            f"💳 Поступила оплата через эквайринг\n"
+            f"👤 Клиент: {fio}\n"
+            f"💰 Сумма: {amount} ₽\n"
+            f"📅 Дата: {date_str}"
+        )
+
+        bot.send_message(chat_id, log_message)
+    except Exception as e:
+        print(f"[PaymentCallback][TelegramLog] Ошибка при отправке лога: {e}")
+    # --- конец логирования ---
 
     return JsonResponse({
         "status": "success",
-        "payment_id": payment.id,
         "actual_payment_id": actual_payment.id,
-        "amount_paid": str(payment.amount_paid),
-        "order_id": order_id,
-    })
+        "orderNumber": order_number,
+        "amount": str(amount),
+    }, status=200)
         
         
         
@@ -893,139 +953,3 @@ class BitrixCreateClientFromDealView(View):
         
         
         
-#TEMP LOGS-----------------------------------------------------------
-
-
-# payments/debug_views.py
-import json
-import threading
-from datetime import datetime
-from pathlib import Path
-
-from django.conf import settings
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-
-# потокобезопасный lock для записи в файл
-_log_lock = threading.Lock()
-
-# Путь к файлу лога — можно переопределить в settings.ALFA_CALLBACK_LOG_PATH
-DEFAULT_LOG_PATH = Path(getattr(settings, "ALFA_CALLBACK_LOG_PATH", settings.BASE_DIR)) / "alfa_callbacks.log"
-
-
-def _ensure_log_path(path: Path):
-    parent = path.parent
-    parent.mkdir(parents=True, exist_ok=True)
-
-
-def _pretty_json(obj):
-    try:
-        return json.dumps(obj, ensure_ascii=False, indent=2)
-    except Exception:
-        return str(obj)
-
-
-@csrf_exempt
-def payment_callback_debug(request):
-    """
-    Временный хендлер для тестирования: записывает тела всех входящих запросов в текстовый файл.
-    Формат записи:
-    === [TIMESTAMP] ===
-    Remote IP: ...
-    Method: POST
-    Path: /api/alfa/payment-callback/
-    --- HEADERS ---
-    { ... }
-    --- QUERY / GET ---
-    { ... }
-    --- FORM ---
-    { ... }
-    --- JSON BODY ---
-    { ... }
-    --- RAW BODY ---
-    <raw body as decoded utf-8 with replacement>
-    === END ===
-
-    Возвращает {"status": "logged"} чтобы внешняя система (банк) видела 200.
-    """
-    log_path = Path(getattr(settings, "ALFA_CALLBACK_LOG_PATH", DEFAULT_LOG_PATH))
-    _ensure_log_path(log_path)
-
-    # Сбор данных
-    timestamp = datetime.utcnow().isoformat(timespec="seconds") + "Z"  # UTC timestamp
-    remote_addr = request.META.get("REMOTE_ADDR", "unknown")
-    method = request.method
-    path = request.get_full_path()
-
-    # Заголовки
-    try:
-        headers = {k: v for k, v in request.headers.items()}
-    except Exception:
-        # Старые версии Django могут не иметь request.headers
-        headers = {}
-        for k, v in request.META.items():
-            if k.startswith("HTTP_"):
-                headers[k[5:].replace("_", "-").title()] = v
-
-    # Query params
-    query_params = dict(request.GET)
-
-    # Form data (POST form-encoded / multipart)
-    form_params = dict(request.POST)
-
-    # Raw body (попытка декодировать)
-    try:
-        raw_body = request.body.decode("utf-8")
-    except Exception:
-        raw_body = request.body.decode("utf-8", errors="replace")
-
-    # JSON body (если возможно)
-    json_body = None
-    if raw_body:
-        try:
-            json_body = json.loads(raw_body)
-        except Exception:
-            json_body = None
-
-    # Собираем красивую запись
-    sep = "\n" + ("=" * 80) + "\n"
-    parts = [
-        sep,
-        f"[{timestamp}]\n",
-        f"Remote IP: {remote_addr}\n",
-        f"Method: {method}\n",
-        f"Path: {path}\n\n",
-        "--- HEADERS ---\n",
-        _pretty_json(headers) + "\n\n",
-        "--- QUERY / GET ---\n",
-        _pretty_json(query_params) + "\n\n",
-        "--- FORM (POST) ---\n",
-        _pretty_json(form_params) + "\n\n",
-        "--- JSON BODY (parsed) ---\n",
-        (_pretty_json(json_body) if json_body is not None else "null") + "\n\n",
-        "--- RAW BODY (utf-8, errors=replacement) ---\n",
-        raw_body + "\n\n",
-        "--- META (selected) ---\n",
-        _pretty_json({
-            "CONTENT_TYPE": request.META.get("CONTENT_TYPE"),
-            "CONTENT_LENGTH": request.META.get("CONTENT_LENGTH"),
-            "HTTP_USER_AGENT": request.META.get("HTTP_USER_AGENT"),
-            "HTTP_HOST": request.META.get("HTTP_HOST"),
-        }) + "\n",
-        ("=" * 80) + "\n\n",
-    ]
-
-    entry = "".join(parts)
-
-    # Запись в файл с блокировкой
-    try:
-        with _log_lock:
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(entry)
-                f.flush()
-    except Exception as e:
-        # Если лог записать не удалось — возвращаем ошибку 500, но для webhook теста можно вернуть 200.
-        return JsonResponse({"status": "log_error", "error": str(e)}, status=500)
-
-    # Вернём 200, чтобы внешняя система считала callback доставленным.
-    return JsonResponse({"status": "logged"})
