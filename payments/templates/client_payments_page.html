@@ -1,0 +1,358 @@
+{% load static %}
+<script src="https://cdn.tailwindcss.com"></script>
+
+<div class="max-w-6xl mx-auto py-10 space-y-12">
+
+<!-- ========================= -->
+<!--   ИНФО О КОНТРАКТЕ        -->
+<!-- ========================= -->
+
+<section class="bg-white shadow-md rounded-2xl p-6 space-y-4">
+    <h2 class="text-2xl font-bold text-slate-700">Информация о контракте</h2>
+
+    <form action="{% url 'update_contract_info' contract.id %}" method="POST" class="space-y-4">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+
+            <!-- Общая сумма -->
+            <div>
+                <p class="text-slate-500 mb-1">Общая сумма</p>
+                <input
+                    type="number"
+                    step="0.01"
+                    name="total_amount"
+                    value="{{ contract.total_amount }}"
+                    class="w-full border rounded-lg p-2 focus:ring focus:ring-blue-300"
+                    required
+                >
+            </div>
+
+            <!-- Скидка -->
+            <div>
+                <p class="text-slate-500 mb-1">Скидка</p>
+                <input
+                    type="number"
+                    step="0.01"
+                    name="discount"
+                    value="{{ contract.discount }}"
+                    class="w-full border rounded-lg p-2 focus:ring focus:ring-blue-300"
+                    required
+                >
+            </div>
+
+        </div>
+
+        <button
+            type="submit"
+            class="bg-blue-600 hover:bg-blue-700 transition text-white px-6 py-2 rounded-lg font-semibold"
+        >
+            Сохранить изменения
+        </button>
+    </form>
+</section>
+
+
+
+{% if total_installments_sum != contract_final_amount %}
+<div class="p-4 rounded-xl bg-red-100 border border-red-300 text-red-800">
+    ⚠️ <b>Сумма платежей по рассрочке не совпадает с суммой по договору!</b><br>
+    По договору (с учётом скидки): {{ contract_final_amount }} ₽<br>
+    По рассрочке: {{ total_installments_sum }} ₽
+</div>
+{% endif %}
+
+
+    <!-- ========================= -->
+    <!--   ПЛАНОВЫЕ ПЛАТЕЖИ        -->
+    <!-- ========================= -->
+
+    <section class="bg-white shadow-md rounded-2xl p-6 space-y-6">
+        <h2 class="text-xl font-bold text-slate-700">Платежи по плану</h2>
+
+        <!-- Форма добавления нового платежа -->
+        <form method="POST" action="/installment/create/" class="flex items-center gap-4">
+            {% csrf_token %}
+
+            <!-- 🔥 Передаём plan_id -->
+            <input type="hidden" name="plan_id" value="{{ plan.id }}">
+
+            <input type="date" name="new_installment_date"
+                   class="border rounded-lg px-3 py-2">
+            <input type="number" name="new_installment_amount"
+                   placeholder="Сумма"
+                   class="border rounded-lg px-3 py-2">
+            <button class="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700">
+                Добавить
+            </button>
+        </form>
+
+        <form id="installments-form">
+            {% csrf_token %}
+
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-100 text-sm text-slate-600">
+                        <th class="p-3">#</th>
+                        <th class="p-3">Дата</th>
+                        <th class="p-3">Сумма</th>
+                        <th class="p-3">Статус</th>
+                        <th class="p-3"></th>
+                    </tr>
+                </thead>
+                <tbody class="text-sm">
+                    {% for p in installments %}
+                    <tr class="border-b hover:bg-slate-50">
+                        <td class="p-3 font-semibold">{{ p.number }}</td>
+
+                        <td class="p-3">
+                            <input type="date"
+                                   name="installment_{{ p.id }}_date"
+                                   value="{{ p.due_date|date:'Y-m-d' }}"
+                                   class="w-full border rounded-lg px-2 py-1">
+                        </td>
+
+                        <td class="p-3">
+                            <input type="number"
+                                   name="installment_{{ p.id }}_amount"
+                                   value="{{ p.amount_due }}"
+                                   class="w-full border rounded-lg px-2 py-1">
+                        </td>
+
+                        <td class="p-3">
+                            <input type="text"
+                                   name="installment_{{ p.id }}_status"
+                                   value="{{ p.status }}"
+                                   class="w-full border rounded-lg px-2 py-1">
+                        </td>
+
+                        <td class="p-3 text-right">
+                            <button type="button"
+                                    class="delete-btn text-red-600"
+                                    data-id="{{ p.id }}"
+                                    data-type="installment">
+                                ✖
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td class="p-3 text-slate-500" colspan="5">Нет платежей</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <button type="button" id="save-installments"
+                    class="mt-4 px-5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">
+                Сохранить изменения
+            </button>
+        </form>
+    </section>
+
+
+
+<!-- ========================= -->
+<!-- СРАВНЕНИЕ СУММ            -->
+<!-- ========================= -->
+
+<section class="bg-white shadow-md rounded-2xl p-6 space-y-4">
+
+    <h2 class="text-xl font-bold text-slate-700">Сводка платежей</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+
+        <!-- Сумма по рассрочке -->
+        <div class="p-4 rounded-xl bg-slate-50 border">
+            <p class="text-slate-500">Сумма всех платежей по рассрочке</p>
+            <p class="text-xl font-bold text-slate-700">
+                {{ total_installments_sum }} ₽
+            </p>
+        </div>
+
+        <!-- Сумма фактических платежей -->
+        <div class="p-4 rounded-xl bg-slate-50 border">
+            <p class="text-slate-500">Сумма всех фактических оплат</p>
+            <p class="text-xl font-bold text-slate-700">
+                {{ total_actuals_sum }} ₽
+            </p>
+        </div>
+
+    </div>
+
+</section>
+
+
+
+    <!-- ========================= -->
+    <!--   ФАКТИЧЕСКИЕ ОПЛАТЫ      -->
+    <!-- ========================= -->
+
+    <section class="bg-white shadow-md rounded-2xl p-6 space-y-6">
+        <h2 class="text-xl font-bold text-slate-700">Фактические оплаты</h2>
+
+        <!-- Форма добавления фактической оплаты -->
+        <form method="POST" action="/actual/create/" class="flex items-center gap-4">
+            {% csrf_token %}
+
+            <!-- 🔥 Передаём plan_id -->
+            <input type="hidden" name="plan_id" value="{{ plan.id }}">
+
+            <input type="date" name="new_actual_date"
+                   class="border rounded-lg px-3 py-2">
+            <input type="number" name="new_actual_amount"
+                   placeholder="Сумма"
+                   class="border rounded-lg px-3 py-2">
+            <button class="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700">
+                Добавить
+            </button>
+        </form>
+
+        <form id="actuals-form">
+            {% csrf_token %}
+
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-100 text-sm text-slate-600">
+                        <th class="p-3">Дата</th>
+                        <th class="p-3">Сумма</th>
+                        <th class="p-3"></th>
+                    </tr>
+                </thead>
+                <tbody class="text-sm">
+                    {% for p in actuals %}
+                    <tr class="border-b hover:bg-slate-50">
+                        <td class="p-3">
+                            <input type="date"
+                                   name="actual_{{ p.id }}_date"
+                                   value="{{ p.payment_date|date:'Y-m-d' }}"
+                                   class="w-full border rounded-lg px-2 py-1">
+                        </td>
+
+                        <td class="p-3">
+                            <input type="number"
+                                   name="actual_{{ p.id }}_amount"
+                                   value="{{ p.amount }}"
+                                   class="w-full border rounded-lg px-2 py-1">
+                        </td>
+
+                        <td class="p-3 text-right">
+                            <button type="button"
+                                    class="delete-btn text-red-600"
+                                    data-id="{{ p.id }}"
+                                    data-type="actual">
+                                ✖
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td class="p-3 text-slate-500" colspan="3">Нет оплат</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <button type="button" id="save-actuals"
+                    class="mt-4 px-5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">
+                Сохранить изменения
+            </button>
+        </form>
+    </section>
+</div>
+
+<!-- ======================= -->
+<!--   МОДАЛКА УДАЛЕНИЯ      -->
+<!-- ======================= -->
+
+<div id="delete-modal"
+     class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+
+    <div class="bg-white p-6 rounded-2xl w-full max-w-md space-y-4 shadow-xl">
+        <h3 class="text-xl font-bold text-slate-800">Удалить запись?</h3>
+        <p class="text-slate-600">Вы уверены, что хотите удалить этот платёж? Это действие необратимо.</p>
+
+        <div class="flex justify-end space-x-3">
+            <button id="cancel-delete"
+                    class="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300">
+                Отмена
+            </button>
+
+            <button id="confirm-delete"
+                    class="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700">
+                Удалить
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const csrfToken = '{{ csrf_token }}';
+
+    // ===========================
+    // Удаление платежей
+    // ===========================
+    let modal = document.getElementById("delete-modal");
+    let confirmBtn = document.getElementById("confirm-delete");
+    let cancelBtn = document.getElementById("cancel-delete");
+    let currentDelete = {id: null, type: null};
+
+    document.querySelectorAll(".delete-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            currentDelete.id = btn.dataset.id;
+            currentDelete.type = btn.dataset.type;
+            modal.classList.remove("hidden");
+        });
+    });
+
+    cancelBtn.addEventListener("click", () => modal.classList.add("hidden"));
+
+    confirmBtn.addEventListener("click", () => {
+        let url = currentDelete.type === 'installment' ?
+            `/installment/delete/${currentDelete.id}/` :
+            `/actual/delete/${currentDelete.id}/`;
+
+        fetch(url, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": csrfToken
+            }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) location.reload();
+            else alert("Ошибка при удалении");
+        });
+
+        modal.classList.add("hidden");
+    });
+
+    // ===========================
+    // Массовое сохранение платежей
+    // ===========================
+    document.getElementById("save-installments").addEventListener("click", () => {
+        const formData = new FormData(document.getElementById("installments-form"));
+        fetch("{% url 'update_installment_payments' %}", {
+            method: "POST",
+            headers: {"X-CSRFToken": csrfToken},
+            body: formData
+        }).then(r => r.json())
+          .then(data => {
+              if (data.success) location.reload();
+              else alert("Ошибка при сохранении");
+          });
+    });
+
+    document.getElementById("save-actuals").addEventListener("click", () => {
+        const formData = new FormData(document.getElementById("actuals-form"));
+        fetch("{% url 'update_actual_payments' %}", {
+            method: "POST",
+            headers: {"X-CSRFToken": csrfToken},
+            body: formData
+        }).then(r => r.json())
+          .then(data => {
+              if (data.success) location.reload();
+              else alert("Ошибка при сохранении");
+          });
+    });
+</script>

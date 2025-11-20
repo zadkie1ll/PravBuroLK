@@ -6,15 +6,16 @@ from django.db.models import Q
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.utils import timezone
 from django.contrib.contenttypes.models import ContentType
-
+from simple_history.models import HistoricalRecords  # ✅ добавлено
 
 
 class Employee(models.Model):
-    bitrix_id = models.CharField(max_length=255, unique=True) 
-    name = models.CharField(max_length=255)                     
+    bitrix_id = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     referral_code = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 
     updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()  # ✅ добавлено
 
     class Meta:
         ordering = ["name"]
@@ -42,6 +43,8 @@ class StageTemplate(models.Model):
         help_text="ID стадии сделки в Битрикс24 (например, 'C1:NEW' или 'C2:WON')"
     )
 
+    history = HistoricalRecords()  # ✅ добавлено
+
     class Meta:
         ordering = ['order']
 
@@ -60,7 +63,6 @@ class StageTemplate(models.Model):
         super().save(*args, **kwargs)
 
     def get_next(self):
-        """Возвращает следующую стадию по order"""
         return StageTemplate.objects.filter(order__gt=self.order).order_by('order').first()
 
 
@@ -73,26 +75,25 @@ class Client(models.Model):
 
     stage = models.ForeignKey("StageTemplate", on_delete=models.SET_NULL, null=True, blank=True)
     referral_code = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    
     old_id = models.PositiveIntegerField(
-    null=True,
-    blank=True,
-    unique=True,
-    db_index=True,
-    help_text="ID клиента в старой системе"
+        null=True,
+        blank=True,
+        unique=True,
+        db_index=True,
+        help_text="ID клиента в старой системе"
     )
-    #Старый айди для миграции
-    
-    # --- Метки показа попапа ---
-    need_stage_popup = models.BooleanField(
+
+    need_stage_popup = models.BooleanField(default=False, help_text="Нужно ли показать попап при входе")
+    stage_popup_shown = models.BooleanField(default=False, help_text="Попап показан и закрыт пользователем")
+
+    # Новое поле
+    acquiring_enabled = models.BooleanField(
         default=False,
-        help_text="Нужно ли показать попап при входе"
+        help_text="Доступен ли эквайринг для клиента"
     )
-    stage_popup_shown = models.BooleanField(
-        default=False,
-        help_text="Попап показан и закрыт пользователем"
-    )
-    
+
+    history = HistoricalRecords()
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -101,17 +102,13 @@ class Client(models.Model):
                 name='unique_bitrix_id_not_null'
             )
         ]
-    
+
     def set_stage(self, new_stage: "StageTemplate"):
-        """
-        Перевод клиента на новую стадию
-        и сброс меток попапа.
-        """
         self.stage = new_stage
         self.need_stage_popup = True
         self.stage_popup_shown = False
         self.save(update_fields=['stage', 'need_stage_popup', 'stage_popup_shown'])
-    
+
     def __str__(self):
         return f"{self.surname} {self.name} {self.middlename or ''}".strip()
 
@@ -127,7 +124,7 @@ class Client(models.Model):
         from django.urls import reverse
         path = reverse("referral_landing", args=[str(self.referral_code)])
         return request.build_absolute_uri(path) if request else path
-    
+
 
 class ReferralClick(models.Model):
     owner_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True, blank=True)
@@ -138,8 +135,10 @@ class ReferralClick(models.Model):
     user_agent = models.TextField(blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
+    history = HistoricalRecords()  # ✅ добавлено
+
     class Meta:
-        unique_together = ("owner_content_type", "owner_object_id", "ip_address")   
+        unique_together = ("owner_content_type", "owner_object_id", "ip_address")
 
 
 class DashboardVisit(models.Model):
@@ -149,7 +148,9 @@ class DashboardVisit(models.Model):
 
     ip_address = models.GenericIPAddressField(blank=True, null=True)
     user_agent = models.TextField(blank=True, null=True)
-    visits = models.JSONField(default=list)  
+    visits = models.JSONField(default=list)
+
+    history = HistoricalRecords()  # ✅ добавлено
 
     class Meta:
         unique_together = ("owner_content_type", "owner_object_id", "ip_address")
@@ -176,6 +177,8 @@ class Application(models.Model):
     referral_owner_content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True)
     referral_owner_object_id = models.PositiveIntegerField(null=True, blank=True)
     referral_owner = GenericForeignKey("referral_owner_content_type", "referral_owner_object_id")
+
+    history = HistoricalRecords()  
 
     def __str__(self):
         return f"Заявка {self.name} ({self.phone})"

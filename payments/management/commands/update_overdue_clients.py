@@ -1,3 +1,5 @@
+import time
+import requests
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from clients.models import Client
@@ -27,7 +29,6 @@ class Command(BaseCommand):
             self.stdout.write("🎉 Новых просроченных платежей нет")
             return
 
-        # 2️⃣ Берём только тех клиентов, у кого платежи были обновлены сейчас
         overdue_client_ids = InstallmentPayment.objects.filter(
             id__in=overdue_ids
         ).values_list(
@@ -39,9 +40,10 @@ class Command(BaseCommand):
 
         self.stdout.write(f"📊 Найдено {total_clients} клиентов с новыми просрочками")
 
-        # 3️⃣ Обновляем статусы и синхронизируем только этих клиентов
         for client in clients_with_new_overdue.iterator(chunk_size=100):
             try:
+                self.stdout.write(f"[BitrixSync] Синхронизация клиента {client.id} ({client})")
+
                 if hasattr(client, "status"):
                     client.status = "overdue"
                     client.save(update_fields=["status"])
@@ -49,8 +51,15 @@ class Command(BaseCommand):
                 sync_client_to_bitrix(client)
 
                 self.stdout.write(self.style.SUCCESS(f"✅ Клиент {client} обновлён и синхронизирован"))
+
+            except requests.exceptions.RequestException as e:
+                self.stdout.write(self.style.ERROR(f"⚠ Ошибка сети при обработке клиента {client}: {e}"))
+                continue
+
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"❌ Ошибка при обработке клиента {client}: {e}"))
+                continue
 
+            time.sleep(0.5)
 
         self.stdout.write(self.style.SUCCESS("🚀 Обработка завершена успешно"))

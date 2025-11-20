@@ -23,17 +23,13 @@
   </div>
 
 
-  <!-- Контент -->
   <div class="relative max-w-5xl mx-auto px-6 py-12 space-y-16">
 
-    <!-- Лого -->
 <div class="flex justify-center mt-8">
   <img src="{% static 'img/logo1.svg' %}" alt="Логотип" class="w-56 h-auto">
 </div>
 
 
-
-<!-- Блок приветствия -->
 <section id="welcome" class="p-8 text-center space-y-4 mt-12">
   <h1 class="text-3xl md:text-4xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
     Здравствуйте, {{ client.name }}
@@ -44,14 +40,11 @@
   </p>
 </section>
 
-<!-- Стадии работы -->
 <section id="stages-wrapper" class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8">
-  <!-- 💻 Десктопная версия -->
 <div id="stages"
      data-current-stage="{{ current_stage_order }}"
      class="hidden md:block relative overflow-hidden w-full h-[650px] mx-auto max-w-[900px]">
 
-  <!-- 🔵 КРУГИ С ССЫЛКАМИ -->
   <a href="stages/newdogovor" data-stage="1"
      class="stage-circle flex items-center justify-center text-slate-600 text-2xl font-semibold font-[Montserrat]
             size-12 left-[300px] top-[60px] absolute rounded-full border-[2px] border-[#365C80] bg-transparent z-20">
@@ -405,111 +398,124 @@
 </section>
 
 
-    <section id="contract" class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 space-y-6">
-      <h2 class="text-2xl md:text-3xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
-        График платежей
-      </h2>
+ <section id="contract" class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 space-y-6">
+  <h2 class="text-2xl md:text-3xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
+    График платежей
+  </h2>
 
-      {% if contract %}
-        <div class="bg-white/70 p-4 rounded-lg shadow-sm text-sm text-gray-700 space-y-1">
-          <p><strong>Сумма договора:</strong> {{ contract_final_amount }} ₽</p>
-          <p><strong>Первый платёж:</strong> {{ contract.first_payment }} ₽ ({{ contract.first_payment_date|rus_date  }})</p>
-          <p><strong>Всего платежей:</strong> {{ contract.number_of_payments }}</p>
-        </div>
+  {% if contract %}
+    <div class="bg-white/70 p-4 rounded-lg shadow-sm text-sm text-gray-700 space-y-1">
+      <p><strong>Сумма договора:</strong> {{ contract_final_amount }} ₽</p>
+      <p><strong>Первый платёж:</strong> {{ contract.first_payment }} ₽ ({{ contract.first_payment_date|rus_date }})</p>
+      <p><strong>Всего платежей:</strong> {{ contract.number_of_payments }}</p>
+    </div>
 
-        {% if installment_payments %}
-        <div class="hidden md:block overflow-x-auto">
-          <table class="w-full text-sm text-left border rounded-lg shadow bg-white/80">
-            <thead class="bg-blue-100 text-gray-700">
-              <tr>
-                <th class="px-3 py-2">#</th>
-                <th class="px-3 py-2">Срок</th>
-                <th class="px-3 py-2">Сумма</th>
-                <th class="px-3 py-2 text-center">Действие</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for payment in installment_payments %}
-              <tr class="border-b {% if payment.status == 'paid' %}bg-green-50{% endif %}">
-                <td class="px-3 py-2">{{ payment.number }}</td>
-                <td class="px-3 py-2">{{ payment.due_date|rus_date }}</td>
-                <td class="px-3 py-2">
-                  {{ payment.amount_paid }} / {{ payment.amount_due }} ₽
-                  {% if payment.status == 'overdue' %}
-                    <span class="ml-2 text-xs text-red-600 font-semibold">Просрочено</span>
-                  {% endif %}
-                </td>
-                <td class="px-3 py-2 text-center">
-                <button
-                  class="px-3 py-1 rounded-lg text-white text-sm
-                        {% if payment.status == 'paid' %}
-                          bg-gray-400 cursor-not-allowed
-                        {% else %}
-                          bg-gradient-to-r from-green-400 to-blue-400 hover:from-green-500 hover:to-blue-500
-                        {% endif %}"
-                  {% if payment.status != 'paid' %}
-                    onclick="window.location.href='{% url 'create_payment' payment.id %}'"
-                  {% else %}
-                    disabled
-                  {% endif %}>
-                  {% if payment.status == 'paid' %}
-                    Оплачено
-                  {% else %}
-                    Оплатить
-                  {% endif %}
-                </button>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="block md:hidden space-y-3">
+    {% if installment_payments %}
+    <div class="hidden md:block overflow-x-auto">
+      <table class="w-full text-sm text-left border rounded-lg shadow bg-white/80">
+        <thead class="bg-blue-100 text-gray-700">
+          <tr>
+            <th class="px-3 py-2">#</th>
+            <th class="px-3 py-2">Срок</th>
+            <th class="px-3 py-2">Сумма</th>
+            <th class="px-3 py-2 text-center">Действие</th>
+          </tr>
+        </thead>
+        <tbody>
           {% for payment in installment_payments %}
-          <div class="border rounded-lg p-4 shadow bg-white/80 {% if payment.status == 'paid' %}bg-green-50{% endif %}">
-            <div class="flex justify-between items-center">
-              <div>
-                <p class="text-sm text-gray-500">Платёж №{{ payment.number }}</p>
-                <p class="text-sm text-gray-500">{{ payment.due_date|rus_date }}</p>
-                <p class="text-base font-semibold">
-                  {{ payment.amount_paid }} / {{ payment.amount_due }} ₽
-                  {% if payment.status == 'overdue' %}
-                    <span class="ml-2 text-xs text-red-600 font-semibold">Просрочено</span>
-                  {% endif %}
-                </p>
-              </div>
-              <div>
-                {% if payment.id %}
-                  <button onclick="window.location.href='{% url 'create_payment' payment.id %}'"
-                          class="px-3 py-1 rounded-lg text-white text-sm
-                                {% if payment.status == 'paid' %}
-                                    bg-gray-400 cursor-not-allowed
-                                {% else %}
-                                    bg-gradient-to-r from-green-400 to-blue-400 hover:from-green-500 hover:to-blue-500
-                                {% endif %}"
-                          {% if payment.status == 'paid' %}disabled{% endif %}>
-                      {% if payment.status == 'paid' %}Оплачено{% else %}Оплатить{% endif %}
-                  </button>
+          <tr class="border-b {% if payment.status == 'paid' %}bg-green-50{% endif %}">
+            <td class="px-3 py-2">{{ payment.number }}</td>
+            <td class="px-3 py-2">{{ payment.due_date|rus_date }}</td>
+            <td class="px-3 py-2">
+              {{ payment.amount_paid }} / {{ payment.amount_due }} ₽
+              {% if payment.status == 'overdue' %}
+                <span class="ml-2 text-xs text-red-600 font-semibold">Просрочено</span>
+              {% endif %}
+            </td>
+            <td class="px-3 py-2 text-center">
+
+              <button
+                class="px-3 py-1 rounded-lg text-white text-sm
+                      {% if payment.status == 'paid' or not client.acquiring_enabled %}
+                          bg-gray-400 cursor-not-allowed
+                      {% else %}
+                          bg-gradient-to-r from-green-400 to-blue-400 hover:from-green-500 hover:to-blue-500
+                      {% endif %}"
+                
+                {% if payment.status == 'paid' or not client.acquiring_enabled %}
+                    disabled
                 {% else %}
-                  <button class="px-3 py-1 rounded-lg bg-gray-300 text-gray-500 cursor-not-allowed">
-                    Недоступно
-                  </button>
+                    onclick="window.location.href='{% url 'create_payment' payment.id %}'"
                 {% endif %}
-              </div>
-            </div>
-          </div>
+              >
+                {% if payment.status == 'paid' %}
+                    Оплачено
+                {% elif not client.acquiring_enabled %}
+                    Недоступно
+                {% else %}
+                    Оплатить
+                {% endif %}
+              </button>
+
+            </td>
+          </tr>
           {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Мобильная версия -->
+    <div class="block md:hidden space-y-3">
+      {% for payment in installment_payments %}
+      <div class="border rounded-lg p-4 shadow bg-white/80 {% if payment.status == 'paid' %}bg-green-50{% endif %}">
+        <div class="flex justify-between items-center">
+          <div>
+            <p class="text-sm text-gray-500">Платёж №{{ payment.number }}</p>
+            <p class="text-sm text-gray-500">{{ payment.due_date|rus_date }}</p>
+            <p class="text-base font-semibold">
+              {{ payment.amount_paid }} / {{ payment.amount_due }} ₽
+              {% if payment.status == 'overdue' %}
+                <span class="ml-2 text-xs text-red-600 font-semibold">Просрочено</span>
+              {% endif %}
+            </p>
+          </div>
+          <div>
+            <button
+              class="px-3 py-1 rounded-lg text-white text-sm
+                    {% if payment.status == 'paid' or not client.acquiring_enabled %}
+                        bg-gray-400 cursor-not-allowed
+                    {% else %}
+                        bg-gradient-to-r from-green-400 to-blue-400 hover:from-green-500 hover:to-blue-500
+                    {% endif %}"
+              
+              {% if payment.status == 'paid' or not client.acquiring_enabled %}
+                  disabled
+              {% else %}
+                  onclick="window.location.href='{% url 'create_payment' payment.id %}'"
+              {% endif %}
+            >
+              {% if payment.status == 'paid' %}
+                  Оплачено
+              {% elif not client.acquiring_enabled %}
+                  Недоступно
+              {% else %}
+                  Оплатить
+              {% endif %}
+            </button>
+          </div>
         </div>
-        {% else %}
-          <p class="text-sm text-slate-500">План рассрочки ещё не рассчитан.</p>
-        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
 
-      {% else %}
-        <p class="text-sm text-slate-500">У вас пока нет активного договора.</p>
-      {% endif %}
-    </section>
+    {% else %}
+      <p class="text-sm text-slate-500">План рассрочки ещё не рассчитан.</p>
+    {% endif %}
 
+  {% else %}
+    <p class="text-sm text-slate-500">У вас пока нет активного договора.</p>
+  {% endif %}
+</section>
     <section id="installment" class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8 space-y-6 text-center">
       <h1 class="text-3xl md:text-4xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
         Помогайте и зарабатывайте!<br>Реферальная программа

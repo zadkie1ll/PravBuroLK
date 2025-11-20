@@ -16,7 +16,6 @@ class BitrixSyncService:
         self.plan = getattr(self.contract, "installmentplan", None) if self.contract else None
 
     def get_admin_url(self):
-        """Формирует URL на страницу администрирования клиента"""
         base_url = getattr(settings, "SITE_BASE_URL", "https://prav-buro.ru")
         return f"{base_url}/client_admin/{self.client.id}/"
 
@@ -24,7 +23,7 @@ class BitrixSyncService:
         if not self.plan:
             return "Нет данных по рассрочке"
 
-        col_widths = [4, 12, 15, 15, 15] 
+        col_widths = [4, 12, 15, 15, 15]
 
         def fmt(text, width, align="left"):
             text = str(text)
@@ -36,7 +35,7 @@ class BitrixSyncService:
             status_display = {
                 "paid": "✅ Оплачен",
                 "overdue": "❌ Просрочен",
-                "partial": "⚠ Частично"
+                "partial": "⚠ Частично",
             }.get(p.status, "Ожидается")
 
             line = " | ".join([
@@ -48,81 +47,106 @@ class BitrixSyncService:
             ])
             lines.append(line)
 
-        table_str = "\n".join(lines)
-        return table_str
+        return "\n".join(lines)
 
     def get_total_sum(self):
-        total = Decimal("0.00")
-        if self.contract:
-            total = self.contract.total_amount - self.contract.discount
-        return total
+        if not self.contract:
+            return Decimal("0.00")
+        return self.contract.total_amount - self.contract.discount
 
     def is_deposit_paid(self):
-        result = (
-            self.client.other_payments.filter(payment_type__in=["deposit", "deposit_extra"], is_paid=True).exists()
+        return (
+            self.client.other_payments.filter(
+                payment_type__in=["deposit", "deposit_extra"], is_paid=True
+            ).exists()
             or getattr(self.contract, "deposit", False)
         )
-        return result
 
     def is_publication_paid(self):
-        result = (
-            self.client.other_payments.filter(payment_type__in=["publication", "publication_extra"], is_paid=True).exists()
+        return (
+            self.client.other_payments.filter(
+                payment_type__in=["publication", "publication_extra"], is_paid=True
+            ).exists()
             or getattr(self.contract, "publication", False)
         )
-        return result
 
     def is_extra_costs_paid(self):
-        result = getattr(self.contract, "extra_court_costs", False)
-        return result
+        return getattr(self.contract, "extra_court_costs", False)
 
     def get_next_payment_date(self):
         if not self.plan:
             return None
-        next_payment = self.plan.payments.filter(status__in=["pending", "partial"]).order_by("due_date").first()
-        result = next_payment.due_date if next_payment else None
-        return result
+        
+        next_payment = self.plan.payments.filter(
+            status__in=["pending", "partial"]
+        ).order_by("due_date").first()
+
+        return next_payment.due_date if next_payment else None
 
     def has_overdue_payments(self):
         if not self.plan:
             return False
 
         today = timezone.now().date()
-        result = self.plan.payments.filter(due_date__lt=today).exclude(status='paid').exists()
-        return result   
+
+        return self.plan.payments.filter(
+            due_date__lt=today
+        ).exclude(status='paid').exists()
 
     def build_payload(self):
         if not self.bitrix_id:
             raise ValueError(f"У клиента {self.client} нет Bitrix ID")
 
+        next_payment = self.get_next_payment_date()
+
         payload = {
             "id": self.bitrix_id,
             "fields": {
-                "UF_CRM_1760618096": str(self.build_payments_table()),
-                "OPPORTUNITY": float(self.get_total_sum()),
+                "UF_CRM_1760618096": self.build_payments_table(),
+                "OPPORTUNITY": str(self.get_total_sum()),  # ВАЖНО: Bitrix не любит float
                 "UF_CRM_1760618033886": 1 if self.is_deposit_paid() else 0,
                 "UF_CRM_1760618045973": 1 if self.is_publication_paid() else 0,
                 "UF_CRM_1760618075429": 1 if self.is_extra_costs_paid() else 0,
-                "UF_CRM_1760618180": self.get_next_payment_date().strftime("%Y-%m-%d")
-                if self.get_next_payment_date() else None,
+                "UF_CRM_1760618180": next_payment.strftime("%Y-%m-%d") if next_payment else None,
                 "UF_CRM_IS_DEBTOR": 1 if self.has_overdue_payments() else 0,
                 "UF_CRM_1762350803092": self.get_admin_url(),
             },
         }
+
         return payload
 
     def send_to_bitrix(self):
         payload = self.build_payload()
-        url = f"{self.webhook_url}/crm.deal.update.json"
-        response = requests.post(url, json=payload)
 
-        data = response.json()
-        if not data.get("result"):
-            raise ValueError(f"Ошибка Bitrix при обновлении клиента {self.client.id}: {data}")
+        url = f"{self.webhook_url}/crm.deal.update.json"
+
+        data = {"id": payload["id"]}
+
+        for key, value in payload["fields"].items():
+            if value is not None:  
+                data[f"fields[{key}]"] = value
+
+        print("\n[BitrixSync → Bitrix] Payload:")
+        print(data)
+
+        response = requests.post(url, data=data)
+
+        print("[BitrixSync ← Bitrix] Response:")
+        print(response.text)
+
+        try:
+            result = response.json()
+        except:
+            raise ValueError(f"Bitrix вернул некорректный JSON: {response.text}")
+
+        if not result.get("result"):
+            raise ValueError(
+                f"Ошибка Bitrix при обновлении сделки ID={self.client.id}: {result}"
+            )
 
         return True
 
 
 def sync_client_to_bitrix(client):
     service = BitrixSyncService(client)
-    result = service.send_to_bitrix()
-    return result
+    return service.send_to_bitrix()

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Генерация документа</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white shadow-lg rounded-xl w-full max-w-2xl p-6">
+    <h1 class="text-2xl font-bold mb-6 text-center">Генерация документа</h1>
+
+    <form method="post" action="{% url 'generate_document' %}" class="space-y-6">
+      {% csrf_token %}
+
+      <!-- Основная информация -->
+      <div class="space-y-4">
+        <h2 class="text-lg font-semibold border-b pb-2 mb-2">Основная информация</h2>
+
+        <div>
+          <label class="block font-medium mb-1">ФИО</label>
+          <input type="text" name="full_name" required
+                 class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-medium mb-1">Дата рождения</label>
+          <input type="date" name="birth_date"
+                 class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-medium mb-1">Паспорт</label>
+          <input type="text" name="passport"
+                 class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-medium mb-1">Адрес</label>
+          <input type="text" name="address"
+                 class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block font-medium mb-1">Комментарий</label>
+          <textarea name="comment"
+                    class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        </div>
+      </div>
+
+      <!-- Кнопка генерации -->
+      <div class="text-center">
+        <button type="submit"
+                class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 focus:outline-none">
+          Сгенерировать
+        </button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

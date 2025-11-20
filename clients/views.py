@@ -51,7 +51,6 @@ def get_client_ip(request):
 def client_dashboard(request):
     client = request.user.client
 
-    # --- Запись визита ---
     content_type = ContentType.objects.get_for_model(client)
     ip_address = request.META.get('REMOTE_ADDR')
     user_agent = request.META.get('HTTP_USER_AGENT', '')
@@ -64,7 +63,6 @@ def client_dashboard(request):
     )
     visit.add_visit()
 
-    # --- Данные по договору и рассрочке ---
     contract = Contract.objects.filter(client=client).first()
     installment_plan = (
         InstallmentPlan.objects.filter(contract=contract).first()
@@ -98,7 +96,6 @@ def client_dashboard(request):
                 "status": status,
             })
 
-    # --- Этапы клиента ---
     all_stages = StageTemplate.objects.all().order_by("order")
     current_stage = client.stage
     stages_data = []
@@ -122,19 +119,16 @@ def client_dashboard(request):
     passed_stages = sum(1 for s in stages_data if s["status"] in ("done", "current"))
     progress_percent = int((passed_stages / total_stages) * 100) if total_stages > 0 else 0
 
-    # --- Видео текущей стадии ---
     embed_url = None
     if current_stage and current_stage.youtube_url:
         embed_url = current_stage.youtube_url.replace("watch?v=", "embed/")
 
-    # --- Логика показа попапа ---
     show_stage_popup = False
     if client.need_stage_popup and not client.stage_popup_shown:
         show_stage_popup = True
         client.stage_popup_shown = True
         client.save(update_fields=["stage_popup_shown"])
 
-    # --- Контекст шаблона ---
     context = {
         "client": client,
         "contract": contract,
@@ -144,6 +138,7 @@ def client_dashboard(request):
         "stages": stages_data,
         "progress_percent": progress_percent,
         "embed_url": embed_url,
+        "acquiring_enabled": client.acquiring_enabled,
         "current_stage": current_stage,  
         "current_stage_order": current_stage.order if current_stage else None,
         "show_stage_popup": show_stage_popup,  
@@ -179,7 +174,6 @@ def mark_stage_popup_shown(request):
     return JsonResponse({"status": "ok"})
 
 
-
 @csrf_exempt
 def bitrix_deal_webhook(request):
     """
@@ -212,7 +206,6 @@ def bitrix_deal_webhook(request):
         except StageTemplate.DoesNotExist:
             return JsonResponse({"status": "error", "message": f"Stage with bitrix_stage_id={bitrix_stage_id} not found"}, status=404)
 
-        # Обновляем стадию клиента
         with transaction.atomic():
             client.set_stage(stage)
 

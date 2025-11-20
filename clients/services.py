@@ -79,12 +79,6 @@ def add_months(origin: date, months: int) -> date:
 # --- Сервисный слой ---------------------------------------------------------
 
 class ClientService:
-    """Сервис-инкапсуляция всей логики создания клиента + договора + плана рассрочки.
-
-    Использование:
-        client, contract, plan = ClientService.create_client_with_contract(**kwargs)
-    """
-
     @staticmethod
     @transaction.atomic
     def create_client_with_contract(
@@ -96,6 +90,10 @@ class ClientService:
         email: Optional[str] = None,
         bitrix_id: Optional[str] = None,
         stage: Optional[Any] = None,
+
+        # новое поле 👇
+        acquiring_enabled: bool = False,
+
         # параметры договора
         total_amount: Any = None,
         discount: Any = 0,
@@ -160,6 +158,9 @@ class ClientService:
             'surname': surname,
             'middlename': middlename,
             'bitrix_id': bitrix_id,
+
+            # новое поле 👇
+            'acquiring_enabled': acquiring_enabled,
         }
         if stage is not None:
             # stage может быть id, имя или экземпляр модели
@@ -243,6 +244,22 @@ class ClientService:
                 payment_date=first_payment_date_parsed,
                 amount=first_payment_d,
             )
+
+# --- Дожидаемся коммита транзакции и отправляем обновление в Bitrix ---
+        from payments.sync_payments_service import sync_client_to_bitrix  # импорт внутри чтобы избежать циклов
+        import time
+
+        def _sync_after_commit():
+            try:
+                print("[ClientService] Ждём 1.2 сек перед синком с Bitrix...")
+                time.sleep(1.2)
+                sync_client_to_bitrix(client)
+                print("[ClientService] Sync с Bitrix успешно выполнен")
+            except Exception as e:
+                print("[ClientService] Ошибка при sync с Bitrix:", e)
+
+        # Планируем синхронизацию после успешного коммита БД
+        transaction.on_commit(_sync_after_commit)
 
         return client, contract, plan
 

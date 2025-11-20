@@ -1,7 +1,9 @@
 from decimal import Decimal
 from django.db import models, transaction
 from django.utils import timezone
+from simple_history.models import HistoricalRecords  # ✅ добавлено
 from .sync_payments_service import sync_client_to_bitrix
+from django.db import IntegrityError
 
 
 class Contract(models.Model):
@@ -22,6 +24,9 @@ class Contract(models.Model):
     publication = models.BooleanField(default=False, help_text="Оплачена публикация")
     extra_court_costs = models.BooleanField(default=False, help_text="Оплачены доп. судебные расходы")
 
+    # ✅ История изменений
+    history = HistoricalRecords()
+
     def __str__(self):
         return f"Contract #{self.id} — {self.client}"
 
@@ -31,49 +36,32 @@ class InstallmentPlan(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     calculated = models.BooleanField(default=False)
 
+    # ✅ История изменений
+    history = HistoricalRecords()
+
     def __str__(self):
         return f"InstallmentPlan for Contract #{self.contract.id}"
 
 
 class InstallmentPayment(models.Model):
-    STATUS_CHOICES = [
-        ('pending', 'Ожидается'),
-        ('paid', 'Оплачен'),
-        ('partial', 'Частично оплачен'),
-        ('overdue', 'Просрочен'),
-    ]
-
     plan = models.ForeignKey(InstallmentPlan, on_delete=models.CASCADE, related_name='payments')
     number = models.PositiveIntegerField()
     due_date = models.DateField()
     amount_due = models.DecimalField(max_digits=10, decimal_places=2)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=10, default='pending')
 
-    # order_id — это наш внутренний номер (orderNumber), который мы создаём и передаём в банк
     order_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
-
-    # bank_order_id — это внутренний ID Альфа-Банка (orderId), который приходит в ответе
     bank_order_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
 
+    history = HistoricalRecords()
+
     def apply_payment(self, amount):
-        """Применяем платёж к этому месяцу"""
-        self.amount_paid += amount
-        if self.amount_paid >= self.amount_due:
-            self.status = "paid"
-            extra = self.amount_paid - self.amount_due
-            self.amount_paid = self.amount_due
-        elif self.amount_paid > 0:
-            self.status = "partial"
-            extra = 0
-        else:
-            self.status = "pending"
-            extra = 0
-        self.save()
-        return extra
+        # Упростить до нуля
+        return
 
     def __str__(self):
-        return f"Платеж #{self.number} — {self.get_status_display()} — {self.amount_due}₽"
+        return f"Платеж #{self.number} — {self.amount_due}₽"    
 
 
 class ActualPayment(models.Model):
@@ -84,98 +72,26 @@ class ActualPayment(models.Model):
         blank=True,
         null=True
     )
+    created_at = models.DateTimeField(auto_now_add=True, null=True, db_index=True)
     payment_date = models.DateField(null=True, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     order_id = models.CharField(max_length=100, blank=True, null=True)
 
-    # флаг, чтобы не применять платёж дважды
+    # Реально больше не нужен, но пусть останется
     is_applied = models.BooleanField(default=False, editable=False)
 
-    # ⚙️ служебный флаг для отключения автоприменения при save()
-    _skip_apply = False
+    history = HistoricalRecords()
 
     def save(self, *args, **kwargs):
-        """
-        При создании (is_new) запускает apply_payment, если флаг _skip_apply=False.
-        Это позволяет отключать автоприменение при необходимости.
-        """
-        is_new = self.pk is None
+        # НЕТ автоприменения — самое главное
         super().save(*args, **kwargs)
 
-        # если объект новый, ещё не применён, и автоприменение не отключено
-        if is_new and not self.is_applied and not getattr(self, "_skip_apply", False):
-            try:
-                self.apply_payment()
-            except Exception as e:
-                print(f"[ActualPayment] Ошибка при применении платежа: {e}")
-
     def apply_payment(self):
-        """
-        Распределяет фактический платёж по платежам плана строго по порядку (number),
-        распределение продолжается пока есть remaining, создаются PaymentApplication записи.
-        После успешного применения помечает self.is_applied = True.
-        Все изменения в транзакции.
-        """
-        if not self.plan:
-            print("[ActualPayment] Нет плана — пропуск распределения")
-            return
-
-        if self.is_applied:
-            print("[ActualPayment] Уже применён — выходим")
-            return
-
-        remaining = Decimal(self.amount or 0)
-        if remaining <= 0:
-            ActualPayment.objects.filter(pk=self.pk).update(is_applied=True)
-            print("[ActualPayment] Нулевая сумма — пометили как применённый")
-            return
-
-        with transaction.atomic():
-            payments_qs = self.plan.payments.select_for_update().order_by("number")
-            for inst_payment in payments_qs:
-                if remaining <= Decimal("0.00"):
-                    break
-
-                to_pay = (inst_payment.amount_due or Decimal("0.00")) - (inst_payment.amount_paid or Decimal("0.00"))
-                if to_pay <= Decimal("0.00"):
-                    continue
-
-                applied = min(remaining, to_pay)
-
-                PaymentApplication.objects.create(
-                    payment=inst_payment,
-                    actual_payment=self,
-                    applied_amount=applied,
-                )
-
-                inst_payment.amount_paid = (inst_payment.amount_paid or Decimal("0.00")) + applied
-                if inst_payment.amount_paid >= inst_payment.amount_due:
-                    inst_payment.status = "paid"
-                    inst_payment.amount_paid = inst_payment.amount_due
-                else:
-                    inst_payment.status = "partial"
-                inst_payment.save()
-
-                remaining -= applied
-
-            ActualPayment.objects.filter(pk=self.pk).update(is_applied=True)
-
-        if remaining > Decimal("0.00"):
-            print(f"[ActualPayment] Остаток {remaining} ₽ не распределён (все платежи закрыты)")
-        else:
-            print(f"[ActualPayment] Платёж {self.amount} ₽ полностью распределён")
-
-        try:
-            if self.plan and getattr(self.plan, 'contract', None) and getattr(self.plan.contract, 'client', None):
-                client = self.plan.contract.client
-                sync_client_to_bitrix(client)
-                print(f"[ActualPayment] Синхронизация клиента {client.id} завершена")
-        except Exception as e:
-            print(f"[ActualPayment] Ошибка при синхронизации: {e}")
+        # Полностью выключено
+        return
 
 
 class PaymentApplication(models.Model):
-    """Связь между фактическим платёжом и платежом по рассрочке"""
     payment = models.ForeignKey(
         'InstallmentPayment',
         on_delete=models.CASCADE,
@@ -187,13 +103,15 @@ class PaymentApplication(models.Model):
         related_name='applications'
     )
     applied_amount = models.DecimalField(max_digits=10, decimal_places=2)
-
     created_at = models.DateTimeField(auto_now_add=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ['created_at']
 
     def __str__(self):
         actual_date = getattr(self.actual_payment, 'payment_date', 'None')
         return f"{self.applied_amount} ₽ → {self.payment} ({actual_date})"
-
 
 class OtherPayment(models.Model):
     PAYMENT_TYPES = [
@@ -212,6 +130,9 @@ class OtherPayment(models.Model):
     paid_at = models.DateTimeField(blank=True, null=True)
     comment = models.TextField(blank=True, null=True)
 
+    # ✅ История изменений
+    history = HistoricalRecords()
+
     def __str__(self):
         return f"{self.get_payment_type_display()} - {self.amount} ₽ для {self.client}"
 
@@ -219,3 +140,12 @@ class OtherPayment(models.Model):
         verbose_name = "Прочий платеж"
         verbose_name_plural = "Прочие платежи"
         ordering = ['-created_at']
+        
+        
+        
+        
+        
+        
+        
+#SIMPLE OPLATAS ZAEBALO NAHUI UJE ETO PEREDELIVAT` YA OCHEN USTAL U MENYA MOZG KIPIT-------------------------------------------------------------------------------------------------------
+

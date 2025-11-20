@@ -32,7 +32,7 @@ from django.db.models.functions import Cast
 from django.db.models import CharField
 from django.db import connection
 import re
-from .utilities import get_deal_data_from_bitrix, russian_to_translit, recreate_actual_payment
+from .utilities import get_deal_data_from_bitrix, russian_to_translit, recreate_actual_payment, delete_actual_payment
 import telebot
 
 
@@ -83,6 +83,205 @@ def calculate_payments(num_payments, total_amount, discount, start_date, first_p
     return table_data
 
 
+@transaction.atomic
+def delete_installment_payment(request, pk):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=400)
+
+    payment = get_object_or_404(InstallmentPayment, pk=pk)
+    plan = payment.plan
+    deleted_number = payment.number
+
+    # Удаляем
+    payment.delete()
+
+    # Сдвигаем все последующие номера вниз
+    next_payments = (
+        InstallmentPayment.objects
+        .filter(plan=plan, number__gt=deleted_number)
+        .order_by("number")
+    )
+
+    for p in next_payments:
+        p.number -= 1
+        p.save()
+
+    return JsonResponse({"success": True})
+
+
+@transaction.atomic
+def update_installment_payments(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=400)
+
+    for key, value in request.POST.items():
+
+        # ищем ключи: installment_{id}_{field}
+        if not key.startswith("installment_"):
+            continue
+
+        _, id_str, field = key.split("_")
+        iid = int(id_str)
+
+        try:
+            inst = InstallmentPayment.objects.get(pk=iid)
+        except InstallmentPayment.DoesNotExist:
+            continue
+
+        if field == "date":
+            inst.due_date = value
+
+        elif field == "amount":
+            inst.amount_due = value
+
+        elif field == "status":
+            inst.status = value
+
+        inst.save()
+
+    return JsonResponse({"success": True})
+
+
+@transaction.atomic
+def delete_actual_payment(request, pk):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=400)
+
+    payment = get_object_or_404(ActualPayment, pk=pk)
+    payment.delete()
+
+    return JsonResponse({"success": True})
+
+@transaction.atomic
+def update_actual_payments(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=400)
+
+    for key, value in request.POST.items():
+
+        if not key.startswith("actual_"):
+            continue
+
+        _, id_str, field = key.split("_")
+        iid = int(id_str)
+
+        try:
+            ap = ActualPayment.objects.get(pk=iid)
+        except ActualPayment.DoesNotExist:
+            continue
+
+        if field == "date":
+            ap.payment_date = value
+
+        elif field == "amount":
+            ap.amount = value
+
+        ap.save()
+
+    return JsonResponse({"success": True})
+
+
+
+@require_POST
+def create_installment_payment(request):
+
+    plan_id = request.POST.get("plan_id") or request.GET.get("plan_id")
+    plan = get_object_or_404(InstallmentPlan, id=plan_id)
+
+    date = request.POST.get("new_installment_date")
+    amount = request.POST.get("new_installment_amount")
+
+    if not date or not amount:
+        return JsonResponse({"success": False, "error": "Missing fields"})
+
+    # получаем следующий номер платежа
+    last = plan.payments.order_by("-number").first()
+    next_number = (last.number + 1) if last else 1
+
+    InstallmentPayment.objects.create(
+        plan=plan,
+        number=next_number,
+        due_date=date,
+        amount_due=Decimal(amount),
+        status="pending"
+    )
+
+    return redirect(request.META.get("HTTP_REFERER", "/"))
+
+
+
+def update_contract_info(request, contract_id):
+    contract = get_object_or_404(Contract, id=contract_id)
+
+    if request.method == "POST":
+        total_amount = request.POST.get("total_amount")
+        discount = request.POST.get("discount")
+
+        try:
+            contract.total_amount = total_amount
+            contract.discount = discount
+            contract.save()
+
+            messages.success(request, "Изменения сохранены.")
+        except Exception as e:
+            messages.error(request, f"Ошибка сохранения: {e}")
+
+        return redirect(request.META.get("HTTP_REFERER", "/"))
+
+    return redirect("/")
+
+
+@require_POST
+def create_actual_payments(request):
+
+    plan_id = request.POST.get("plan_id") or request.GET.get("plan_id")
+    plan = None
+
+    if plan_id:
+        plan = get_object_or_404(InstallmentPlan, id=plan_id)
+
+    date = request.POST.get("new_actual_date")
+    amount = request.POST.get("new_actual_amount")
+
+    if not date or not amount:
+        return JsonResponse({"success": False, "error": "Missing fields"})
+
+    ActualPayment.objects.create(
+        plan=plan,
+        payment_date=date,
+        amount=Decimal(amount)
+    )
+
+    return redirect(request.META.get("HTTP_REFERER", "/"))
+
+
+def client_payments_page(request, client_id):
+    contract = get_object_or_404(Contract, client__id=client_id)
+    plan, _ = InstallmentPlan.objects.get_or_create(contract=contract)
+
+    installments = InstallmentPayment.objects.filter(plan=plan).order_by("number")
+    actuals = ActualPayment.objects.filter(plan=plan).order_by("payment_date")
+
+    total_installments_sum = installments.aggregate(models.Sum("amount_due"))["amount_due__sum"] or 0
+    total_actuals_sum = actuals.aggregate(models.Sum("amount"))["amount__sum"] or 0
+
+    # Учитываем скидку
+    contract_final_amount = (contract.total_amount or 0) - (contract.discount or 0)
+
+    return render(request, "client_payments_page.html", {
+        "contract": contract,
+        "plan": plan,
+
+        "installments": installments,
+        "actuals": actuals,
+
+        "total_installments_sum": total_installments_sum,
+        "total_actuals_sum": total_actuals_sum,
+
+        # Итоговая сумма (используется везде кроме секции редактирования)
+        "contract_final_amount": contract_final_amount,
+    })
+
 
 
 def payments_dashboard(request):
@@ -129,22 +328,18 @@ def payments_dashboard(request):
 @login_required
 def client_admin_view(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
-
     contract = Contract.objects.filter(client=client).first()
-
     plan = InstallmentPlan.objects.filter(contract=contract).first() if contract else None
-
     payments = plan.payments.all().order_by('due_date', 'id') if plan else []
 
+    # ✅ теперь учитываем частичные оплаты
     paid_sum = (
-        plan.payments.filter(status='paid').aggregate(total=Sum('amount_due'))['total']
+        plan.payments.filter(amount_paid__gt=0).aggregate(total=Sum('amount_paid'))['total']
         if plan else 0
-    )
+    ) or 0
 
     actual_payments = ActualPayment.objects.filter(plan__contract=contract) if contract else []
-
     other_payments = client.other_payments.all()
-
     expected_total = contract.total_amount - contract.discount if contract else 0
 
     payments_data = []
@@ -182,6 +377,7 @@ def client_admin_view(request, client_id):
         "expected_total": expected_total,
         "other_payments": other_payments,
     })
+
 
 
 
@@ -342,6 +538,28 @@ def recalculate_installment(request, client_id):
 
     return redirect("client_admin_view", client_id=client.id)
 
+
+
+@csrf_exempt
+def delete_actual_payment_view(request, payment_id):
+    """
+    Удаляет фактический платёж и перераспределяет оставшиеся.
+    """
+    if request.method != "POST":
+        return JsonResponse({"success": False, "error": "Только POST-запросы разрешены"})
+
+    try:
+        payment = ActualPayment.objects.get(pk=payment_id)
+    except ActualPayment.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Платёж не найден"})
+
+    try:
+        delete_actual_payment(payment)
+        return JsonResponse({"success": True})
+    except Exception as e:
+        return JsonResponse({"success": False, "error": str(e)})
+
+
 @csrf_exempt
 @require_POST
 def update_custom_payments(request, client_id):
@@ -465,6 +683,31 @@ def add_actual_payment(request, client_id):
     return redirect("client_admin_view", client_id=client.id)
 
 
+def create_other_payment(request):
+    if request.method == "POST":
+        client_id = request.POST.get("client_id")
+        payment_type = request.POST.get("payment_type")
+        amount = request.POST.get("amount")
+        comment = request.POST.get("comment")
+
+        client = get_object_or_404(Client, id=client_id)
+
+        other_payment = OtherPayment.objects.create(
+            client=client,
+            payment_type=payment_type,
+            amount=amount,
+            comment=comment,
+            is_paid=True,                
+            paid_at=timezone.now(),       
+        )
+
+        return JsonResponse({
+            "status": "success",
+            "message": "Прочий платёж успешно добавлен и отмечен как оплаченный!"
+        })
+
+    return JsonResponse({"status": "error", "message": "Invalid request"})
+
 
 @method_decorator(csrf_exempt, name="dispatch")
 class BitrixWebhookCreateClientView(View):
@@ -570,6 +813,10 @@ class BitrixWebhookCreateClientView(View):
 
             from clients.services import ClientService
             
+            # --- логика для нового поля эквайринга ---
+            acquiring_value = external_data.get("result", {}).get("UF_CRM_1760099004")
+            acquiring_enabled = acquiring_value == "2022"
+
             client, contract, plan = ClientService.create_client_with_contract(
                 username=username,
                 password=password,
@@ -585,7 +832,12 @@ class BitrixWebhookCreateClientView(View):
                 first_payment_date=parse_bitrix_date(deal_data.get("UF_CRM_1742468566169")),
                 number_of_payments=number_of_payments,
                 preferred_payment_day=preferred_payment_day,
+                
+                # передаём новое поле
+                acquiring_enabled=acquiring_enabled,
             )
+            
+            sync_client_to_bitrix(client)
             # Логи в тг, нужно в последствии добавить, думаю на проде
             text = (
                 f"Новый клиент из Bitrix: {first_name} {middlename} {last_name}\n"
@@ -892,6 +1144,9 @@ class BitrixCreateClientFromDealView(View):
 
             # --- Генерация пароля ---
             new_password = generate_password()
+            
+            # --- Проверка поля 2022 ---
+            acquiring_flag = (str(deal_data.get("UF_CRM_1760099004")) == "2022")
 
             # --- Создание клиента ---
             with transaction.atomic():
@@ -910,6 +1165,7 @@ class BitrixCreateClientFromDealView(View):
                     first_payment_date=parse_bitrix_date(deal_data.get("UF_CRM_1742468566169")),
                     number_of_payments=number_of_payments,
                     preferred_payment_day=preferred_payment_day,
+                    acquiring_enabled=acquiring_flag,
                 )
 
                 deal_id = str(deal_data.get("ID") or "")

@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html_join
 from django.utils.safestring import mark_safe
+from simple_history.admin import SimpleHistoryAdmin  # 👈 добавляем историю
 from payments.models import (
     Contract,
     InstallmentPlan,
@@ -31,7 +32,7 @@ class OtherPaymentInline(admin.TabularInline):
 
 
 @admin.register(Client)
-class ClientAdmin(admin.ModelAdmin):
+class ClientAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = (
         'id', 'surname', 'name', 'middlename', 'bitrix_id', 'user',
         'stage', 'referral_code',
@@ -43,14 +44,15 @@ class ClientAdmin(admin.ModelAdmin):
     ordering = ('surname', 'name')
     readonly_fields = ('referral_code', 'installment_payments_list')
     inlines = [ContractInline, OtherPaymentInline]
+    history_list_display = ['stage', 'user']  # 👈 доп. поля в истории
 
     fieldsets = (
         (None, {
             "fields": (
                 'surname', 'name', 'middlename', 'bitrix_id', 'user',
                 'stage', 'referral_code',
-                'need_stage_popup',      
-                'stage_popup_shown',
+                'need_stage_popup', 'stage_popup_shown',
+                'acquiring_enabled',   # ← добавлено
             ),
         }),
         ("Платежи по рассрочке", {
@@ -76,7 +78,7 @@ class ClientAdmin(admin.ModelAdmin):
 
 
 @admin.register(StageTemplate)
-class StageTemplateAdmin(admin.ModelAdmin):
+class StageTemplateAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = ('id', 'name', 'slug', 'order', 'description')
     ordering = ('order',)
     search_fields = ('name', 'slug', 'description')
@@ -100,7 +102,7 @@ class PaymentApplicationInline(admin.TabularInline):
 
 
 @admin.register(Contract)
-class ContractAdmin(admin.ModelAdmin):
+class ContractAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = ('id', 'client', 'total_amount', 'discount', 'first_payment',
                     'first_payment_date', 'number_of_payments', 'created_at')
     search_fields = ('client__surname', 'client__name', 'client__bitrix_id')
@@ -109,7 +111,7 @@ class ContractAdmin(admin.ModelAdmin):
 
 
 @admin.register(InstallmentPlan)
-class InstallmentPlanAdmin(admin.ModelAdmin):
+class InstallmentPlanAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = ('id', 'contract', 'created_at', 'calculated')
     inlines = [InstallmentPaymentInline]
     list_filter = ('calculated',)
@@ -124,7 +126,7 @@ class InstallmentPlanAdmin(admin.ModelAdmin):
 
 
 @admin.register(InstallmentPayment)
-class InstallmentPaymentAdmin(admin.ModelAdmin):
+class InstallmentPaymentAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = ('id', 'plan', 'number', 'due_date', 'amount_due', 'amount_paid', 'status')
     list_filter = ('status', 'due_date')
     ordering = ('due_date',)
@@ -141,7 +143,7 @@ class InstallmentPaymentAdmin(admin.ModelAdmin):
 
 
 @admin.register(ActualPayment)
-class ActualPaymentAdmin(admin.ModelAdmin):
+class ActualPaymentAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = ("id", "plan", "payment_date", "amount")  
     ordering = ("-payment_date",)  
     list_filter = ("payment_date",)
@@ -154,32 +156,15 @@ class ActualPaymentAdmin(admin.ModelAdmin):
 
 
 @admin.register(OtherPayment)
-class OtherPaymentAdmin(admin.ModelAdmin):
+class OtherPaymentAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = ('id', 'client', 'payment_type', 'amount', 'is_paid', 'created_at', 'paid_at')
     list_filter = ('payment_type', 'is_paid')
     search_fields = ('client__surname', 'client__bitrix_id')
     ordering = ('-created_at',)
 
 
-# --- Новые модели реферальной системы ---
-
-# @admin.register(ReferralClick)
-# class ReferralClickAdmin(admin.ModelAdmin):
-#     list_display = ('id', 'client', 'ip_address', 'user_agent', 'timestamp')
-#     list_filter = ('timestamp',)
-#     search_fields = ('client__surname', 'client__bitrix_id', 'ip_address')
-#     ordering = ('-timestamp',)
-
-
-# @admin.register(Application)
-# class ApplicationAdmin(admin.ModelAdmin):
-#     list_display = ('id', 'name', 'phone', 'client', 'referral_owner', 'created_at')
-#     list_filter = ('created_at',)
-#     search_fields = ('name', 'phone', 'client__surname', 'referral_owner__surname')
-#     ordering = ('-created_at',)
-    
 @admin.register(Employee)
-class EmployeeAdmin(admin.ModelAdmin):
+class EmployeeAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = ("id", "name", "bitrix_id", "referral_code", "updated_at")
     search_fields = ("name", "bitrix_id", "referral_code")
     readonly_fields = ("referral_code", "updated_at")

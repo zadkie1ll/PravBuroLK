@@ -120,12 +120,22 @@
                   {% endif %}
                 </td>
                 <td class="px-3 py-2 text-center">
-                  <button class="px-3 py-1 rounded-lg text-white
-                                 {% if payment.status == 'paid' %}bg-gray-400 cursor-not-allowed
-                                 {% else %}bg-blue-600 hover:bg-blue-700{% endif %}"
-                          {% if payment.status == 'paid' %}disabled{% endif %}>
-                    {% if payment.status == 'paid' %}Оплачено{% else %}Оплатить{% endif %}
-                  </button>
+                <button class="px-3 py-1 rounded-lg text-white
+                    {% if payment.status == 'paid' or not client.acquiring_enabled %}
+                        bg-gray-400 cursor-not-allowed
+                    {% else %}
+                        bg-blue-600 hover:bg-blue-700
+                    {% endif %}"
+                    {% if payment.status == 'paid' or not client.acquiring_enabled %}disabled{% endif %}>
+                    
+                    {% if payment.status == 'paid' %}
+                        Оплачено
+                    {% elif not client.acquiring_enabled %}
+                        Недоступно
+                    {% else %}
+                        Оплатить
+                    {% endif %}
+                </button>
                 </td>
               </tr>
               {% endfor %}
@@ -149,12 +159,22 @@
                 </p>
               </div>
               <div>
-                <button class="px-3 py-1 rounded-lg text-white text-sm
-                               {% if payment.status == 'paid' %}bg-gray-400 cursor-not-allowed
-                               {% else %}bg-blue-600 hover:bg-blue-700{% endif %}"
-                        {% if payment.status == 'paid' %}disabled{% endif %}>
-                  {% if payment.status == 'paid' %}Оплачено{% else %}Оплатить{% endif %}
-                </button>
+            <button class="px-3 py-1 rounded-lg text-white text-sm
+                {% if payment.status == 'paid' or not client.acquiring_enabled %}
+                    bg-gray-400 cursor-not-allowed
+                {% else %}
+                    bg-blue-600 hover:bg-blue-700
+                {% endif %}"
+                {% if payment.status == 'paid' or not client.acquiring_enabled %}disabled{% endif %}>
+                
+                {% if payment.status == 'paid' %}
+                    Оплачено
+                {% elif not client.acquiring_enabled %}
+                    Недоступно
+                {% else %}
+                    Оплатить
+                {% endif %}
+            </button>
               </div>
             </div>
           </div>

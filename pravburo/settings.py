@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'bitrix',
     'payments',
     'clients',
+    "documents",
 ]
 
 MIDDLEWARE = [
@@ -97,6 +98,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
+]
+
+
+INSTALLED_APPS += ["simple_history"]
+
+MIDDLEWARE += [
+    'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
 
