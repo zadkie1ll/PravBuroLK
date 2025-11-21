@@ -267,6 +267,8 @@ def client_payments_page(request, client_id):
 
     # Учитываем скидку
     contract_final_amount = (contract.total_amount or 0) - (contract.discount or 0)
+    
+    other_payments = OtherPayment.objects.filter(client__id=client_id).order_by("-created_at")
 
     return render(request, "client_payments_page.html", {
         "contract": contract,
@@ -278,9 +280,88 @@ def client_payments_page(request, client_id):
         "total_installments_sum": total_installments_sum,
         "total_actuals_sum": total_actuals_sum,
 
-        # Итоговая сумма (используется везде кроме секции редактирования)
         "contract_final_amount": contract_final_amount,
+        
+        "other_payments": other_payments,
     })
+
+
+
+
+@require_POST
+def create_other_payments(request):
+    client_id = request.POST.get("client_id")
+    payment_type = request.POST.get("payment_type")
+    amount = request.POST.get("new_other_amount")
+    comment = request.POST.get("new_other_comment")
+
+    if not client_id or not payment_type or not amount:
+        return redirect(request.META.get("HTTP_REFERER", "/"))
+
+    try:
+        amount = Decimal(amount)
+    except:
+        return redirect(request.META.get("HTTP_REFERER", "/"))
+
+    client = get_object_or_404(Client, id=client_id)
+
+    OtherPayment.objects.create(
+        client=client,
+        payment_type=payment_type,
+        amount=amount,
+        comment=comment
+    )
+
+    # ⬅⬅⬅ Вот тут
+    return redirect(request.META.get("HTTP_REFERER", "/"))
+
+
+
+
+def delete_other_payment(request, payment_id):
+    if request.method == "POST":
+        try:
+            obj = OtherPayment.objects.get(id=payment_id)
+            obj.delete()
+            return JsonResponse({"success": True})
+        except OtherPayment.DoesNotExist:
+            return JsonResponse({"success": False, "error": "Not found"})
+
+    return JsonResponse({"success": False, "error": "Invalid method"})
+
+
+
+
+def update_other_payments(request):
+    if request.method == "POST":
+
+        for key, value in request.POST.items():
+
+            if key.startswith("other_") and key.endswith("_type"):
+                payment_id = key.split("_")[1]
+                obj = OtherPayment.objects.get(id=payment_id)
+
+                obj.payment_type = value
+
+                # Сумма
+                amount_key = f"other_{payment_id}_amount"
+                if amount_key in request.POST:
+                    obj.amount = request.POST.get(amount_key)
+
+                # Комментарий
+                comment_key = f"other_{payment_id}_comment"
+                if comment_key in request.POST:
+                    obj.comment = request.POST.get(comment_key)
+
+                # Оплачен
+                paid_key = f"other_{payment_id}_is_paid"
+                obj.is_paid = paid_key in request.POST
+
+                obj.save()
+
+        return JsonResponse({"success": True})
+
+    return JsonResponse({"success": False, "error": "Invalid method"})
 
 
 
@@ -867,13 +948,46 @@ ALFA_PASSWORD = "Qwasdcvbgh243567!@"
 
 def create_payment(request, payment_id):
     payment = get_object_or_404(InstallmentPayment, id=payment_id)
+    installment_plan = payment.plan
 
-    remaining = Decimal(payment.amount_due) - Decimal(payment.amount_paid or 0)
+    # --- Загружаем все фактические платежи ---
+    actual_payments = list(
+        ActualPayment.objects.filter(plan=installment_plan).order_by("payment_date")
+    )
+
+    # Создаем копию остатков для FIFO расчёта
+    remaining_actual = [p.amount for p in actual_payments]
+
+    # --- Находим реальный amount_paid для всех платежей плана ---
+    real_amount_paid = {}
+
+    for p in installment_plan.payments.order_by("number"):
+        paid = 0
+        due = p.amount_due
+
+        for i, amt in enumerate(remaining_actual):
+            if amt <= 0:
+                continue
+
+            apply_sum = min(amt, due - paid)
+            paid += apply_sum
+            remaining_actual[i] -= apply_sum
+
+            if paid >= due:
+                break
+
+        real_amount_paid[p.id] = paid
+
+    # --- Берём реальный остаток конкретного платежа ---
+    amount_paid = real_amount_paid.get(payment.id, 0)
+    remaining = payment.amount_due - amount_paid
+
     if remaining <= 0:
         messages.error(request, f"Платёж №{payment.number} уже полностью оплачен.")
         return redirect(request.META.get("HTTP_REFERER", "/"))
 
-    amount = int(remaining * 100)  
+    # --- Сумма для Альфы ---
+    amount = int(remaining * 100)
     order_number = f"InstallmentPayment-{payment.id}-{int(time.time())}"
 
     return_url = "https://prav-buro.ru"
@@ -892,8 +1006,8 @@ def create_payment(request, payment_id):
 
     try:
         response = requests.post(ALFA_API_URL, data=payload, timeout=15)
-    except requests.RequestException as e:
-        messages.error(request, "Не удалось подключиться к Альфа-Банк API. Повторите попытку позже.")
+    except requests.RequestException:
+        messages.error(request, "Не удалось подключиться к Альфа-Банк API.")
         return redirect(f"{return_url}?payment_status=error")
 
     if response.status_code != 200:
@@ -968,7 +1082,8 @@ def create_actual_payment(request):
 @csrf_exempt
 def payment_callback(request):
     """
-    Callback от Альфа-Банка — уведомление об оплате
+    Callback от Альфа-Банка — уведомление об оплате.
+    Теперь работает с новой моделью без PaymentApplication.
     """
     data = request.GET or request.POST
 
@@ -980,6 +1095,7 @@ def payment_callback(request):
     if not order_number:
         return JsonResponse({"error": "orderNumber required"}, status=400)
 
+    # Нас интересует только успешная оплата
     if not (status == "1" and operation == "deposited"):
         return JsonResponse({
             "status": "ignored",
@@ -990,14 +1106,17 @@ def payment_callback(request):
     if not payment:
         return JsonResponse({"error": f"InstallmentPayment not found for {order_number}"}, status=404)
 
+    # Дубликат
     if ActualPayment.objects.filter(order_id=order_number).exists():
         return JsonResponse({"status": "duplicate"}, status=200)
 
+    # Парсим сумму
     try:
         amount = Decimal(amount_str) / Decimal("100")
     except Exception:
-        amount = payment.amount_due
+        amount = Decimal("0.00")
 
+    # Создаем фактический платёж
     actual_payment = ActualPayment.objects.create(
         plan=payment.plan,
         payment_date=timezone.now().date(),
@@ -1005,13 +1124,13 @@ def payment_callback(request):
         order_id=order_number,
     )
 
-    # --- логирование в Telegram ---
+    # --- Логирование в Telegram ---
     try:
         import telebot
         from django.conf import settings
 
-        chat_id = CHAT_ID 
         bot = telebot.TeleBot(BOT_TOKEN)
+        chat_id = CHAT_ID
 
         client = payment.plan.contract.client
         fio = f"{client.name} {client.surname} {client.middlename or ''}".strip()
@@ -1023,10 +1142,9 @@ def payment_callback(request):
             f"💰 Сумма: {amount} ₽\n"
             f"📅 Дата: {date_str}"
         )
-
         bot.send_message(chat_id, log_message)
     except Exception as e:
-        print(f"[PaymentCallback][TelegramLog] Ошибка при отправке лога: {e}")
+        print(f"[PaymentCallback] Telegram error: {e}")
     # --- конец логирования ---
 
     return JsonResponse({

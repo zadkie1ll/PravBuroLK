@@ -7,6 +7,13 @@
 <!--   ИНФО О КОНТРАКТЕ        -->
 <!-- ========================= -->
 
+
+<a href="{% url 'client_search' %}"
+   class="inline-block px-5 py-2 bg-slate-200 text-slate-700 rounded-xl
+          font-semibold hover:bg-slate-300 transition">
+    ← Назад к поиску клиентов
+</a>
+
 <section class="bg-white shadow-md rounded-2xl p-6 space-y-4">
     <h2 class="text-2xl font-bold text-slate-700">Информация о контракте</h2>
 
@@ -70,22 +77,26 @@
     <section class="bg-white shadow-md rounded-2xl p-6 space-y-6">
         <h2 class="text-xl font-bold text-slate-700">Платежи по плану</h2>
 
-        <!-- Форма добавления нового платежа -->
-        <form method="POST" action="/installment/create/" class="flex items-center gap-4">
-            {% csrf_token %}
+                <!-- Форма добавления нового платежа -->
+                <form method="POST" action="/installment/create/" class="flex items-center gap-4">
+                    {% csrf_token %}
 
-            <!-- 🔥 Передаём plan_id -->
-            <input type="hidden" name="plan_id" value="{{ plan.id }}">
+                    <!-- 🔥 Передаём plan_id -->
+                    <input type="hidden" name="plan_id" value="{{ plan.id }}" required>
 
-            <input type="date" name="new_installment_date"
-                   class="border rounded-lg px-3 py-2">
-            <input type="number" name="new_installment_amount"
-                   placeholder="Сумма"
-                   class="border rounded-lg px-3 py-2">
-            <button class="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700">
-                Добавить
-            </button>
-        </form>
+                    <input type="date" name="new_installment_date"
+                        class="border rounded-lg px-3 py-2"
+                        required>
+
+                    <input type="number" name="new_installment_amount"
+                        placeholder="Сумма"
+                        class="border rounded-lg px-3 py-2"
+                        required>
+
+                    <button class="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700">
+                        Добавить
+                    </button>
+                </form>
 
         <form id="installments-form">
             {% csrf_token %}
@@ -191,22 +202,26 @@
     <section class="bg-white shadow-md rounded-2xl p-6 space-y-6">
         <h2 class="text-xl font-bold text-slate-700">Фактические оплаты</h2>
 
-        <!-- Форма добавления фактической оплаты -->
-        <form method="POST" action="/actual/create/" class="flex items-center gap-4">
-            {% csrf_token %}
+<!-- Форма добавления фактической оплаты -->
+<form method="POST" action="/actual/create/" class="flex items-center gap-4">
+    {% csrf_token %}
 
-            <!-- 🔥 Передаём plan_id -->
-            <input type="hidden" name="plan_id" value="{{ plan.id }}">
+                <!-- 🔥 Передаём plan_id -->
+                <input type="hidden" name="plan_id" value="{{ plan.id }}" required>
 
-            <input type="date" name="new_actual_date"
-                   class="border rounded-lg px-3 py-2">
-            <input type="number" name="new_actual_amount"
-                   placeholder="Сумма"
-                   class="border rounded-lg px-3 py-2">
-            <button class="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700">
-                Добавить
-            </button>
-        </form>
+                <input type="date" name="new_actual_date"
+                    class="border rounded-lg px-3 py-2"
+                    required>
+
+                <input type="number" name="new_actual_amount"
+                    placeholder="Сумма"
+                    class="border rounded-lg px-3 py-2"
+                    required>
+
+                <button class="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700">
+                    Добавить
+                </button>
+            </form>
 
         <form id="actuals-form">
             {% csrf_token %}
@@ -259,7 +274,155 @@
             </button>
         </form>
     </section>
+
+<!-- ========================= -->
+<!--      ПРОЧИЕ ПЛАТЕЖИ       -->
+<!-- ========================= -->
+
+<section class="bg-white shadow-md rounded-2xl p-6 space-y-6">
+    <h2 class="text-xl font-bold text-slate-700">Прочие платежи</h2>
+
+    <!-- Форма добавления прочего платежа -->
+    <form method="POST" action="{% url 'create_other_payments' %}" class="flex items-center gap-4">
+        {% csrf_token %}
+
+        <input type="hidden" name="client_id" value="{{ contract.client.id }}" required>
+
+        <!-- Тип -->
+        <select name="payment_type"
+                class="border rounded-lg px-3 py-2"
+                required>
+            <option value="">Тип платежа</option>
+            <option value="deposit">Судебный депозит</option>
+            <option value="publication">Публикация</option>
+            <option value="post">Почтовые расходы</option>
+            <option value="deposit_extra">Доп. депозит</option>
+            <option value="publication_extra">Доп. публикация</option>
+        </select>
+
+        <!-- Сумма -->
+        <input type="number"
+               name="new_other_amount"
+               placeholder="Сумма"
+               class="border rounded-lg px-3 py-2"
+               required>
+
+        <!-- Комментарий -->
+        <input type="text"
+               name="new_other_comment"
+               placeholder="Комментарий"
+               class="border rounded-lg px-3 py-2 w-64">
+
+        <button class="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700">
+            Добавить
+        </button>
+    </form>
+
+    <!-- Таблица прочих платежей -->
+    <form id="others-form">
+        {% csrf_token %}
+
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-slate-100 text-sm text-slate-600">
+                    <th class="p-3">Тип</th>
+                    <th class="p-3">Сумма</th>
+                    <th class="p-3">Комментарий</th>
+                    <th class="p-3"></th>
+                </tr>
+            </thead>
+
+            <tbody class="text-sm">
+                {% for op in contract.client.other_payments.all %}
+                <tr class="border-b hover:bg-slate-50">
+
+                    <!-- Тип -->
+                    <td class="p-3">
+                        <select name="other_{{ op.id }}_type"
+                                class="border rounded-lg px-2 py-1 w-full">
+                            {% for key, label in op.PAYMENT_TYPES %}
+                            <option value="{{ key }}"
+                                {% if op.payment_type == key %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+
+                    <!-- Сумма -->
+                    <td class="p-3">
+                        <input type="number"
+                               name="other_{{ op.id }}_amount"
+                               value="{{ op.amount }}"
+                               class="w-full border rounded-lg px-2 py-1">
+                    </td>
+
+                    <!-- Комментарий -->
+                    <td class="p-3">
+                        <input type="text"
+                               name="other_{{ op.id }}_comment"
+                               value="{{ op.comment }}"
+                               class="w-full border rounded-lg px-2 py-1">
+                    </td>
+
+                    <!-- Удаление -->
+                    <td class="p-3 text-right">
+                        <button type="button"
+                                class="delete-btn text-red-600"
+                                data-id="{{ op.id }}"
+                                data-type="other"
+                                data-url="{% url 'delete_other_payment' op.id %}">
+                            ✖
+                        </button>
+                    </td>
+
+                </tr>
+                {% empty %}
+                <tr>
+                    <td class="p-3 text-slate-500" colspan="4">
+                        Нет прочих платежей
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <button type="button" id="save-others"
+                class="mt-4 px-5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700">
+            Сохранить изменения
+        </button>
+    </form>
+</section>
+
+<script>
+
+document.getElementById("save-others").addEventListener("click", () => {
+    const formData = new FormData(document.getElementById("others-form"));
+
+    fetch("{% url 'update_other_payments' %}", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+        },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else alert(data.error || "Ошибка сохранения");
+    });
+});
+
+
+
+</script>
+
+
+
 </div>
+
+
+
 
 <!-- ======================= -->
 <!--   МОДАЛКА УДАЛЕНИЯ      -->
@@ -295,12 +458,14 @@
     let modal = document.getElementById("delete-modal");
     let confirmBtn = document.getElementById("confirm-delete");
     let cancelBtn = document.getElementById("cancel-delete");
-    let currentDelete = {id: null, type: null};
+    let currentDelete = { id: null, type: null, url: null };
 
     document.querySelectorAll(".delete-btn").forEach(btn => {
         btn.addEventListener("click", () => {
             currentDelete.id = btn.dataset.id;
             currentDelete.type = btn.dataset.type;
+            currentDelete.url = btn.dataset.url || null; // <-- для прочих платежей
+
             modal.classList.remove("hidden");
         });
     });
@@ -308,24 +473,32 @@
     cancelBtn.addEventListener("click", () => modal.classList.add("hidden"));
 
     confirmBtn.addEventListener("click", () => {
-        let url = currentDelete.type === 'installment' ?
-            `/installment/delete/${currentDelete.id}/` :
-            `/actual/delete/${currentDelete.id}/`;
+        let url = "";
+
+        if (currentDelete.type === "installment") {
+            url = `/installment/delete/${currentDelete.id}/`;
+        } else if (currentDelete.type === "actual") {
+            url = `/actual/delete/${currentDelete.id}/`;
+        } else if (currentDelete.type === "other") {
+            url = currentDelete.url;   // <-- используем data-url
+        }
 
         fetch(url, {
             method: "POST",
-            headers: {
-                "X-CSRFToken": csrfToken
-            }
+            headers: { "X-CSRFToken": csrfToken }
         })
         .then(r => r.json())
         .then(data => {
-            if (data.success) location.reload();
-            else alert("Ошибка при удалении");
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.error || "Ошибка при удалении");
+            }
         });
 
         modal.classList.add("hidden");
     });
+
 
     // ===========================
     // Массовое сохранение платежей

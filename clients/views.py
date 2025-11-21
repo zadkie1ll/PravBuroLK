@@ -8,7 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from clients.models import Client, StageTemplate
 from django.contrib.auth.views import LogoutView as DjangoLogoutView
 from django.contrib.auth.views import LoginView
-from payments.models import Contract, InstallmentPlan
+from payments.models import Contract, InstallmentPlan, ActualPayment
 from .models import DashboardVisit
 import time
 from django.shortcuts import redirect
@@ -74,15 +74,40 @@ def client_dashboard(request):
         contract_final_amount = contract.total_amount - contract.discount
 
     installment_payments = []
-    if installment_plan:
-        for p in installment_plan.payments.prefetch_related("applications__actual_payment").order_by("number"):
-            applied_sum = sum(app.applied_amount for app in p.applications.all())
+    actual_payments = []
 
-            if applied_sum >= p.amount_due:
+    if installment_plan:
+        # 1. Получаем фактические платежи клиента
+        actual_payments = list(
+            ActualPayment.objects.filter(plan=installment_plan).order_by("payment_date")
+        )
+
+        # 2. Создаем копию сумм фактических платежей
+        remaining_actual = [p.amount for p in actual_payments]
+
+        # 3. Проходим по платежам рассрочки и распределяем суммы
+        for p in installment_plan.payments.order_by("number"):
+            amount_paid = 0
+            amount_due = p.amount_due
+
+            # Распределяем суммы simple FIFO (только визуально)
+            for i, amt in enumerate(remaining_actual):
+                if amt <= 0:
+                    continue
+
+                to_apply = min(amt, amount_due - amount_paid)
+                amount_paid += to_apply
+                remaining_actual[i] -= to_apply
+
+                if amount_paid >= amount_due:
+                    break
+
+            # Статус
+            if amount_paid >= amount_due:
                 status = "paid"
             elif p.due_date < timezone.now().date():
                 status = "overdue"
-            elif 0 < applied_sum < p.amount_due:
+            elif 0 < amount_paid < amount_due:
                 status = "partial"
             else:
                 status = "pending"
@@ -91,8 +116,8 @@ def client_dashboard(request):
                 "id": p.id,
                 "number": p.number,
                 "due_date": p.due_date,
-                "amount_due": p.amount_due,
-                "amount_paid": applied_sum,
+                "amount_due": amount_due,
+                "amount_paid": amount_paid,
                 "status": status,
             })
 
