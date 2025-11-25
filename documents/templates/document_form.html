@@ -19,32 +19,46 @@
         <div>
           <label class="block font-medium mb-1">ФИО</label>
           <input type="text" name="full_name" required
-                 class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                 class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
         </div>
 
         <div>
           <label class="block font-medium mb-1">Дата рождения</label>
           <input type="date" name="birth_date"
-                 class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                 class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
         </div>
 
         <div>
           <label class="block font-medium mb-1">Паспорт</label>
           <input type="text" name="passport"
-                 class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                 class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
         </div>
 
         <div>
           <label class="block font-medium mb-1">Адрес</label>
           <input type="text" name="address"
-                 class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                 class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
         </div>
 
         <div>
           <label class="block font-medium mb-1">Комментарий</label>
           <textarea name="comment"
-                    class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2"></textarea>
         </div>
+      </div>
+
+      <!-- Блок долгов -->
+      <div class="space-y-4">
+        <h2 class="text-lg font-semibold border-b pb-2 mb-2">Должники / Кредиторы</h2>
+
+        <!-- Список -->
+        <div id="creditor-list" class="space-y-3"></div>
+
+        <!-- Кнопка добавить -->
+        <button type="button" id="add-creditor"
+                class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+          + Добавить кредитора
+        </button>
       </div>
 
       <!-- Кнопка генерации -->
@@ -56,5 +70,33 @@
       </div>
     </form>
   </div>
+
+<script>
+document.getElementById("add-creditor").addEventListener("click", function () {
+    const container = document.getElementById("creditor-list");
+
+    const row = document.createElement("div");
+    row.className = "flex gap-3 items-center";
+
+    row.innerHTML = `
+      <input type="text" name="creditors[]" placeholder="Кредитор"
+             class="flex-1 border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
+
+      <input type="number" name="amounts[]" placeholder="Сумма"
+             class="w-40 border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
+
+      <button type="button"
+              class="text-red-500 font-bold text-xl remove-row">
+        ×
+      </button>
+    `;
+
+    container.appendChild(row);
+
+    // обработчик удаления
+    row.querySelector(".remove-row").addEventListener("click", () => row.remove());
+});
+</script>
+
 </body>
 </html>

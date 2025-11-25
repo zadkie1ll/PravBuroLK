@@ -5,7 +5,7 @@ from clients.views import CustomLoginView, TestCreateClientView, stage_detail, d
 from django.contrib.auth.views import LogoutView
 from payments.views import client_admin_view, create_other_payments, delete_other_payment, update_other_payments, update_contract_info, create_installment_payment, create_actual_payments, delete_installment_payment, update_installment_payments, delete_actual_payment, update_actual_payments, client_payments_page, create_other_payment, delete_actual_payment_view, save_actual_payment, create_actual_payment, create_payment, payment_callback, BitrixCreateClientFromDealView, recalculate_installment, update_custom_payments, payments_dashboard, client_search_view, BitrixWebhookCreateClientView, admin_dashboard
 from bitrix.views import referral_landing, referral_submit, application_success, referral_stats
-from documents.views import document_form, generate_document
+from documents.views import document_form, generate_document, dogovor
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -40,7 +40,6 @@ urlpatterns = [
     path('save_actual_payment/<int:payment_id>/', save_actual_payment, name='save_actual_payment'),
     path("delete_actual_payment/<int:payment_id>/", delete_actual_payment_view, name="delete_actual_payment"),
     path('client_admin/<int:client_id>/', client_payments_page, name='client_admin_view'),
-    # path('client/<int:client_id>/payments/', client_payments_page, name='client_payments_page'),
     path('client_search/', client_search_view, name='client_search'),
     path('other/create/', create_other_payments, name='create_other_payments'),
     path('other/delete/<int:payment_id>/', delete_other_payment, name='delete_other_payment'),
@@ -52,4 +51,5 @@ urlpatterns = [
     path('client/<int:client_id>/update_custom_payments/', update_custom_payments, name='update_custom_payments'),
     path("form/", document_form, name="document_form"),
     path("generate/", generate_document, name="generate_document"),
+    path("dogovor/", dogovor, name="dogovor"),
 ]
