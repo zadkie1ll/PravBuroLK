@@ -22,6 +22,30 @@
       </a>
     </header>
 
+
+
+<!-- Данные клиента -->
+<section class="bg-white rounded-2xl shadow p-6 mb-6">
+  <h2 class="text-xl font-semibold mb-4">🧑‍💼 Данные клиента</h2>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+    <div>
+      <span class="block text-gray-500">Фамилия</span>
+      <span class="block font-medium text-gray-900">{{ client.surname }}</span>
+    </div>
+
+    <div>
+      <span class="block text-gray-500">Имя</span>
+      <span class="block font-medium text-gray-900">{{ client.name }}</span>
+    </div>
+
+    <div>
+      <span class="block text-gray-500">Отчество</span>
+      <span class="block font-medium text-gray-900">{{ client.middlename }}</span>
+    </div>
+  </div>
+</section>
+
     <!-- Контракт -->
     {% if contract %}
   <!-- Перерасчёт рассрочки -->

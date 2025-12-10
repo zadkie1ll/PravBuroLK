@@ -5,7 +5,6 @@ from django.shortcuts import render
 from django.conf import settings
 from .services.document_pipeline import DocumentPipeline
 from pathlib import Path
-
 from django.shortcuts import render,get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -41,45 +40,16 @@ def generate_document(request):
 
     context = request.POST.dict()
 
-    creditors = request.POST.getlist("creditors[]")
-    amounts = request.POST.getlist("amounts[]")
+    # 🟢 1. Берём НОВУЮ логику распределения
+    creditors_data, total_debt, distribution_sum = parse_creditors_and_calculate(request)
 
-    debts = []
-    total_debt = 0
-
-    # собираем долги
-    for creditor, amount in zip(creditors, amounts):
-        try:
-            debt_value = float(amount)
-        except ValueError:
-            debt_value = 0
-
-        total_debt += debt_value
-
-        debts.append({
-            "creditor": creditor,
-            "amount": debt_value,   # число, а не строка
-        })
-
-    # считаем общий платёж = 10%
-    total_pay = round(total_debt * 0.10, 2)
-
-    # считаем выплату каждому
-    for entry in debts:
-        if total_debt > 0:
-            proportion = entry["amount"] / total_debt
-        else:
-            proportion = 0
-
-        entry["payment"] = round(total_pay * proportion, 2)
-
-    # добавляем в контекст
-    context["debts"] = debts
-    context["total_pay"] = total_pay
+    # 🟢 2. Передаём в шаблон ТОЛЬКО НОВЫЕ ДАННЫЕ
+    context["debts"] = creditors_data
     context["total_debt"] = total_debt
+    context["total_pay"] = distribution_sum  # 👈 Теперь total_pay = введённая вручную сумма!
 
-    # === остальная часть без изменений ===
-
+    # 🟢 3. Старый код расчёта 10% УДАЛЁН полностью — никакого total_pay = 10%
+    # 🟢 4. Генерация документа — без изменений
     template_path = os.path.join(
         settings.BASE_DIR,
         "documents",
@@ -351,12 +321,10 @@ def replace_text_in_paragraphs(doc, data):
             full_text = full_text.replace(placeholder, str(value))
 
         if full_text != paragraph.text:
-            # очищаем старые runs
             for _ in range(len(paragraph.runs)):
                 paragraph.runs[0].clear()
                 paragraph.runs[0]._element.getparent().remove(paragraph.runs[0]._element)
 
-            # создаём новый run с заменённым текстом
             run = paragraph.add_run(full_text)
             set_run_font(run)
 
@@ -410,7 +378,7 @@ def insert_table_after_heading(doc, table_data):
                         except:
                             cell_data = str(cell_data)
                     cell.text = str(cell_data)
-                    cell.paragraphs[0].alignment = 1  # по центру
+                    cell.paragraphs[0].alignment = 1 
 
             paragraph._element.addnext(table._element)
             break
@@ -477,24 +445,20 @@ def upload_to_bitrix(deal_id, file_path, field_id, payment_table):
     if not os.path.exists(file_path):
         return {"status": "error", "message": f"Файл не найден: {file_path}"}
 
-    # Кодируем файл в base64
     with open(file_path, "rb") as f:
         encoded = base64.b64encode(f.read()).decode("utf-8")
 
-    # Получаем второй платёж (если есть)
     try:
         second_payment = payment_table[1][2]
     except Exception:
         second_payment = None
 
-    # Формируем payload в ТОМ ВИДЕ, КОТОРЫЙ Bitrix принимает
     fields = {
         field_id: {
             "fileData": [os.path.basename(file_path), encoded]
         }
     }
 
-    # Добавляем поле с оплатой, если оно есть
     if second_payment is not None:
         fields["UF_CRM_1745841297007"] = second_payment
 
@@ -556,28 +520,22 @@ def number_to_words(num):
     
     
 def parse_creditors_and_calculate(request):
-    """
-    Парсит данные из формы:
-        creditors[] — имена кредиторов
-        amounts[]   — суммы долгов
-
-    Возвращает:
-        creditors_data — список структур:
-            { "name": str, "debt": float, "pay": float }
-        total_debt — общий долг
-        total_pay — общая сумма выплат (10%)
-    """
-
     creditor_names = request.POST.getlist("creditors[]")
     creditor_amounts = request.POST.getlist("amounts[]")
+    creditor_dates = request.POST.getlist("court_date[]")
+
+    # Указанная вручную сумма распределения
+    try:
+        distribution_sum = float(request.POST.get("distribution_sum", 0))
+    except ValueError:
+        distribution_sum = 0
 
     creditors_data = []
     total_debt = 0
 
-    # 1. Парсинг и валидация
-    for name, amount in zip(creditor_names, creditor_amounts):
+    for name, amount, date in zip(creditor_names, creditor_amounts, creditor_dates):
         if not name.strip():
-            continue  # пропускаем пустые строки
+            continue
 
         try:
             debt = float(amount)
@@ -586,19 +544,19 @@ def parse_creditors_and_calculate(request):
 
         creditors_data.append({
             "name": name.strip(),
-            "debt": debt
+            "debt": debt,
+            "date": date  # 👈 добавили дату
         })
+
         total_debt += debt
 
-    # 2. Расчёт выплат
-    total_pay = round(total_debt * 0.10, 2)
-
+    # Расчёт пропорциональной выплаты
     for c in creditors_data:
         if total_debt > 0:
             proportion = c["debt"] / total_debt
         else:
             proportion = 0
 
-        c["pay"] = round(total_pay * proportion, 2)
+        c["pay"] = round(distribution_sum * proportion, 2)
 
-    return creditors_data, total_debt, total_pay
+    return creditors_data, total_debt, distribution_sum 

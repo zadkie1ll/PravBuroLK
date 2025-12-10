@@ -258,19 +258,32 @@ def create_actual_payments(request):
 def client_payments_page(request, client_id):
     contract = get_object_or_404(Contract, client__id=client_id)
     plan, _ = InstallmentPlan.objects.get_or_create(contract=contract)
+    client = contract.client
 
     installments = InstallmentPayment.objects.filter(plan=plan).order_by("number")
-    actuals = ActualPayment.objects.filter(plan=plan).order_by("payment_date")
+
+    # ---- ФИЛЬТР ПО ДАТЕ ----
+    date_from = request.GET.get("actual_from")
+    date_to = request.GET.get("actual_to")
+
+    actuals = ActualPayment.objects.filter(plan=plan)
+
+    if date_from:
+        actuals = actuals.filter(payment_date__gte=date_from)
+    if date_to:
+        actuals = actuals.filter(payment_date__lte=date_to)
+
+    actuals = ActualPayment.objects.filter(plan=plan).order_by("payment_date", "id")
 
     total_installments_sum = installments.aggregate(models.Sum("amount_due"))["amount_due__sum"] or 0
     total_actuals_sum = actuals.aggregate(models.Sum("amount"))["amount__sum"] or 0
 
-    # Учитываем скидку
     contract_final_amount = (contract.total_amount or 0) - (contract.discount or 0)
     
     other_payments = OtherPayment.objects.filter(client__id=client_id).order_by("-created_at")
 
     return render(request, "client_payments_page.html", {
+        "client": client,
         "contract": contract,
         "plan": plan,
 
@@ -283,9 +296,10 @@ def client_payments_page(request, client_id):
         "contract_final_amount": contract_final_amount,
         
         "other_payments": other_payments,
+
+        "date_from": date_from,
+        "date_to": date_to,
     })
-
-
 
 
 @require_POST
