@@ -64,6 +64,18 @@
         </div>
       </div>
 
+
+      <div class="space-y-4 mt-8">
+  <h2 class="text-lg font-semibold border-b pb-2 mb-2">Возмещения убытков</h2>
+
+  <div id="loss-list" class="space-y-6"></div>
+
+  <button type="button" id="add-loss"
+          class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">
+    + Добавить убыток
+  </button>
+</div>
+
       <!-- Блок кредиторов -->
       <div class="space-y-4">
         <h2 class="text-lg font-semibold border-b pb-2 mb-2">Кредиторы</h2>
@@ -121,6 +133,69 @@ document.getElementById("add-creditor").addEventListener("click", function () {
         <label class="text-sm text-gray-600">Дата определения суда</label>
         <input type="date" name="court_date[]"
                class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
+      </div>
+    `;
+
+    container.appendChild(row);
+
+    row.querySelector(".remove-row").addEventListener("click", () => row.remove());
+});
+</script>
+
+
+<script>
+document.getElementById("add-creditor").addEventListener("click", function () {
+    const container = document.getElementById("creditor-list");
+
+    const row = document.createElement("div");
+    row.className = "border p-4 rounded-lg bg-gray-50 space-y-3";
+
+    row.innerHTML = `
+      <div class="flex gap-3 items-center">
+        <input type="text" name="creditors[]" placeholder="Кредитор"
+               class="flex-1 border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
+
+        <input type="number" name="amounts[]" placeholder="Сумма"
+               class="w-40 border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
+
+        <button type="button"
+                class="text-red-500 font-bold text-xl remove-row">
+          ×
+        </button>
+      </div>
+
+      <div>
+        <label class="text-sm text-gray-600">Дата определения суда</label>
+        <input type="date" name="court_date[]"
+               class="w-full border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
+      </div>
+    `;
+
+    container.appendChild(row);
+
+    row.querySelector(".remove-row").addEventListener("click", () => row.remove());
+});
+
+
+// === БЛОК УБЫТКОВ ===
+document.getElementById("add-loss").addEventListener("click", function () {
+    const container = document.getElementById("loss-list");
+
+    const row = document.createElement("div");
+    row.className = "border p-4 rounded-lg bg-gray-50 space-y-3";
+
+    row.innerHTML = `
+      <div class="flex gap-3 items-center">
+        <input type="text" name="loss_org[]" placeholder="Организация"
+               class="flex-1 border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
+
+        <input type="number" name="loss_amount[]" placeholder="Сумма"
+               class="w-40 border border-gray-300 rounded px-3 py-2 focus:ring-blue-500 focus:ring-2">
+
+        <button type="button"
+                class="text-red-500 font-bold text-xl remove-row">
+          ×
+        </button>
       </div>
     `;
 

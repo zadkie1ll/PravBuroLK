@@ -40,16 +40,35 @@ def generate_document(request):
 
     context = request.POST.dict()
 
-    # 🟢 1. Берём НОВУЮ логику распределения
+    # --- КРЕДИТОРЫ ---
     creditors_data, total_debt, distribution_sum = parse_creditors_and_calculate(request)
-
-    # 🟢 2. Передаём в шаблон ТОЛЬКО НОВЫЕ ДАННЫЕ
     context["debts"] = creditors_data
     context["total_debt"] = total_debt
-    context["total_pay"] = distribution_sum  # 👈 Теперь total_pay = введённая вручную сумма!
+    context["total_pay"] = distribution_sum     
 
-    # 🟢 3. Старый код расчёта 10% УДАЛЁН полностью — никакого total_pay = 10%
-    # 🟢 4. Генерация документа — без изменений
+    # --- ВОЗМЕЩЕНИЯ УБЫТКОВ ---
+    losses_names = request.POST.getlist("loss_org[]")
+    losses_amounts = request.POST.getlist("loss_amount[]")
+
+    losses = []
+    total_losses = 0
+
+    for name, amount in zip(losses_names, losses_amounts):
+        if name.strip() or amount.strip():
+            amount_float = float(amount) if amount.strip() else 0
+            losses.append({
+                "name": name,
+                "amount": amount_float
+            })
+            total_losses += amount_float
+
+    context["losses"] = losses
+    context["total_losses"] = total_losses
+
+    # Общая сумма = кредиторы + убытки
+    context["grand_total"] = total_debt + total_losses
+
+    # --- ПАЙПЛАЙН ---
     template_path = os.path.join(
         settings.BASE_DIR,
         "documents",
@@ -103,7 +122,6 @@ def dogovor(request):
     deal_id = m.group(1)
     deal_url = f"{WEBHOOK_URL}crm.deal.get.json?ID={deal_id}"
 
-    # --- Получение сделки ---
     try:
         deal_resp = requests.get(deal_url, timeout=10)
         logger.error(f"DEAL RESPONSE: {deal_resp.text}")
@@ -115,7 +133,6 @@ def dogovor(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'Deal fetch error: {e}'}, status=500)
 
-    # --- Подготовка данных ---
     try:
         contact_id = deal_data.get("CONTACT_ID")
         phone_number = get_phone_number(contact_id) if contact_id else "00000000000"
@@ -156,7 +173,6 @@ def dogovor(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'Data preparation error: {e}'}, status=500)
 
-    # --- Расчёт платежей ---
     try:
         total = int(contract["сумма юристы"]) + int(contract["сумма бонус"])
         num = int(contract["количество платежей"])
@@ -560,3 +576,161 @@ def parse_creditors_and_calculate(request):
         c["pay"] = round(distribution_sum * proportion, 2)
 
     return creditors_data, total_debt, distribution_sum 
+
+
+
+#LEGENDA--------------------------------------------------------------------------------------------------------------------------------
+
+OPENAI_API_KEY = "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"  # лучше перенести в переменные окружения
+BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
+
+TOR_PROXIES = {
+    'http': 'socks5h://127.0.0.1:9050',
+    'https': 'socks5h://127.0.0.1:9050'
+    }
+
+
+def get_deal_data_from_bitrix(post_data):
+    """
+    Извлекает ID сделки из POST-данных Bitrix24 и возвращает данные сделки
+    """
+    document_id_2 = post_data.get('document_id[2]')
+    if not document_id_2:
+        return None, 'document_id[2] not found'
+
+    deal_id_match = re.search(r'DEAL_(\d+)', document_id_2)
+    if not deal_id_match:
+        return None, 'Invalid deal ID format'
+
+    deal_id = deal_id_match.group(1)
+
+    # Подставь актуальный вебхук и пользователя
+    webhook_url = f"{BITRIX_WEBHOOK_URL}crm.deal.get.json?ID={deal_id}"
+    response = requests.get(webhook_url)
+
+    if response.status_code != 200:
+        return None, f"Bitrix24 request failed with status {response.status_code}"
+
+    try:
+        deal_data = response.json().get('result', {})
+        return deal_data, None
+    except json.JSONDecodeError:
+        return None, 'Invalid JSON response from Bitrix'
+
+@csrf_exempt
+@require_POST
+def parse_legenda(request):
+    try:
+        post_data = request.POST.dict()
+        deal_data, error = get_deal_data_from_bitrix(post_data)
+        if error:
+            return JsonResponse({"error": error}, status=400)
+
+        legenda = deal_data.get("COMMENTS")
+        deal_id = deal_data.get("ID")
+
+        if not legenda:
+            return JsonResponse({"error": "В сделке нет текста легенды (COMMENTS)"}, status=400)
+
+        # === Шаг 2: System prompt ===
+        system_prompt = (
+            "Ты — аналитик юридической компании. "
+            "Твоя задача — строго по тексту легенды извлечь данные для CRM в формате JSON. "
+            "Все данные должны быть напрямую подтверждены текстом, а не основаны на догадках.\n\n"
+            "📌 Правила извлечения:\n"
+            "1. Читай весь текст внимательно и используй только ту информацию, которая прямо указана.\n"
+            "2. Если есть сомнения или нет точного упоминания — заполняй поле указанным fallback-значением.\n"
+            "3. Для чисел бери только те, что явно относятся к данному полю, игнорируй все остальные.\n"
+            "4. Разрешено перефразировать ответы для улучшения читаемости в полях:\n"
+            "   UF_CRM_1754647579070, UF_CRM_1754647590990, UF_CRM_1754647601622,\n"
+            "   UF_CRM_1754647621350, UF_CRM_1754647681566, UF_CRM_1754647691574.\n"
+            "5. Для остальных полей текст должен быть максимально близок к оригиналу.\n"
+            "6. Ответ всегда в виде одного корректного JSON-объекта без пояснений и комментариев.\n\n"
+            "📌 Формат и fallback-значения:\n"
+            "- UF_CRM_1754647579070: боль клиента. Если нет — 'не обнаружено'\n"
+            "- UF_CRM_1754647590990: краткая характеристика клиента, как он общается - если нет данных — 'адекватный'\n"
+            "- UF_CRM_1754647601622: имущество клиента. Если нет — 'не обнаружено'\n"
+            "- UF_CRM_1754647621350: состоит ли клиент в браке и есть ли совместное имущество. Если нет данных — 'неизвестно'\n"
+            "- UF_CRM_1754647636597: доход клиента. Если нет данных или не уверен — 'неизвестно'\n"
+            "- UF_CRM_1754647649551: знает ли клиент про блокировку карт в банкротстве. Если нет — 'в диалоге не упоминалось'\n"
+            "- UF_CRM_1754647663541: сделки за 3 года. Если нет — 'не обнаружено'\n"
+            "- UF_CRM_1754647671862: дети на иждивении. Если нет — 'не обнаружено'\n"
+            "- UF_CRM_1754647681566: что обещано клиенту. Если нет — 'просто пройти процедуру'\n"
+            "- UF_CRM_1754647691574: пожелания клиента. Если нет — 'пожеланий нет'\n"
+            "- UF_CRM_1754647902223: сделки супруга за 3 года. Если не в браке — 'не в браке'\n"
+        )
+
+        parsed_fields = {}
+        # === Шаг 3: Запрос к OpenAI ===
+        try:
+            payload = {
+                "model": "gpt-4o",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": legenda}
+                ],
+                "temperature": 0.2
+            }
+            openai_response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json=payload,
+                proxies=TOR_PROXIES,
+                timeout=60
+            )
+            openai_response.raise_for_status()
+            raw_output = openai_response.json()["choices"][0]["message"]["content"].strip()
+            cleaned_output = re.sub(r"^```json\s*|\s*```$", "", raw_output, flags=re.IGNORECASE).strip()
+            parsed_fields = json.loads(cleaned_output)
+        except Exception as e:
+            parsed_fields = {}
+            print("OpenAI error:", e)
+
+        # === Шаг 4: Обновляем сделку в Bitrix ===
+        try:
+            if parsed_fields:
+                bitrix_payload = {"id": deal_id}
+                for field_code, field_value in parsed_fields.items():
+                    bitrix_payload[f"fields[{field_code}]"] = field_value
+                bitrix_update_url = f"{BITRIX_WEBHOOK_URL}crm.deal.update.json"
+                bitrix_response = requests.post(bitrix_update_url, data=bitrix_payload)
+                bitrix_response.raise_for_status()
+        except Exception as e:
+            print("Bitrix update error:", e)
+
+        # === Шаг 5: Генерация документа ===
+        template_id = 40
+        entity_type_id = 2  # Сделка
+        document_url = f"{BITRIX_WEBHOOK_URL}crm.documentgenerator.document.add.json"
+        try:
+            document_payload = {
+                "templateId": template_id,
+                "entityTypeId": entity_type_id,
+                "entityId": deal_id,
+                "values": {"SAVE_IN_ENTITY": "Y"}
+            }
+            doc_response = requests.post(document_url, json=document_payload)
+            doc_response.raise_for_status()
+            doc_result = doc_response.json().get("result")
+            download_url = pdf_url = None
+            if doc_result and "document" in doc_result:
+                doc_data = doc_result["document"]
+                download_url = doc_data.get("downloadUrl")
+                pdf_url = doc_data.get("pdfUrl")
+        except Exception as e:
+            return JsonResponse({"error": "Не удалось сгенерировать документ", "detail": str(e)}, status=502)
+
+        return JsonResponse({
+            "success": True,
+            "data_written": parsed_fields,
+            "document": {
+                "downloadUrl": download_url,
+                "pdfUrl": pdf_url
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

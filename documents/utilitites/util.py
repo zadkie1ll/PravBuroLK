@@ -13,6 +13,16 @@ CATEGORY_ID = 2
 EXCEL_FILENAME = "deals_export.xlsx"
 
 
+def map_group_code(value):
+    if value == "60":
+        return "Наши"
+    elif value == "62":
+        return "ИУС"
+    elif value == "64":
+        return "Киргизы"
+    return "Наши"
+
+
 def bitrix(method: str, params: dict = None):
     """Универсальный запрос с паузой."""
     url = f"{BITRIX_WEBHOOK_URL}{method}"
@@ -107,6 +117,9 @@ def fetch_all_deals(category_id: int):
                 "UF_CRM_1754401876367",
                 "UF_CRM_1745888327609",
                 "UF_CRM_1746616466655",
+                "UF_CRM_1745885588898",
+                "UF_CRM_1745890459834",
+                "UF_CRM_1765530407479", #новое поле
             ],
         }
 
@@ -179,10 +192,13 @@ def normalize_deal(deal, region_map):
         "Фактический регион проживания": region_map.get(
             deal.get("UF_CRM_1745886887592", ""), ""
         ),
+        "Группа": map_group_code(str(deal.get("UF_CRM_1745885588898", ""))),
         "Сумма долга": deal.get("UF_CRM_1746616466655", ""),
         "Дата завершения": format_date(deal.get("CLOSEDATE", "")),
         "Дело на КадАрбитре": deal.get("UF_CRM_1754401876367", ""),
         "Ссылка на сделку": f"https://prav-buro.bitrix24.ru/crm/deal/details/{deal_id}/",
+        "Комментарий контроля качества": deal.get("UF_CRM_1745890459834", ""),
+        "подтверждение": "да" if str(deal.get("UF_CRM_1765530407479", "")) == "1" else "нет",
     }
 
 
@@ -204,6 +220,9 @@ def export_to_excel(deals, region_map, filename="deals.xlsx"):
         "Дата завершения",
         "Дело на КадАрбитре",
         "Ссылка на сделку",
+        "Группа",
+        "Комментарий контроля качества",
+        "подтверждение",
     ]
 
     sheet.append(headers)
