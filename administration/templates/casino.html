@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Komanda.Game Casino</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    background: radial-gradient(circle at top, #1f2937, #020617);
+    color: #fff;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.casino {
+    background: #020617;
+    border-radius: 20px;
+    padding: 30px;
+    width: 380px;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6);
+    text-align: center;
+}
+
+.input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    margin-bottom: 15px;
+    font-size: 16px;
+    text-align: center;
+}
+
+/* ===== SLOTS ===== */
+.slots {
+    display: flex;
+    justify-content: space-between;
+    margin: 20px 0;
+}
+
+.reel {
+    width: 100px;
+    height: 200px; /* центральный + половина слота сверху  */
+    overflow: hidden;
+    background: #111827;
+    border-radius: 14px;
+    position: relative;
+}
+
+.reel-track {
+    position: absolute;
+    top: -50px; /* чтобы центр совпал */
+    width: 100%;
+}
+
+.symbol {
+    height: 100px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.symbol img {
+    width: 80%;
+    height: 80%;
+    object-fit: contain;
+}
+
+/* ===== BUTTON ===== */
+button {
+    background: linear-gradient(180deg, #facc15, #ca8a04);
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    width: 100%;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+button:disabled { opacity: 0.5; }
+
+/* ===== POPUP ===== */
+.popup {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.popup.hidden { display: none; }
+
+.popup-content {
+    background: #020617;
+    padding: 25px;
+    border-radius: 20px;
+    text-align: center;
+}
+
+.popup-content img {
+    width: 140px;
+    height: 140px;
+}
+
+
+.toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #dc2626; /* красный */
+    color: #fff;
+    padding: 14px 22px;
+    border-radius: 12px;
+    font-size: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    z-index: 9999;
+}
+
+.toast.show {
+    opacity: 1;
+}
+
+.toast.hidden {
+    display: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="casino">
+    <h1>Komanda.Game</h1>
+    <input id="ticketCode" class="input" placeholder="Введите код билета" maxlength="6">
+
+    <div class="slots">
+        <div class="reel"><div class="reel-track" id="r1"></div></div>
+        <div class="reel"><div class="reel-track" id="r2"></div></div>
+        <div class="reel"><div class="reel-track" id="r3"></div></div>
+    </div>
+
+    <button id="spinBtn">Крутить</button>
+</div>
+
+<div id="errorToast" class="toast hidden"></div>
+
+<div id="popup" class="popup hidden">
+    <div class="popup-content">
+        <img id="popupImage">
+        <h2 id="popupTitle"></h2>
+        <button onclick="location.reload()">Ещё раз</button>
+    </div>
+</div>
+
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code'); // получаем значение ?code=XYZ
+    if (code) {
+        const input = document.getElementById('ticketCode');
+        input.value = code;
+    }
+});
+</script>
+
+<script>
+const CSRF_TOKEN = "{{ csrf_token }}";
+const prizeImages = [
+{% for prize in prizes %}
+"{{ prize.image.url }}"{% if not forloop.last %},{% endif %}
+{% endfor %}
+];
+
+const toast = document.getElementById('errorToast');
+
+function showError(message) {
+    toast.textContent = message;
+    toast.classList.remove('hidden');
+    toast.classList.add('show');
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 2500);
+
+    setTimeout(() => {
+        toast.classList.add('hidden');
+    }, 3000);
+}
+
+const reels = [
+    document.getElementById('r1'),
+    document.getElementById('r2'),
+    document.getElementById('r3')
+];
+
+const spinBtn = document.getElementById('spinBtn');
+const popup = document.getElementById('popup');
+const popupImage = document.getElementById('popupImage');
+const popupTitle = document.getElementById('popupTitle');
+
+const SYMBOL_HEIGHT = 100;
+const SPIN_TIME = 5000; // 5 секунд
+
+function randomImage() {
+    return prizeImages[Math.floor(Math.random() * prizeImages.length)];
+}
+
+function createSymbol(img) {
+    const d = document.createElement('div');
+    d.className = 'symbol';
+    d.innerHTML = `<img src="${img}">`;
+    return d;
+}
+
+/* ===== INIT ===== */
+reels.forEach(reel => {
+    reel.innerHTML = '';
+    reel.append(createSymbol(randomImage()));
+    reel.append(createSymbol(randomImage()));
+    reel.append(createSymbol(randomImage()));
+});
+
+/* ===== MAIN ===== */
+spinBtn.onclick = async () => {
+    const code = ticketCode.value.trim().toUpperCase();
+
+    if (!code) {
+        showError("Введите код билета");
+        return;
+    }
+
+    spinBtn.disabled = true;
+
+    const res = await fetch("{% url 'spin' %}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF_TOKEN
+        },
+        body: JSON.stringify({ code })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || data.success === false) {
+        showError(data.error || "Ошибка");
+        spinBtn.disabled = false;
+        return;
+    }
+
+    let final;
+    if (data.result === 'win') {
+        final = [data.image, data.image, data.image];
+    } else {
+        const shuffled = [...prizeImages].sort(() => Math.random() - 0.5);
+        final = shuffled.slice(0, 3);
+    }
+
+    reels.forEach((reel, i) => {
+        reel.innerHTML = '';
+
+        const TOTAL = 32;
+        const FINAL_INDEX = TOTAL - 3;
+
+        for (let j = 0; j < TOTAL; j++) {
+            reel.append(
+                createSymbol(j === FINAL_INDEX ? final[i] : randomImage())
+            );
+        }
+
+        const offset = (FINAL_INDEX - 1) * SYMBOL_HEIGHT;
+        reel.style.transition = `transform ${SPIN_TIME}ms cubic-bezier(.15,.85,.25,1)`;
+        reel.style.transform = `translateY(-${offset}px)`;
+    });
+
+    setTimeout(() => {
+        popup.classList.remove('hidden');
+        if (data.result === 'win') {
+            popupTitle.innerText = `🎉 Вы выиграли ${data.prize}`;
+            popupImage.src = data.image;
+        } else {
+            popupTitle.innerText = '😢 Попробуйте снова';
+            popupImage.src = "/media/prizes/sad.jpg";
+        }
+    }, SPIN_TIME + 3000);
+};
+</script>
+
+</body>
+</html>

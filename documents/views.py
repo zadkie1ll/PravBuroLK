@@ -19,6 +19,7 @@ from docx.oxml.ns import qn
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 import json
+import time
 import re
 import base64
 import telebot
@@ -28,6 +29,7 @@ from django.db.models import Sum
 import traceback
 from django.utils.timezone import now
 
+USE_PROXIES = True
 
 WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/"
 
@@ -65,10 +67,9 @@ def generate_document(request):
     context["losses"] = losses
     context["total_losses"] = total_losses
 
-    # Общая сумма = кредиторы + убытки
     context["grand_total"] = total_debt + total_losses
 
-    # --- ПАЙПЛАЙН ---
+    # ----ПАЙПЛАЙН------------------------------------------------------------------------------------------------------------------------
     template_path = os.path.join(
         settings.BASE_DIR,
         "documents",
@@ -217,8 +218,6 @@ def dogovor(request):
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'Doc generation error: {e}'}, status=500)
-
-    # --- Загрузка в Bitrix ---
     try:
         result = upload_to_bitrix(
             deal_id,
@@ -530,6 +529,60 @@ def number_to_words(num):
     )
     thousands_forms = ("тысяча", "тысячи", "тысяч")
     millions_forms = ("миллион", "миллиона", "миллионов")
+
+    def get_form(number, forms):
+        if 11 <= number % 100 <= 19:
+            return forms[2]
+        elif number % 10 == 1:
+            return forms[0]
+        elif 2 <= number % 10 <= 4:
+            return forms[1]
+        else:
+            return forms[2]
+
+    def three_digit_number_to_words(n):
+        result = []
+        if n >= 100:
+            result.append(hundreds[n // 100])
+            n %= 100
+        if 10 <= n < 20:
+            result.append(teens[n - 10])
+        else:
+            if n >= 20:
+                result.append(tens[n // 10])
+            if n % 10 > 0:
+                result.append(units[n % 10])
+        
+        
+        return " ".join(result).strip()
+
+
+    result = []
+
+    if num >= 1_000_000:
+        millions = num // 1_000_000
+        result.append(f"{three_digit_number_to_words(millions)} {get_form(millions, millions_forms)}")
+        num %= 1_000_000
+
+    if num >= 1_000:
+        thousands = num // 1_000
+        thousands_text = three_digit_number_to_words(thousands)
+
+        words = thousands_text.split()
+        for i in range(len(words)):
+            if words[i] == "один":
+                words[i] = "одна"
+            elif words[i] == "два":
+                words[i] = "две"
+        thousands_text = " ".join(words)
+
+        result.append(f"{thousands_text} {get_form(thousands, thousands_forms)}")
+        num %= 1_000
+
+    if num > 0:
+        result.append(three_digit_number_to_words(num))
+
+    return " ".join(result).strip()
     
     
     
@@ -620,6 +673,7 @@ def get_deal_data_from_bitrix(post_data):
 @csrf_exempt
 @require_POST
 def parse_legenda(request):
+    print(">>> parse_legenda HIT", request.method)
     try:
         post_data = request.POST.dict()
         deal_data, error = get_deal_data_from_bitrix(post_data)
@@ -631,6 +685,8 @@ def parse_legenda(request):
 
         if not legenda:
             return JsonResponse({"error": "В сделке нет текста легенды (COMMENTS)"}, status=400)
+        if not deal_id:
+            return JsonResponse({"error": "Не найден ID сделки"}, status=400)
 
         # === Шаг 2: System prompt ===
         system_prompt = (
@@ -645,7 +701,8 @@ def parse_legenda(request):
             "   UF_CRM_1754647579070, UF_CRM_1754647590990, UF_CRM_1754647601622,\n"
             "   UF_CRM_1754647621350, UF_CRM_1754647681566, UF_CRM_1754647691574.\n"
             "5. Для остальных полей текст должен быть максимально близок к оригиналу.\n"
-            "6. Ответ всегда в виде одного корректного JSON-объекта без пояснений и комментариев.\n\n"
+            "6. Ответ всегда в виде одного корректного JSON-объекта без пояснений и комментариев.\n"
+            "7. Верни объект СТРОГО с этими ключами (все 11 ключей обязательны). Если данных нет — используй fallback.\n\n"
             "📌 Формат и fallback-значения:\n"
             "- UF_CRM_1754647579070: боль клиента. Если нет — 'не обнаружено'\n"
             "- UF_CRM_1754647590990: краткая характеристика клиента, как он общается - если нет данных — 'адекватный'\n"
@@ -660,77 +717,167 @@ def parse_legenda(request):
             "- UF_CRM_1754647902223: сделки супруга за 3 года. Если не в браке — 'не в браке'\n"
         )
 
+        # === Нормализация: гарантируем полный набор ключей ===
+        expected_defaults = {
+            "UF_CRM_1754647579070": "не обнаружено",
+            "UF_CRM_1754647590990": "адекватный",
+            "UF_CRM_1754647601622": "не обнаружено",
+            "UF_CRM_1754647621350": "неизвестно",
+            "UF_CRM_1754647636597": "неизвестно",
+            "UF_CRM_1754647649551": "в диалоге не упоминалось",
+            "UF_CRM_1754647663541": "не обнаружено",
+            "UF_CRM_1754647671862": "не обнаружено",
+            "UF_CRM_1754647681566": "просто пройти процедуру",
+            "UF_CRM_1754647691574": "пожеланий нет",
+            "UF_CRM_1754647902223": "не в браке",
+        }
+
         parsed_fields = {}
+
         # === Шаг 3: Запрос к OpenAI ===
         try:
             payload = {
-                "model": "gpt-4o",
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": legenda}
-                ],
-                "temperature": 0.2
+            "model": "gpt-4o",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": legenda},
+            ],
+            "temperature": 0.2,
+        }
+
+            openai_kwargs = {
+                "headers": {
+                    "Authorization": f"Bearer {OPENAI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                "json": payload,
+                "timeout": 60,
             }
+
+            if USE_PROXIES:
+                openai_kwargs["proxies"] = TOR_PROXIES
+
             openai_response = requests.post(
                 "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENAI_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json=payload,
-                proxies=TOR_PROXIES,
-                timeout=60
+                **openai_kwargs
             )
+
             openai_response.raise_for_status()
+
             raw_output = openai_response.json()["choices"][0]["message"]["content"].strip()
             cleaned_output = re.sub(r"^```json\s*|\s*```$", "", raw_output, flags=re.IGNORECASE).strip()
+
             parsed_fields = json.loads(cleaned_output)
+            if not isinstance(parsed_fields, dict):
+                raise ValueError("OpenAI вернул не JSON-объект")
+
         except Exception as e:
-            parsed_fields = {}
             print("OpenAI error:", e)
+            parsed_fields = {}
+
+        # Добиваем отсутствующие ключи fallback-ами
+        normalized_fields = dict(expected_defaults)
+        for k, v in (parsed_fields or {}).items():
+            if k in expected_defaults:
+                normalized_fields[k] = v if v is not None and str(v).strip() != "" else expected_defaults[k]
 
         # === Шаг 4: Обновляем сделку в Bitrix ===
+        bitrix_update_ok = False
         try:
-            if parsed_fields:
-                bitrix_payload = {"id": deal_id}
-                for field_code, field_value in parsed_fields.items():
-                    bitrix_payload[f"fields[{field_code}]"] = field_value
-                bitrix_update_url = f"{BITRIX_WEBHOOK_URL}crm.deal.update.json"
-                bitrix_response = requests.post(bitrix_update_url, data=bitrix_payload)
-                bitrix_response.raise_for_status()
+            bitrix_payload = {"id": deal_id}
+            for field_code, field_value in normalized_fields.items():
+                bitrix_payload[f"fields[{field_code}]"] = field_value
+
+            bitrix_update_url = f"{BITRIX_WEBHOOK_URL}crm.deal.update.json"
+            bitrix_response = requests.post(bitrix_update_url, data=bitrix_payload)
+            # ВАЖНО: битрикс может вернуть 200, но с "error" внутри
+            try:
+                bitrix_json = bitrix_response.json()
+            except Exception:
+                bitrix_json = {}
+
+            print("Bitrix update resp:", bitrix_response.text)
+
+            bitrix_response.raise_for_status()
+            if "error" in bitrix_json:
+                raise Exception(f"{bitrix_json.get('error')}: {bitrix_json.get('error_description')}")
+
+            bitrix_update_ok = True
+
         except Exception as e:
             print("Bitrix update error:", e)
+            bitrix_update_ok = False
+
+        # === Шаг 4.1: Ждём, пока обновления реально станут видны (защита от гонки) ===
+        # Если не нужно — можешь убрать этот блок, но он помогает, когда DG берет старые данные.
+        waited_ok = False
+        try:
+            if bitrix_update_ok:
+                deal_get_url = f"{BITRIX_WEBHOOK_URL}crm.deal.get.json"
+                for _ in range(6):  # 6 попыток
+                    get_resp = requests.post(deal_get_url, data={"id": deal_id})
+                    get_json = get_resp.json()
+                    current = get_json.get("result") or {}
+
+                    # Проверяем, что все ключи совпали со значениями, которые записывали
+                    if all(str(current.get(k, "")) == str(normalized_fields.get(k, "")) for k in expected_defaults.keys()):
+                        waited_ok = True
+                        break
+
+                    time.sleep(0.5)
+        except Exception as e:
+            print("Bitrix get/wait error:", e)
 
         # === Шаг 5: Генерация документа ===
+        # КЛЮЧЕВОЕ: прокидываем values прямо в документ, чтобы DG не зависел от того,
+        # успела ли сущность обновиться/проиндексироваться.
         template_id = 40
         entity_type_id = 2  # Сделка
         document_url = f"{BITRIX_WEBHOOK_URL}crm.documentgenerator.document.add.json"
+
+        download_url = None
+        pdf_url = None
+
         try:
             document_payload = {
                 "templateId": template_id,
                 "entityTypeId": entity_type_id,
                 "entityId": deal_id,
-                "values": {"SAVE_IN_ENTITY": "Y"}
+                "values": {
+                    "SAVE_IN_ENTITY": "Y",
+                    **normalized_fields,   # <-- важная часть
+                },
             }
+
             doc_response = requests.post(document_url, json=document_payload)
+            print("Doc gen resp:", doc_response.text)
+
             doc_response.raise_for_status()
-            doc_result = doc_response.json().get("result")
-            download_url = pdf_url = None
+            doc_json = doc_response.json()
+            if "error" in doc_json:
+                raise Exception(f"{doc_json.get('error')}: {doc_json.get('error_description')}")
+
+            doc_result = doc_json.get("result")
             if doc_result and "document" in doc_result:
                 doc_data = doc_result["document"]
                 download_url = doc_data.get("downloadUrl")
                 pdf_url = doc_data.get("pdfUrl")
+
         except Exception as e:
             return JsonResponse({"error": "Не удалось сгенерировать документ", "detail": str(e)}, status=502)
 
-        return JsonResponse({
-            "success": True,
-            "data_written": parsed_fields,
-            "document": {
-                "downloadUrl": download_url,
-                "pdfUrl": pdf_url
+        return JsonResponse(
+            {
+                "success": True,
+                "data_written": normalized_fields,
+                "bitrix_update_ok": bitrix_update_ok,
+                "bitrix_waited_ok": waited_ok,
+                "document": {
+                    "downloadUrl": download_url,
+                    "pdfUrl": pdf_url,
+                },
             }
-        })
+        )
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

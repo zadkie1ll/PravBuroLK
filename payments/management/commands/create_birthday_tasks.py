@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from django.core.management.base import BaseCommand
 
 BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
-ACCOMPLICE_ID = 298
+ACCOMPLICE_ID = 58
 EXCEL_FILENAME = "deals_export.xlsx"
 CREATOR_ID = 290
 

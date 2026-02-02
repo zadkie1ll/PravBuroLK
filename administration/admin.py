@@ -17,6 +17,7 @@ from clients.models import (
     Application,
     Employee,
 )
+from .models import Prize, Ticket, SpinResult
 
 
 class ContractInline(admin.TabularInline):
@@ -169,3 +170,65 @@ class EmployeeAdmin(SimpleHistoryAdmin):  # 👈 история включена
     search_fields = ("name", "bitrix_id", "referral_code")
     readonly_fields = ("referral_code", "updated_at")
     ordering = ("name",)
+    
+    
+    
+@admin.register(Prize)
+class PrizeAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "chance",
+        "is_active",
+        "created_at",
+    )
+
+    list_editable = (
+        "chance",
+        "is_active",
+    )
+
+    list_filter = (
+        "is_active",
+        "created_at",
+    )
+
+    search_fields = (
+        "name",
+    )
+
+    ordering = (
+        "-created_at",
+    )
+
+@admin.register(SpinResult)
+class SpinResultAdmin(admin.ModelAdmin):
+    list_display = ("ticket", "prize", "is_win", "created_at")
+    list_filter = ("is_win", "prize")
+    search_fields = ("ticket__code",)
+
+@admin.register(Ticket)
+class TicketAdmin(admin.ModelAdmin):
+    list_display = (
+        "code",
+        "is_used",
+        "used_at",
+        "created_at",
+    )
+
+    list_filter = (
+        "is_used",
+        "created_at",
+    )
+
+    search_fields = (
+        "code",
+    )
+
+    ordering = (
+        "-created_at",
+    )
+
+    readonly_fields = (
+        "used_at",
+        "created_at",
+    )
