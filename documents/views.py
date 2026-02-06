@@ -657,7 +657,6 @@ def get_deal_data_from_bitrix(post_data):
 
     deal_id = deal_id_match.group(1)
 
-    # Подставь актуальный вебхук и пользователя
     webhook_url = f"{BITRIX_WEBHOOK_URL}crm.deal.get.json?ID={deal_id}"
     response = requests.get(webhook_url)
 

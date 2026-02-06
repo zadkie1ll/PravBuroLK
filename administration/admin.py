@@ -18,6 +18,7 @@ from clients.models import (
     Employee,
 )
 from .models import Prize, Ticket, SpinResult
+from education_platform.models import TraineeProfile
 
 
 class ContractInline(admin.TabularInline):
@@ -232,3 +233,35 @@ class TicketAdmin(admin.ModelAdmin):
         "used_at",
         "created_at",
     )
+    
+    
+    
+@admin.register(TraineeProfile)
+class TraineeProfileAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "birthday",
+        "started_at",
+        "is_active",
+        "created_at",
+    )
+
+    list_select_related = ("user",)
+
+    search_fields = (
+        "user__username",
+        "user__first_name",
+        "user__last_name",
+        "user__email",
+    )
+
+    list_filter = (
+        "is_active",
+        "started_at",
+        "created_at",
+    )
+
+    ordering = ("-created_at",)
+
+    readonly_fields = ("created_at", "updated_at")

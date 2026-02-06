@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Статистика по источникам</title>
+<style>
+    body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 20px; color: #333; }
+    h1, h2 { text-align: center; color: #4a4a8c; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .source-block { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .source-header { font-size: 1.4em; color: #007bff; margin-bottom: 10px; word-break: break-all; }
+    table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #007bff; color: white; }
+    tr:hover { background: #f8f9fa; }
+    .copy-btn { background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+    .copy-btn:hover { background: #218838; }
+    form { margin: 10px 0; }
+    input[type="text"], input[type="url"] { padding: 6px; width: 220px; }
+    button { padding: 8px 14px; margin: 0 5px; border: none; border-radius: 4px; cursor: pointer; }
+    button[name="edit_destination"], button[name="add_source"], button[name="add_new_destination"] { background: #007bff; color: white; }
+    button[name="edit_source"] { background: #ffc107; color: black; }
+    button[name="delete_source"], button[name="delete_destination"] { background: #dc3545; color: white; }
+    .success { color: #28a745; font-weight: bold; text-align: center; }
+    .error { color: #dc3545; font-weight: bold; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Статистика по назначениям и источникам</h1>
+
+    <!-- Форма нового назначения -->
+    <h2>Добавить новое назначение</h2>
+    <form method="post">
+        {% csrf_token %}
+        <input type="url" name="new_destination" placeholder="URL назначения[](https://...)" required style="width:350px;">
+        <input type="text" name="new_source" placeholder="Код источника (tgchat)" required>
+        <button type="submit" name="add_new_destination">Добавить</button>
+    </form>
+
+    <!-- Сообщения -->
+    {% for level, msg in messages %}
+        <p class="{% if level == 'success' %}success{% else %}error{% endif %}">{{ msg }}</p>
+    {% endfor %}
+
+    <!-- Блоки по назначениям -->
+    {% for item in stats %}
+    <div class="source-block">
+        <div class="source-header">{{ item.destination }}</div>
+        <p>Всего кликов: <strong>{{ item.total_clicks }}</strong></p>
+
+        <!-- Изменить URL назначения -->
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="old_destination" value="{{ item.destination }}">
+            <input type="url" name="new_destination" value="{{ item.destination }}" required style="width:500px;">
+            <button type="submit" name="edit_destination">Изменить URL назначения</button>
+        </form>
+
+        <!-- Удалить назначение целиком -->
+        <form method="post" onsubmit="return confirm('Удалить назначение {{ item.destination }} и ВСЕ источники внутри? Это действие нельзя отменить!');">
+            {% csrf_token %}
+            <input type="hidden" name="destination" value="{{ item.destination }}">
+            <button type="submit" name="delete_destination">Удалить назначение целиком</button>
+        </form>
+
+        <!-- Добавить источник в это назначение -->
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="destination" value="{{ item.destination }}">
+            <input type="text" name="new_source" placeholder="Новый код источника" required>
+            <button type="submit" name="add_source">Добавить источник</button>
+        </form>
+
+        <table>
+            <thead>
+            <tr>
+                <th>Источник</th>
+                <th>Клики</th>
+                <th>Ссылка</th>
+                <th>Изменить / Удалить</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for src in item.sources %}
+            <tr>
+                <td>{{ src.source }}</td>
+                <td>{{ src.clicks }}</td>
+                <td>
+                    <button class="copy-btn" data-source="{{ src.source }}">Копировать ссылку</button>
+                </td>
+                <td>
+                    <!-- Изменить источник -->
+                    <form method="post" style="display: inline-block;">
+                        {% csrf_token %}
+                        <input type="hidden" name="old_source" value="{{ src.source }}">
+                        <input type="text" name="new_source" value="{{ src.source }}" size="15">
+                       <!----- <input type="url" name="new_destination" value="{{ src.destination }}" size="35">-->
+                        <button type="submit" name="edit_source">Сохранить</button>
+                    </form>
+
+                    <!-- Удалить источник -->
+                    <form method="post" style="display: inline-block;" onsubmit="return confirm('Удалить источник {{ src.source }}?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="source" value="{{ src.source }}">
+                        <button type="submit" name="delete_source">Удалить</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">Источников нет (странно, но бывает)</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% empty %}
+    <p style="text-align:center;">Нет назначений для отображения. Добавьте первое!</p>
+    {% endfor %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const source = this.dataset.source;
+            const link = `${window.location.origin}/url/?source=${encodeURIComponent(source)}`;
+            navigator.clipboard.writeText(link).then(() => {
+                alert('Ссылка скопирована:\n' + link);
+            }).catch(() => {
+                alert('Не удалось скопировать');
+            });
+        });
+    });
+});
+</script>
+</body>
+</html>

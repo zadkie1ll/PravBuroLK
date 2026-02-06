@@ -286,6 +286,7 @@ def client_payments_page(request, client_id):
         "client": client,
         "contract": contract,
         "plan": plan,
+        "text"
 
         "installments": installments,
         "actuals": actuals,

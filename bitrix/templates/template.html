@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #ffffff;
+        }
+        .header {
+            padding: 40px 30px 20px;
+            text-align: left;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            color: #2563eb;
+            text-transform: uppercase;
+        }
+        .header p {
+            margin-top: 8px;
+            color: #000000;
+            font-size: 14px;
+        }
+        .container {
+            padding: 0 30px;
+        }
+        .manager-card {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin-bottom: 40px;
+        }
+        .photo-wrapper {
+            min-width: 120px;
+            height: 120px;
+            background-color: #1f50bb; 
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2; /* Higher z-index to be on top */
+            overflow: hidden; /* Ensure rounding */
+            position: relative;
+        }
+        .photo {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            z-index: 3;
+        }
+        .manager-info {
+            background-color: #2563eb;
+            color: white;
+            padding: 15px 25px;
+            border-top-right-radius: 30px;
+            border-bottom-right-radius: 30px;
+            font-size: 16px;
+            min-width: 470px;
+            margin-left: -35px; /* Adjusted overlap for better connection without distorting circle */
+            position: relative;
+            z-index: 1; /* Behind the circle */
+        }
+        .manager-info .row {
+            margin: 6px 20px; /* Adjusted margin to fit content better */
+        }
+        .manager-info .row b {
+            font-weight: bold;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 18px;
+            border: 2px solid #2563eb; /* Blue border for cards */
+            overflow: hidden;
+        }
+        .card-title {
+            background-color: #2563eb;
+            color: white;
+            padding: 15px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .card-content {
+            padding: 20px;
+        }
+        .row {
+            margin: 6px 0;
+            font-size: 16px;
+        }
+        .row b {
+            font-weight: bold;
+        }
+        .viz {
+            margin-top: 20px;
+        }
+        .viz-title {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .bar-chart-img {
+            width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <div class="header">
+        <h1>Первая консультация - отчёт клиенту</h1>
+        <p>Автоматически сформировано из JSON данных.</p>
+    </div>
+    <div class="container">
+        <!-- MANAGER CARD -->
+        <div class="manager-card">
+            <div class="photo-wrapper">
+                <img class="photo" src="{{ data.manager.photo_file }}" />
+            </div>
+            <div class="manager-info">
+                <div class="row"><b>Менеджер:</b> {{ data.manager.first_name | upper }}</div>
+                <div class="row">Дата консультации: {{ data.consultation.date }}</div>
+                <div class="row">
+                    Договор:
+                    {% if data.consultation.contract_link %}
+                        <a href="{{ data.consultation.contract_link }}">ссылка</a>
+                    {% else %}
+                        ОТСУТСТВУЕТ
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <!-- GRID -->
+        <div class="grid">
+            <!-- FINANCE -->
+            <div class="card">
+                <div class="card-title">Финансовый обзор</div>
+                <div class="card-content">
+                    <div class="row">Долг: {{ data.finance.debt_amount_rub }}</div>
+                    <div class="row">Стоимость: {{ data.finance.work_cost_rub }}</div>
+                    {% if data.finance.work_bonus_rub %}
+                        <div class="row">Бонус: {{ data.finance.work_bonus_rub }}</div>
+                    {% endif %}
+                    <div class="row">Рассрочка: {{ data.finance.installment_plan }}</div>
+                    <div class="viz">
+                        <div class="viz-title"><b>Пропорциональная визуализация</b></div>
+                        <img class="bar-chart-img" src="{{ data.finance.bar_chart_file }}" />
+                    </div>
+                </div>
+            </div>
+            <!-- SUMMARY -->
+            <div class="card">
+                <div class="card-title">Данные клиента</div>
+                <div class="card-content">
+                    <div class="row"><b>Имущество:</b> {{ data.summary.property }}</div>
+                    <div class="row"><b>Сделки:</b> {{ data.summary.deals }}</div>
+                    <div class="row"><b>Брак:</b> {{ data.summary.marriage }}</div>
+                    <div class="row"><b>Доход:</b> {{ data.summary.income_rub }}</div>
+                    <div class="row"><b>Дети:</b> {{ data.summary.children }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

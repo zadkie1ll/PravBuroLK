@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -23,10 +24,15 @@ INSTALLED_APPS = [
     'payments',
     'clients',
     "documents",
+    "corsheaders",
+    "education_platform",
+    "urlshorter"
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -107,6 +113,11 @@ MIDDLEWARE += [
     'simple_history.middleware.HistoryRequestMiddleware',
 ]
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = '/'  # куда перенаправить после логина
@@ -124,6 +135,8 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 
 # Static files (CSS, JavaScript, Images)
@@ -147,3 +160,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+CORS_ALLOW_ALL_METHODS = True
+
+
+
+#bitrix OAuth----------------------------------
+
+BITRIX_CLIENT_ID = os.getenv("BITRIX_CLIENT_ID", "")
+BITRIX_CLIENT_SECRET = os.getenv("BITRIX_CLIENT_SECRET", "")
+BITRIX_REDIRECT_URI = os.getenv("BITRIX_REDIRECT_URI", "http://localhost:8000/auth/bitrix/callback/")
+
+# Базовый URL OAuth-сервера (типично так)
+BITRIX_OAUTH_BASE_URL = os.getenv("BITRIX_OAUTH_BASE_URL", "https://oauth.bitrix.info/oauth")   
