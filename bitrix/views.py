@@ -14,6 +14,14 @@ from documents.views import get_deal_data_from_bitrix
 import base64
 import requests
 import tempfile
+from django.db import transaction
+from .models import Region
+from .services.regions_sync import sync_regions_from_bitrix_logic
+from django.conf import settings
+from .services.km_calculator import KmInput, PmValues, calculate_km
+from .models import PmRate
+
+BITRIX_REGION_FIELD = "UF_CRM_1745886887592"
 
 BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
 
@@ -237,12 +245,36 @@ def referral_stats(request):
 
 
 
+@csrf_exempt
+@require_POST
+def sync_regions_from_bitrix(request):
+    try:
+        result = sync_regions_from_bitrix_logic()
+        return JsonResponse(result)
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
 
 
 
 #пдф для ОП---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+
+
+# UF поля
+UF_REGION = "UF_CRM_1745886887592"
+UF_SHOW_KM = "UF_CRM_1770730700097"
+
+UF_SALARY = "UF_CRM_1770129399154"
+UF_PENSION = "UF_CRM_1770647008781"
+
+UF_BENEFITS = "UF_CRM_1770646540351"
+UF_CHILD_PAYMENTS = "UF_CRM_1770646550503"
+UF_ALIMONY = "UF_CRM_1770646560950"
+UF_SOCIAL = "UF_CRM_1770646571974"
+UF_OTHER = "UF_CRM_1770646605351"
+
+UF_CHILDREN_COUNT = "UF_CRM_1770721913265"
 
 
 @csrf_exempt
@@ -272,6 +304,42 @@ def build_consultation(request):
         except Exception:
             user = {"NAME": None, "LAST_NAME": None, "PHOTO_URL": None}
 
+        # --- NEW: KM inputs ---
+        show_km = bitrix_checkbox_to_bool(pick(deal_data, UF_SHOW_KM))
+
+        region_raw = pick(deal_data, UF_REGION)
+        region_id = None
+        try:
+            if region_raw is not None and str(region_raw).strip() != "":
+                region_id = int(str(region_raw).strip())
+        except ValueError:
+            region_id = None
+
+        # достаём ПМ из БД (если регион не выбран или не заполнен — будет None)
+        now = timezone.localtime()
+        pm_rate = PmRate.get_for_region_on(region_id, dt=now) if region_id else None
+
+        pm_values = PmValues(
+            pm_working=pm_rate.pm_working if pm_rate else 0,
+            pm_pensioner=pm_rate.pm_pensioner if pm_rate else 0,
+            pm_child=(pm_rate.pm_child if (pm_rate and pm_rate.pm_child is not None) else 0),
+        )
+
+        km_json = calculate_km(
+            KmInput(
+                region_bitrix_id=region_id,
+                salary=pick(deal_data, UF_SALARY),
+                pension=pick(deal_data, UF_PENSION),
+                children_count=pick(deal_data, UF_CHILDREN_COUNT),
+                benefits=pick(deal_data, UF_BENEFITS),
+                child_payments=pick(deal_data, UF_CHILD_PAYMENTS),
+                alimony=pick(deal_data, UF_ALIMONY),
+                social=pick(deal_data, UF_SOCIAL),
+                other=pick(deal_data, UF_OTHER),
+            ),
+            pm_values,
+        )
+
         payload = {
             "document": {
                 "document_id": f"CONS-{deal_id}",
@@ -293,27 +361,33 @@ def build_consultation(request):
                 "property": pick(deal_data, "UF_CRM_1754647601622"),
                 "deals": pick(deal_data, "UF_CRM_1754647663541"),
                 "marriage": pick(deal_data, "UF_CRM_1754647902223"),
-                "income": pick(deal_data, "UF_CRM_1770129399154"),
+
+                # оставим как было (для fallback/совместимости)
+                "income": pick(deal_data, UF_SALARY),
+
                 "children": pick(deal_data, "UF_CRM_1754647671862"),
+
+                # --- NEW: show KM flag for template ---
+                "show_km": show_km,
             },
             "risks": {
                 "no_property_loss_risk": bitrix_checkbox_to_bool(pick(deal_data, "UF_CRM_1770130642610")),
                 "no_spouse_property_risk": bitrix_checkbox_to_bool(pick(deal_data, "UF_CRM_1770130660552")),
             },
+
+            # --- NEW: KM расчет целиком (для generate_pdf -> шаблона) ---
+            "km": km_json,
         }
 
         print(payload)
-        
+
         pdf_bytes = generate_pdf(payload)
         filename = f"CONS-{deal_id}.pdf"
 
-        # 1) сохраняем во временный файл
         tmp_path = None
         try:
             tmp_path = save_pdf_temp(pdf_bytes, filename)
 
-            # payment_table у тебя в этой view сейчас не формируется.
-            # Чтобы функция не падала — передаём пустую таблицу.
             upload_result = upload_to_bitrix(
                 deal_id=deal_id,
                 file_path=tmp_path,
@@ -323,21 +397,115 @@ def build_consultation(request):
             print("Bitrix upload result:", upload_result)
 
         except Exception as e:
-            # Не роняем эндпоинт: PDF всё равно отдаём
             print("Bitrix attach failed:", repr(e))
 
         finally:
-            # чистим временный файл
             if tmp_path and os.path.exists(tmp_path):
                 try:
                     os.remove(tmp_path)
                 except OSError:
                     pass
 
-        # 2) ВСЕГДА возвращаем PDF
         resp = HttpResponse(pdf_bytes, content_type="application/pdf")
         resp["Content-Disposition"] = f'inline; filename="{filename}"'
         return resp
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
+    
+    
+    
+    
+    
+#KM_CALCULATOR-------------------------------------------------------------------------------------------------------------------------------------------------------
+# поля Bitrix
+UF_REGION = "UF_CRM_1745886887592"
+
+UF_SALARY = "UF_CRM_1770129399154"
+UF_PENSION = "UF_CRM_1770647008781"
+
+UF_BENEFITS = "UF_CRM_1770646540351"
+UF_CHILD_PAYMENTS = "UF_CRM_1770646550503"
+UF_ALIMONY = "UF_CRM_1770646560950"
+UF_SOCIAL = "UF_CRM_1770646571974"
+UF_OTHER = "UF_CRM_1770646605351"
+
+UF_CHILDREN_COUNT = "UF_CRM_1770721913265"
+
+
+@csrf_exempt
+@require_POST
+def calc_km_for_deal(request):
+    """
+    Принимает POST от Битрикса, достаёт сделку и возвращает JSON с расчётом конкурсной массы.
+    """
+    try:
+        post_data = request.POST.dict()
+
+        deal_data, error = get_deal_data_from_bitrix(post_data)
+        if error:
+            return JsonResponse({"ok": False, "error": error}, status=400)
+
+        deal_id = pick(deal_data, "ID")
+        assigned_id = pick(deal_data, "ASSIGNED_BY_ID")
+        if not deal_id:
+            return JsonResponse({"ok": False, "error": "Deal ID not found in deal_data"}, status=400)
+        if not assigned_id:
+            return JsonResponse({"ok": False, "error": "ASSIGNED_BY_ID not found in deal_data"}, status=400)
+
+        # регион (enum ID из списка)
+        region_bitrix_id_raw = pick(deal_data, UF_REGION)
+        region_bitrix_id = None
+        try:
+            # бывает строка
+            if region_bitrix_id_raw is not None and str(region_bitrix_id_raw).strip() != "":
+                region_bitrix_id = int(str(region_bitrix_id_raw).strip())
+        except ValueError:
+            region_bitrix_id = None
+
+        # берём ПМ на дату расчёта (можно привязать к дате консультации/создания сделки)
+        now = timezone.localtime()
+        pm_rate = PmRate.get_for_region_on(region_bitrix_id, dt=now) if region_bitrix_id else None
+
+        pm_values = PmValues(
+            pm_working=pm_rate.pm_working if pm_rate else 0,
+            pm_pensioner=pm_rate.pm_pensioner if pm_rate else 0,
+            pm_child=(pm_rate.pm_child if (pm_rate and pm_rate.pm_child is not None) else 0),
+        )
+
+        inp = KmInput(
+            region_bitrix_id=region_bitrix_id,
+            salary=pick(deal_data, UF_SALARY),
+            pension=pick(deal_data, UF_PENSION),
+            children_count=pick(deal_data, UF_CHILDREN_COUNT),
+            benefits=pick(deal_data, UF_BENEFITS),
+            child_payments=pick(deal_data, UF_CHILD_PAYMENTS),
+            alimony=pick(deal_data, UF_ALIMONY),
+            social=pick(deal_data, UF_SOCIAL),
+            other=pick(deal_data, UF_OTHER),
+        )
+
+        km_json = calculate_km(inp, pm_values)
+
+        return JsonResponse({
+            "ok": True,
+            "deal": {
+                "id": deal_id,
+                "assigned_id": assigned_id,
+                "region_bitrix_id": region_bitrix_id,
+            },
+            "pm_rate": (
+                {
+                    "effective_from": pm_rate.effective_from.isoformat(),
+                    "pm_working": float(pm_rate.pm_working),
+                    "pm_pensioner": float(pm_rate.pm_pensioner),
+                    "pm_child": float(pm_rate.pm_child) if pm_rate.pm_child is not None else 0.0,
+                }
+                if pm_rate else None
+            ),
+            "km": km_json,
+        })
+
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)

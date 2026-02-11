@@ -19,6 +19,15 @@ from clients.models import (
 )
 from .models import Prize, Ticket, SpinResult
 from education_platform.models import TraineeProfile
+from bitrix.models import Region, PmRate
+
+from django.contrib import admin, messages
+from django.urls import path
+from django.shortcuts import redirect
+from django.conf import settings
+import requests
+from bitrix.services.regions_sync import sync_regions_from_bitrix_logic
+
 
 
 class ContractInline(admin.TabularInline):
@@ -265,3 +274,47 @@ class TraineeProfileAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
 
     readonly_fields = ("created_at", "updated_at")
+    
+    
+@admin.register(Region)
+class RegionAdmin(admin.ModelAdmin):
+    list_display = ("name", "bitrix_region_id", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("name", "bitrix_region_id")
+    ordering = ("name",)
+    change_list_template = "admin/regions_changelist.html"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "sync-from-bitrix/",
+                self.admin_site.admin_view(self.sync_from_bitrix),
+                name="sync_regions_from_bitrix",
+            ),
+        ]
+        return custom_urls + urls
+
+    def sync_from_bitrix(self, request):
+        try:
+            data = sync_regions_from_bitrix_logic()
+            self.message_user(
+                request,
+                f"Синхронизация завершена: "
+                f"создано {data.get('created', 0)}, "
+                f"обновлено {data.get('updated', 0)}, "
+                f"деактивировано {data.get('deactivated', 0)}",
+                level=messages.SUCCESS,
+            )
+        except Exception as e:
+            self.message_user(request, f"Ошибка синхронизации регионов: {e}", level=messages.ERROR)
+
+        return redirect("..")
+
+
+@admin.register(PmRate)
+class PmRateAdmin(admin.ModelAdmin):
+    list_display = ("region", "effective_from", "pm_working", "pm_pensioner", "pm_child", "updated_at")
+    list_filter = ("region", "effective_from")
+    search_fields = ("region__name", "region__bitrix_region_id")
+    ordering = ("region__name", "-effective_from")

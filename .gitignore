@@ -17,4 +17,9 @@ venv/
 # Файлы среды
 .env
 
+
+db.sqlite3
+*.sqlite3
+
+
 burnished-block-442415-n4-0f8d850242ed.json

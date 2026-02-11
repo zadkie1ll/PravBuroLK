@@ -6,7 +6,7 @@ from clients.views import client_dashboard, redirect_handler, referral_page, mar
 from clients.views import CustomLoginView, TestCreateClientView, stage_detail, dashboard_stats, confident_police, bitrix_deal_webhook
 from django.contrib.auth.views import LogoutView
 from payments.views import client_admin_view, create_other_payments, delete_other_payment, update_other_payments, update_contract_info, create_installment_payment, create_actual_payments, delete_installment_payment, update_installment_payments, delete_actual_payment, update_actual_payments, client_payments_page, create_other_payment, delete_actual_payment_view, save_actual_payment, create_actual_payment, create_payment, payment_callback, BitrixCreateClientFromDealView, recalculate_installment, update_custom_payments, payments_dashboard, client_search_view, BitrixWebhookCreateClientView, admin_dashboard
-from bitrix.views import referral_landing, referral_submit, application_success, referral_stats, build_consultation
+from bitrix.views import referral_landing, referral_submit, application_success, referral_stats, build_consultation, sync_regions_from_bitrix, calc_km_for_deal
 from administration.views import casino_page, spin_view
 from documents.views import document_form, generate_document, dogovor, parse_legenda
 from education_platform.views import auth_api_login, auth_page
@@ -14,6 +14,8 @@ from urlshorter.views import generate_url, show_stats
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path("api/calc-km/", calc_km_for_deal, name="calc_km_for_deal"),
+    path("api/sync-regions/", sync_regions_from_bitrix, name="sync_regions_from_bitrix"),
     path("api/createpdf/", build_consultation, name="pdf"),
     path('ai/', parse_legenda, name='ai_engine'),
     # path('casino/', casino_page, name='casino'),

@@ -41,8 +41,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 2; /* Higher z-index to be on top */
-            overflow: hidden; /* Ensure rounding */
+            z-index: 2;
+            overflow: hidden;
             position: relative;
         }
         .photo {
@@ -60,12 +60,12 @@
             border-bottom-right-radius: 30px;
             font-size: 16px;
             min-width: 470px;
-            margin-left: -35px; /* Adjusted overlap for better connection without distorting circle */
+            margin-left: -35px;
             position: relative;
-            z-index: 1; /* Behind the circle */
+            z-index: 1;
         }
         .manager-info .row {
-            margin: 6px 20px; /* Adjusted margin to fit content better */
+            margin: 6px 20px;
         }
         .manager-info .row b {
             font-weight: bold;
@@ -78,7 +78,7 @@
         .card {
             background: white;
             border-radius: 18px;
-            border: 2px solid #2563eb; /* Blue border for cards */
+            border: 2px solid #2563eb;
             overflow: hidden;
         }
         .card-title {
@@ -110,6 +110,48 @@
         .bar-chart-img {
             width: 100%;
             height: auto;
+        }
+
+        .risk-ok {
+            background: #dcfce7;
+            border: 1px solid #22c55e;
+            padding: 6px 10px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+        .risk-note {
+            margin: 6px 0 0 0;
+            font-size: 13px;
+            color: #16a34a;
+        }
+
+        .km-blue {
+            background: #dbeafe;
+            border: 1px solid #2563eb;    
+            padding: 6px 10px;
+            border-radius: 10px;
+            margin-left: 10px;
+            white-space: nowrap;
+        }
+        .row-inline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        /* --- ADDED: income KM highlight --- */
+        .income-km {
+            background: #dbeafe;          /* светло-синий */
+            border: 1px solid #2563eb;    /* синий */
+            padding: 8px 12px;
+            border-radius: 12px;
+            margin-top: 10px;
+        }
+        .income-km .sub {
+            margin-top: 4px;
+            font-size: 14px;
+            color: #1e40af;
         }
     </style>
 </head>
@@ -156,14 +198,43 @@
                     </div>
                 </div>
             </div>
+
             <!-- SUMMARY -->
             <div class="card">
                 <div class="card-title">Данные клиента</div>
                 <div class="card-content">
-                    <div class="row"><b>Имущество:</b> {{ data.summary.property }}</div>
-                    <div class="row"><b>Сделки:</b> {{ data.summary.deals }}</div>
+
+                    <!-- Имущество -->
+                    {% if data.risks.no_property_loss_risk %}
+                        <div class="risk-ok">
+                            <div class="row"><b>Имущество:</b> {{ data.summary.property }}</div>
+                            <div class="risk-note">✅ Подлежит сохранению</div>
+                        </div>
+                    {% else %}
+                        <div class="row"><b>Имущество:</b> {{ data.summary.property }}</div>
+                    {% endif %}
+
+                    <!-- Сделки -->
+                    {% if data.risks.no_spouse_property_risk %}
+                        <div class="risk-ok">
+                            <div class="row"><b>Сделки:</b> {{ data.summary.deals }}</div>
+                            <div class="risk-note">✅ Подлежит сохранению</div>
+                        </div>
+                    {% else %}
+                        <div class="row"><b>Сделки:</b> {{ data.summary.deals }}</div>
+                    {% endif %}
+
                     <div class="row"><b>Брак:</b> {{ data.summary.marriage }}</div>
-                    <div class="row"><b>Доход:</b> {{ data.summary.income_rub }}</div>
+
+                    {% if data.summary.show_km %}
+                        <div class="income-km">
+                            <div class="row"><b>Офиц. заработок:</b> {{ data.summary.official_income_rub }}</div>
+                            <div class="sub"><b>После КМ:</b> {{ data.summary.income_after_km_rub }}</div>
+                        </div>
+                    {% else %}
+                        <div class="row"><b>Офиц. заработок:</b> {{ data.summary.official_income_rub }}</div>
+                    {% endif %}
+
                     <div class="row"><b>Дети:</b> {{ data.summary.children }}</div>
                 </div>
             </div>

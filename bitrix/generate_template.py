@@ -1,18 +1,15 @@
 import os
 import json
-import uuid
-from pathlib import Path
-
+import tempfile
 import requests
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML
 
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("Agg")  # важно: ДО pyplot
 import matplotlib.pyplot as plt
 
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+plt.rcParams["font.family"] = "Arial"
 
 
 # ---------- helpers ----------
@@ -31,166 +28,184 @@ def parse_amount(val):
         amt, _ = s.split("|", 1)
     else:
         amt = s
-    return float(amt)
+    try:
+        return float(amt)
+    except ValueError:
+        return None
 
 
-def _ensure_tmp_assets_dir(templates_dir: str) -> str:
+def download_photo(url: str, filepath: str):
     """
-    Создаём папку templates/_assets_tmp (если нет).
-    Всё, что туда положим, будет доступно из WeasyPrint через base_url=templates_dir.
-    """
-    assets_dir = os.path.join(templates_dir, "_assets_tmp")
-    os.makedirs(assets_dir, exist_ok=True)
-    return assets_dir
-
-
-def _make_asset_paths(templates_dir: str, ext: str, prefix: str) -> tuple[str, str]:
-    """
-    Возвращает:
-      abs_path: абсолютный путь, куда сохранить файл
-      rel_path: относительный путь относительно templates_dir (то, что подставляется в шаблон)
-    """
-    assets_dir = _ensure_tmp_assets_dir(templates_dir)
-    fname = f"{prefix}_{uuid.uuid4().hex}.{ext.lstrip('.')}"
-    abs_path = os.path.join(assets_dir, fname)
-
-    # относительный путь: "_assets_tmp/....png"
-    rel_path = os.path.relpath(abs_path, templates_dir)
-    return abs_path, rel_path
-
-
-def download_photo(url: str, templates_dir: str, timeout=15) -> tuple[str | None, str | None]:
-    """
-    Скачивает фото и сохраняет ВНУТРИ templates_dir/_assets_tmp,
-    чтобы WeasyPrint нашёл его по base_url.
-    Возвращает (abs_path, rel_path).
+    Скачивает фото по url и сохраняет в filepath.
+    Возвращает filepath или None.
+    ВАЖНО: не падает, если фото недоступно.
     """
     if not url:
-        return None, None
-
-    abs_path, rel_path = _make_asset_paths(templates_dir, ext="png", prefix="manager_photo")
-
-    headers = {"User-Agent": "Mozilla/5.0"}  # иногда CDN/защита требуют UA
-    resp = requests.get(url, headers=headers, timeout=timeout)
-    resp.raise_for_status()
-
-    # пишем как есть (png/jpg — не важно, WeasyPrint обычно распознаёт по содержимому)
-    with open(abs_path, "wb") as f:
-        f.write(resp.content)
-
-    return abs_path, rel_path
+        return None
+    try:
+        r = requests.get(url, timeout=30)
+        r.raise_for_status()
+        with open(filepath, "wb") as f:
+            f.write(r.content)
+        return filepath
+    except Exception:
+        return None
 
 
-def generate_bar_chart(debt, full_work_total, templates_dir: str) -> tuple[str, str]:
+def generate_placeholder_avatar(filepath: str, size_px: int = 220) -> str:
     """
-    Сравнение: Долг vs Полная стоимость работы юристов (work_cost + work_bonus).
-    Сохраняет png в templates_dir/_assets_tmp и возвращает (abs_path, rel_path).
+    Делает простую синюю аватарку-плейсхолдер PNG,
+    чтобы <img> всегда имел валидный src.
     """
-    if debt is None:
-        debt = 0
-    if full_work_total is None:
-        full_work_total = 0
+    fig, ax = plt.subplots(figsize=(size_px / 100, size_px / 100), dpi=100)
+    ax.axis("off")
+    # круг + "голова" + "плечи" без шрифтов (стабильно)
+    # фон-круг
+    circle = plt.Circle((0.5, 0.5), 0.48, transform=ax.transAxes)
+    ax.add_artist(circle)
+    circle.set_facecolor("#1f50bb")
+    circle.set_edgecolor("#1f50bb")
 
-    abs_path, rel_path = _make_asset_paths(templates_dir, ext="png", prefix="bar_chart")
+    # голова
+    head = plt.Circle((0.5, 0.62), 0.14, transform=ax.transAxes)
+    ax.add_artist(head)
+    head.set_facecolor("#dbeafe")
+    head.set_edgecolor("#dbeafe")
 
-    labels = ["Юристы (полная)", "Долг"]
-    values = [float(debt), float(full_work_total)]
-    colors = ["#ef4444", "#2563eb"]  # красный долг, синий стоимость
+    # плечи (полукруг/овал)
+    shoulders = plt.Circle((0.5, 0.28), 0.28, transform=ax.transAxes)
+    ax.add_artist(shoulders)
+    shoulders.set_facecolor("#dbeafe")
+    shoulders.set_edgecolor("#dbeafe")
+
+    plt.tight_layout(pad=0)
+    fig.savefig(filepath, transparent=True, bbox_inches="tight", pad_inches=0)
+    plt.close(fig)
+    return filepath
+
+
+def generate_bar_chart(work_cost, installment, filepath: str):
+    """
+    Рисует график и сохраняет в filepath.
+    Возвращает filepath.
+    """
+    work_cost = work_cost or 0
+    installment = installment or 0
+
+    labels = ["Стоимость", "Сумма долга"]
+    values = [work_cost, installment]
 
     fig, ax = plt.subplots(figsize=(6, 2))
-    ax.barh(labels, values, color=colors, height=0.42)
+    ax.barh(labels, values, height=0.2)
+    ax.tick_params(axis="y", labelsize=26)
 
-    maxv = max(values) if max(values) > 0 else 1
-
-    # Подписи сумм
+    mx = max(values) if max(values) > 0 else 1
     for i, v in enumerate(values):
-        ax.text(v + maxv * 0.01, i, rub(v), va="center", ha="left", fontsize=10)
+        ax.text(v + mx * 0.01, i, rub(v), va="center", ha="left", fontsize=26)
 
-    # (опционально) маленькая подсказка разницы
-    diff = full_work_total - debt
-    sign = "+" if diff >= 0 else "-"
-    diff_text = f"Разница: {sign}{rub(abs(diff))}"
-    ax.text(maxv * 0.02, -0.65, diff_text, fontsize=9)  # чуть выше/ниже — можно подправить
-
-    # Чистый вид
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.spines["bottom"].set_visible(False)
-    ax.spines["left"].set_visible(False)
+    # Clean look
+    for s in ["top", "right", "bottom", "left"]:
+        ax.spines[s].set_visible(False)
     ax.set_xticks([])
     ax.tick_params(axis="y", length=0)
 
     plt.tight_layout()
-    fig.savefig(abs_path, bbox_inches="tight", transparent=True, dpi=150)
+    fig.savefig(filepath, bbox_inches="tight", transparent=True, dpi=150)
     plt.close(fig)
-
-    return abs_path, rel_path
+    return filepath
 
 
 # ---------- main PDF generator ----------
-def generate_pdf(data):
-    # --- Load template dir early (нужно для путей ресурсов) ---
-    templates_dir = os.path.join(BASE_DIR, "templates")
+def generate_pdf(data) -> bytes:
+    """
+    ВАЖНО: возвращает bytes (PDF), чтобы handler мог:
+    - save_pdf_temp(pdf_bytes, filename)
+    - upload_to_bitrix(...)
+    - HttpResponse(pdf_bytes, ...)
+    """
 
-    # --- Compatibility block ---
+    data = json.loads(json.dumps(data, ensure_ascii=False))
+
     data["consultation"] = {
         "date": data["document"]["generated_at"],
         "contract_link": None
     }
 
-    # --- Parse finance amounts ---
-    debt = parse_amount(data["finance"]["debt_amount"])
-    work_cost = parse_amount(data["finance"]["work_cost"])
-    work_bonus = parse_amount(data["finance"]["work_bonus"])
-    installment = parse_amount(data["finance"]["installment_plan"])
-    income = parse_amount(data["summary"]["income"])
+    # Parse finance amounts
+    debt = parse_amount(data["finance"].get("debt_amount"))
+    work_cost = parse_amount(data["finance"].get("work_cost"))
+    work_bonus = parse_amount(data["finance"].get("work_bonus"))
+    installment = parse_amount(data["finance"].get("installment_plan"))
 
-    # --- Format values for template ---
     data["finance"]["debt_amount_rub"] = rub(debt)
     data["finance"]["work_cost_rub"] = rub(work_cost)
     data["finance"]["work_bonus_rub"] = rub(work_bonus)
-    data["finance"]["installment_plan_rub"] = rub(installment)
-    data["summary"]["income_rub"] = rub(income)
+    data["finance"]["installment_plan"] = rub(installment)
 
-    # --- Generate assets INSIDE templates_dir so base_url resolves them ---
-    chart_abs = chart_rel = None
-    photo_abs = photo_rel = None
+    # ---- income fields for template (official + after KM) ----
+    show_km = bool(data.get("summary", {}).get("show_km", False))
+    data.setdefault("summary", {})
+    data["summary"]["show_km"] = show_km
+
+    km = data.get("km") or {}
+    base_income = None
+    remain_after_km = None
 
     try:
-        chart_abs, chart_rel = generate_bar_chart(work_cost, debt, templates_dir=templates_dir)
-        data["finance"]["bar_chart_file"] = chart_rel  # <-- ВАЖНО: относительный путь
+        base_income = (km.get("result") or {}).get("base_income")
+        remain_after_km = (km.get("result") or {}).get("remain_to_person")
+    except Exception:
+        base_income = None
+        remain_after_km = None
 
-        photo_abs, photo_rel = download_photo(data["manager"]["photo"], templates_dir=templates_dir)
-        data["manager"]["photo_file"] = photo_rel      # <-- ВАЖНО: относительный путь
+    if base_income is None:
+        base_income = parse_amount(data["summary"].get("income")) or 0
 
-        # --- Load template ---
-        env = Environment(loader=FileSystemLoader(templates_dir))
+    data["summary"]["official_income_rub"] = rub(base_income)
+
+    if show_km and remain_after_km is not None:
+        data["summary"]["income_after_km_rub"] = rub(remain_after_km)
+    else:
+        data["summary"]["income_after_km_rub"] = ""
+
+    # backward compat
+    data["summary"]["income_rub"] = data["summary"]["official_income_rub"]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # chart
+        bar_chart_path = os.path.join(tmp, "bar_chart.png")
+        generate_bar_chart(work_cost, debt, bar_chart_path)
+        data["finance"]["bar_chart_file"] = "bar_chart.png"
+
+        # photo: download or placeholder
+        photo_url = data.get("manager", {}).get("photo")
+        photo_path = os.path.join(tmp, "manager_photo.jpg")
+        photo_file = download_photo(photo_url, photo_path) if photo_url else None
+
+        if not photo_file:
+            # делаем плейсхолдер, чтобы img всегда был валидным
+            placeholder_path = os.path.join(tmp, "manager_photo.png")
+            generate_placeholder_avatar(placeholder_path)
+            data["manager"]["photo_file"] = "manager_photo.png"
+        else:
+            data["manager"]["photo_file"] = "manager_photo.jpg"
+
+        # template
+        env = Environment(loader=FileSystemLoader("bitrix/templates"))
         template = env.get_template("template.html")
-
         html_content = template.render(data=data)
 
-        # --- Generate PDF in memory ---
-        pdf_bytes = HTML(
-            string=html_content,
-            base_url=templates_dir  # теперь img src="...rel..." резолвится
-        ).write_pdf()
+        pdf_bytes = HTML(string=html_content, base_url=tmp).write_pdf()
 
-        if not pdf_bytes.startswith(b"%PDF"):
-            raise ValueError("Generated file is not a valid PDF")
+    return pdf_bytes
 
-        return pdf_bytes
 
-    finally:
-        # --- Cleanup temp files ---
-        # Удаляем именно по abs-путям (они точные)
-        if photo_abs and os.path.exists(photo_abs):
-            try:
-                os.remove(photo_abs)
-            except OSError:
-                pass
+# ---------- RUN ----------
+if __name__ == "__main__":
+    with open("card.json", "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-        if chart_abs and os.path.exists(chart_abs):
-            try:
-                os.remove(chart_abs)
-            except OSError:
-                pass
+    pdf_bytes = generate_pdf(data)
+    with open("client_report.pdf", "wb") as f:
+        f.write(pdf_bytes)
+    print("✅ PDF создан: client_report.pdf (bytes =", len(pdf_bytes), ")")
