@@ -23,3 +23,5 @@ db.sqlite3
 
 
 burnished-block-442415-n4-0f8d850242ed.json
+# local prod config
+pravburo/settings.py
