@@ -3,21 +3,29 @@ __pycache__/
 *.pyc
 *.pyo
 
-# venv
+# Virtual environments
 venv/
 .venv/
 
-# env files
+# Env / secrets
 .env
 .env.*
 
-# Django artifacts / data
+# Django / DB
 db.sqlite3
 *.sqlite3
+
+# Collected static (но НЕ исходная static/)
 staticfiles/
+
+# User uploads / runtime data
 media/
 generated_docs/
+
+# Logs / artifacts
 *.log
+
+# Generated documents / exports
 *.pdf
 *.xlsx
 
