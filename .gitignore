@@ -2,26 +2,29 @@
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
 
-# Виртуальное окружение
+# venv
 venv/
+.venv/
 
-# Логи
-*.log
-
-# Настройки IDE
-.vscode/
-.idea/
-
-# Файлы среды
+# env files
 .env
+.env.*
 
-
+# Django artifacts / data
 db.sqlite3
 *.sqlite3
+staticfiles/
+media/
+generated_docs/
+*.log
+*.pdf
+*.xlsx
 
 
 burnished-block-442415-n4-0f8d850242ed.json
 # local prod config
 pravburo/settings.py
+# IDE
+.vscode/
+.idea/
