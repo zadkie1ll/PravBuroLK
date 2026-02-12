@@ -9,7 +9,7 @@ def auth_page(request):
     Страница авторизации (HTML).
     Никакой логики логина — только UI.
     """
-    return render(request, "education/auth.html")
+    return render(request, "education/auth.html") # крутой комментарий
 
 
 @require_POST
