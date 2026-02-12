@@ -26,6 +26,6 @@ echo "[6/6] Restart service"
 sudo -n /usr/bin/systemctl restart pravburo.service
 
 echo "[7/7] Status"
-sudo -n /usr/bin/systemctl --no-pager --full status pravburo.service | head -n 50
+/usr/bin/systemctl --no-pager --full status pravburo.service | head -n 50
 
 echo "DONE"
