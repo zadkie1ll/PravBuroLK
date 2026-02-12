@@ -11,6 +11,7 @@ from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.db import models
+from django.db.models import Count
 from django.db.models.functions import Lower
 from django.db.models import Sum
 from django.utils import timezone
@@ -257,8 +258,20 @@ def create_actual_payments(request):
 
 def client_payments_page(request, client_id):
     contract = get_object_or_404(Contract, client__id=client_id)
-    plan, _ = InstallmentPlan.objects.get_or_create(contract=contract)
     client = contract.client
+
+    # 1) Берём "лучший" план: тот, где больше всего платежей (если вдруг есть дубли)
+    plan = (
+        InstallmentPlan.objects
+        .filter(contract=contract)
+        .annotate(inst_cnt=Count("payments"), act_cnt=Count("actual_payments"))
+        .order_by("-inst_cnt", "-act_cnt", "-id")
+        .first()
+    )
+
+    # 2) Если плана вообще нет — тогда создаём (редкий случай)
+    if plan is None:
+        plan = InstallmentPlan.objects.create(contract=contract)
 
     installments = InstallmentPayment.objects.filter(plan=plan).order_by("number")
 
@@ -267,26 +280,25 @@ def client_payments_page(request, client_id):
     date_to = request.GET.get("actual_to")
 
     actuals = ActualPayment.objects.filter(plan=plan)
-
     if date_from:
         actuals = actuals.filter(payment_date__gte=date_from)
     if date_to:
         actuals = actuals.filter(payment_date__lte=date_to)
 
-    actuals = ActualPayment.objects.filter(plan=plan).order_by("payment_date", "id")
+    # ВАЖНО: больше не перезатираем actuals!
+    actuals = actuals.order_by("payment_date", "id")
 
     total_installments_sum = installments.aggregate(models.Sum("amount_due"))["amount_due__sum"] or 0
     total_actuals_sum = actuals.aggregate(models.Sum("amount"))["amount__sum"] or 0
 
     contract_final_amount = (contract.total_amount or 0) - (contract.discount or 0)
-    
+
     other_payments = OtherPayment.objects.filter(client__id=client_id).order_by("-created_at")
 
     return render(request, "client_payments_page.html", {
         "client": client,
         "contract": contract,
         "plan": plan,
-        "text"
 
         "installments": installments,
         "actuals": actuals,
@@ -295,7 +307,6 @@ def client_payments_page(request, client_id):
         "total_actuals_sum": total_actuals_sum,
 
         "contract_final_amount": contract_final_amount,
-        
         "other_payments": other_payments,
 
         "date_from": date_from,
