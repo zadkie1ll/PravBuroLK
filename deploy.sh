@@ -10,20 +10,22 @@ cd "$APP_DIR"
 echo "[1/6] Pull latest"
 git pull --ff-only
 
-echo "[2/6] Install deps"
+echo "[2/6] Activate venv"
 source "$VENV/bin/activate"
+
+echo "[3/6] Install deps"
 pip install -r requirements.txt
 
-echo "[3/6] Migrate"
+echo "[4/6] Migrate"
 $PY manage.py migrate --noinput
 
-echo "[4/6] Collectstatic"
+echo "[5/6] Collectstatic"
 $PY manage.py collectstatic --noinput
 
-echo "[5/6] Restart service"
-sudo systemctl restart pravburo
+echo "[6/6] Restart service"
+sudo -n systemctl restart pravburo.service
 
-echo "[6/6] Status"
-sudo systemctl status pravburo --no-pager
+echo "[7/7] Status"
+sudo -n systemctl --no-pager --full status pravburo.service | head -n 60
 
-echo "DONE ✅"
+echo "DONE"
