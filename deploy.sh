@@ -23,9 +23,9 @@ echo "[5/6] Collectstatic"
 $PY manage.py collectstatic --noinput
 
 echo "[6/6] Restart service"
-sudo -n systemctl restart pravburo.service
+sudo -n /usr/bin/systemctl restart pravburo.service
 
 echo "[7/7] Status"
-sudo -n systemctl --no-pager --full status pravburo.service | head -n 60
+sudo -n /usr/bin/systemctl --no-pager --full status pravburo.service | head -n 50
 
 echo "DONE"
