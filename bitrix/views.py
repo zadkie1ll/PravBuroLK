@@ -268,6 +268,7 @@ UF_SHOW_KM = "UF_CRM_1770730700097"
 UF_SALARY = "UF_CRM_1770129399154"
 UF_PENSION = "UF_CRM_1770647008781"
 
+UF_CLIENT_NAME = "UF_CRM_1754380684375"
 UF_BENEFITS = "UF_CRM_1770646540351"
 UF_CHILD_PAYMENTS = "UF_CRM_1770646550503"
 UF_ALIMONY = "UF_CRM_1770646560950"
@@ -358,16 +359,15 @@ def build_consultation(request):
                 "installment_plan": pick(deal_data, "UF_CRM_1754380522464"),
             },
             "summary": {
+                "client_name": pick(deal_data, UF_CLIENT_NAME) or "Клиент",
+
                 "property": pick(deal_data, "UF_CRM_1754647601622"),
                 "deals": pick(deal_data, "UF_CRM_1754647663541"),
                 "marriage": pick(deal_data, "UF_CRM_1754647902223"),
 
-                # оставим как было (для fallback/совместимости)
                 "income": pick(deal_data, UF_SALARY),
 
                 "children": pick(deal_data, "UF_CRM_1754647671862"),
-
-                # --- NEW: show KM flag for template ---
                 "show_km": show_km,
             },
             "risks": {

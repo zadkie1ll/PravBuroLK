@@ -158,8 +158,7 @@
 <body>
     <!-- HEADER -->
     <div class="header">
-        <h1>Первая консультация - отчёт клиенту</h1>
-        <p>Автоматически сформировано из JSON данных.</p>
+        <h1>Первая консультация: {{ data.summary.client_name }}</h1>
     </div>
     <div class="container">
         <!-- MANAGER CARD -->
@@ -191,7 +190,7 @@
                     {% if data.finance.work_bonus_rub %}
                         <div class="row">Бонус: {{ data.finance.work_bonus_rub }}</div>
                     {% endif %}
-                    <div class="row">Рассрочка: {{ data.finance.installment_plan }}</div>
+                    <div class="row">Платеж по рассрочке: {{ data.finance.installment_plan }}</div>
                     <div class="viz">
                         <div class="viz-title"><b>Пропорциональная визуализация</b></div>
                         <img class="bar-chart-img" src="{{ data.finance.bar_chart_file }}" />
