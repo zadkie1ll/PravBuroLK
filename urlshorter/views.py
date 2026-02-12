@@ -4,7 +4,11 @@ from django.db.models import Count
 from urllib.parse import urlencode  # Для добавления UTM к destination
 from django.contrib.auth.decorators import login_required
 from collections import defaultdict
+from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError
+
+
+@csrf_exempt
 def generate_url(request):
     source = request.GET.get('source')
     social = request.GET.get('social', '')  # По умолчанию пусто, если не передан
@@ -33,6 +37,7 @@ def generate_url(request):
     # Редирект на destination с UTM (permanent=False по умолчанию — 302)
     return redirect(destination_with_utm)
 
+@csrf_exempt
 @login_required
 def show_stats(request):
     messages = []  # список кортежей ('success'/'error', текст)

@@ -7,8 +7,10 @@ PY="$VENV/bin/python"
 
 cd "$APP_DIR"
 
-echo "[1/6] Pull latest"
-git pull --ff-only
+echo "[1/7] Sync repo to origin/main (clean local changes)"
+git fetch origin main
+git reset --hard origin/main
+git clean -fd
 
 echo "[2/6] Activate venv"
 source "$VENV/bin/activate"
