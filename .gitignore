@@ -31,8 +31,6 @@ generated_docs/
 
 
 burnished-block-442415-n4-0f8d850242ed.json
-# local prod config
-pravburo/settings.py
 # IDE
 .vscode/
 .idea/
