@@ -11,7 +11,7 @@ from administration.views import casino_page, spin_view
 from documents.views import document_form, generate_document, dogovor, parse_legenda
 from education_platform.views import auth_api_login, auth_page
 from urlshorter.views import generate_url, show_stats
-
+from yclients.views import yclients_webhook
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("api/calc-km/", calc_km_for_deal, name="calc_km_for_deal"),
@@ -67,6 +67,7 @@ urlpatterns = [
     path("api/education/auth/", auth_api_login, name="education_auth_api"),
     path("url/", generate_url, name="short_url"),
     path("url-stats/", show_stats, name="url-stats"),
+    path("yclients-webhook", yclients_webhook)
 ]
 
 
