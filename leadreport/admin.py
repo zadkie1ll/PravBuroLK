@@ -20,7 +20,7 @@ class LeadSourceAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
 
     # Подменяем шаблон списка, чтобы добавить кнопку
-    change_list_template = "admin\leads\leadsource\change_list.html"  
+    change_list_template = "admin/leads/leadsource/change_list.html"  
 
     def get_urls(self):
         urls = super().get_urls()
@@ -114,7 +114,7 @@ class SalesManagerAdmin(admin.ModelAdmin):
     list_editable = ("is_active",)
     list_per_page = 50
 
-    change_list_template = "admin\leads\salesmanager\change_list.html"
+    change_list_template = "admin/leads/salesmanager/change_list.html"
 
     def get_urls(self):
         urls = super().get_urls()
