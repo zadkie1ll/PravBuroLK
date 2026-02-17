@@ -52,6 +52,7 @@ INSTALLED_APPS = [
 
     "corsheaders",
     "simple_history",
+    "leadreport",
 ]
 
 # ------------------------------------------------------------------

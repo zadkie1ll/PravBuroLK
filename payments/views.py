@@ -1004,7 +1004,6 @@ def create_payment(request, payment_id):
 
         real_amount_paid[p.id] = paid
 
-    # --- Берём реальный остаток конкретного платежа ---
     amount_paid = real_amount_paid.get(payment.id, 0)
     remaining = payment.amount_due - amount_paid
 
@@ -1012,7 +1011,6 @@ def create_payment(request, payment_id):
         messages.error(request, f"Платёж №{payment.number} уже полностью оплачен.")
         return redirect(request.META.get("HTTP_REFERER", "/"))
 
-    # --- Сумма для Альфы ---
     amount = int(remaining * 100)
     order_number = f"InstallmentPayment-{payment.id}-{int(time.time())}"
 
@@ -1121,7 +1119,6 @@ def payment_callback(request):
     if not order_number:
         return JsonResponse({"error": "orderNumber required"}, status=400)
 
-    # Нас интересует только успешная оплата
     if not (status == "1" and operation == "deposited"):
         return JsonResponse({
             "status": "ignored",
