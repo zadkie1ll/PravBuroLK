@@ -1,0 +1,51 @@
+{% extends "education_platform/hr_base.html" %}
+
+{% block content %}
+<div class="actions" style="margin-bottom:16px;">
+    <a class="btn primary" href="{% url 'education_hr_course_create' %}">+ Новый курс</a>
+    <a class="btn" href="{% url 'education_hr_module_create' %}">+ Новый модуль</a>
+</div>
+
+{% for course in courses %}
+    <div class="card">
+        <h2>{{ course.name }}</h2>
+        <div class="muted">ID: {{ course.id }} | Активен: {{ course.is_active|yesno:"да,нет" }}</div>
+        <p>{{ course.description|default:"-" }}</p>
+        <p class="muted">Отделы:
+            {% for dep in course.departments.all %}
+                <span>{{ dep.name }} ({{ dep.code }}){% if not forloop.last %}, {% endif %}</span>
+            {% empty %}
+                не указаны
+            {% endfor %}
+        </p>
+        <div class="actions" style="margin-bottom:8px;">
+            <a class="btn" href="{% url 'education_hr_course_edit' course.id %}">Редактировать курс</a>
+            <a class="btn" href="{% url 'education_hr_module_create' %}?course={{ course.id }}">+ Модуль в этот курс</a>
+        </div>
+
+        <h3>Модули</h3>
+        {% for module in course.modules.all %}
+            <div class="card" style="background:#fafafa;">
+                <strong>#{{ module.order }} {{ module.name }}</strong>
+                <div class="muted">ID: {{ module.id }} | Активен: {{ module.is_active|yesno:"да,нет" }}</div>
+                <p>{{ module.description|default:"-" }}</p>
+                <div class="actions">
+                    <a class="btn" href="{% url 'education_hr_module_edit' module.id %}">Редактировать модуль</a>
+                    <a class="btn" href="{% url 'education_hr_test_edit' module.id %}">Тест и вопросы</a>
+                </div>
+                {% if module.test %}
+                    <p class="muted" style="margin-top:8px;">
+                        Тест: {{ module.test.name }} | Попыток: {{ module.test.max_attempts }} | Вопросов: {{ module.test.questions.count }}
+                    </p>
+                {% else %}
+                    <p class="muted" style="margin-top:8px;">Тест не создан.</p>
+                {% endif %}
+            </div>
+        {% empty %}
+            <p class="muted">В этом курсе пока нет модулей.</p>
+        {% endfor %}
+    </div>
+{% empty %}
+    <div class="card">Курсы пока не созданы.</div>
+{% endfor %}
+{% endblock %}

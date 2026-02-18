@@ -1,0 +1,49 @@
+{% extends "education_platform/hr_base.html" %}
+
+{% block content %}
+<div class="card">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="actions">
+            <button class="btn primary" type="submit">Сохранить тест</button>
+            <a class="btn" href="{% url 'education_hr_dashboard' %}">Назад</a>
+        </div>
+    </form>
+</div>
+
+<div class="actions" style="margin-bottom:12px;">
+    <a class="btn primary" href="{% url 'education_hr_question_create' test.id %}">+ Добавить вопрос</a>
+</div>
+
+{% for q in questions %}
+    <div class="card">
+        <strong>#{{ q.order }} {{ q.text }}</strong>
+        <div class="muted">Тип: {{ q.question_type }} | Баллы: {{ q.score }}</div>
+        <div class="actions" style="margin-top:8px;">
+            <a class="btn" href="{% url 'education_hr_question_edit' q.id %}">Редактировать вопрос</a>
+            <form method="post" action="{% url 'education_hr_question_delete' q.id %}">
+                {% csrf_token %}
+                <button class="btn" type="submit">Удалить вопрос</button>
+            </form>
+            <a class="btn" href="{% url 'education_hr_option_create' q.id %}">+ Вариант ответа</a>
+        </div>
+        <ul>
+            {% for opt in q.options.all %}
+                <li>
+                    {{ opt.text }} {% if opt.is_correct %}(верный){% endif %}
+                    <a class="btn" style="margin-left:8px;" href="{% url 'education_hr_option_edit' opt.id %}">Ред.</a>
+                    <form method="post" action="{% url 'education_hr_option_delete' opt.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button class="btn" type="submit">Удалить</button>
+                    </form>
+                </li>
+            {% empty %}
+                <li class="muted">Варианты не добавлены.</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% empty %}
+    <div class="card muted">В тесте пока нет вопросов.</div>
+{% endfor %}
+{% endblock %}
