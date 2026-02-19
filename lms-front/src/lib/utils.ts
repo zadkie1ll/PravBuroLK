@@ -1,1 +1,2 @@
-export const backend = "http://127.0.0.1:8000"
+const envBackend = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim()
+export const backend = envBackend || window.location.origin

@@ -3,11 +3,13 @@ import './Home.css';
 
 const Home = () => {
   const navigate = useNavigate()
+  const logoSrc = `${import.meta.env.BASE_URL}pravburo_logo.png`
+
   return (
     <div className="home">
       <div className="home-card">
         <img
-          src="/pravburo_logo.png"
+          src={logoSrc}
           alt="ПравБюро"
           className="logo"
         />
