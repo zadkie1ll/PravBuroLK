@@ -23,17 +23,21 @@ pip install -r requirements.txt
 
 if [[ "$DEPLOY_FRONTEND" == "1" ]]; then
   echo "[4/9] Build frontend (Vite)"
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+  nvm install --lts
+
   cd "$FRONT_DIR"
+  VITE_BASE_PATH="${VITE_BASE_PATH:-/static/lms-front/}"
+  VITE_APP_BASENAME="${VITE_APP_BASENAME:-/static/lms-front}"
   if [[ -f package-lock.json ]]; then
     npm ci
   else
     npm install
   fi
-  if [[ -n "${VITE_BACKEND_URL:-}" ]]; then
-    VITE_BACKEND_URL="$VITE_BACKEND_URL" npm run build
-  else
-    npm run build
-  fi
+  VITE_BACKEND_URL="${VITE_BACKEND_URL:-}" \
+  VITE_BASE_PATH="$VITE_BASE_PATH" \
+  VITE_APP_BASENAME="$VITE_APP_BASENAME" \
+  npm run build
 
   echo "[5/9] Copy frontend dist to Django static"
   rm -rf "$FRONT_STATIC_DIR"
