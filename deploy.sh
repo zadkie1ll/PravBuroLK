@@ -23,8 +23,7 @@ pip install -r requirements.txt
 
 if [[ "$DEPLOY_FRONTEND" == "1" ]]; then
   echo "[4/9] Build frontend (Vite)"
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-  nvm install --lts
+  sudo apt install nodejs npm
 
   cd "$FRONT_DIR"
   VITE_BASE_PATH="${VITE_BASE_PATH:-/static/lms-front/}"
