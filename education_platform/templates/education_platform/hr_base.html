@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title|default:"LMS HR" }}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f3f5f7; color: #222; }
+        .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn { display: inline-block; padding: 8px 12px; border-radius: 8px; border: 1px solid #d0d7de; background: #fff; color: #111; text-decoration: none; cursor: pointer; }
+        .btn.primary { background: #0f62fe; color: #fff; border-color: #0f62fe; }
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+        .muted { color: #667085; font-size: 14px; }
+        ul { margin: 8px 0; padding-left: 20px; }
+        form p { margin: 8px 0; }
+        label { font-weight: 600; }
+        input, textarea, select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #d0d7de; box-sizing: border-box; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .messages { margin-bottom: 16px; }
+        .msg { background: #e8f5e9; border: 1px solid #a5d6a7; padding: 8px 10px; border-radius: 8px; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="top">
+        <h1>{{ title|default:"LMS HR" }}</h1>
+        <a class="btn" href="{% url 'education_hr_dashboard' %}">Каталог LMS</a>
+    </div>
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <div class="msg">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+</div>
+</body>
+</html>

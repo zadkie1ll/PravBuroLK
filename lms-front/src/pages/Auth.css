@@ -1,0 +1,117 @@
+.auth {
+  min-height: 100vh;
+  min-width: 100vw;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: #1e1e1e;
+  color: white;
+}
+
+.auth-card {
+  width: 30vw;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  transition: transform 0.4s ease;
+}
+
+
+.form {
+  min-width: 80%;
+  background: #2a2a2a;
+  padding: 10%;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+input, select {
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  outline: none;
+  font-size: 14px;
+}
+
+button {
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+button:hover {
+  background: #1e4fd8;
+}
+
+.switch {
+  margin-top: 20px;
+  font-size: 14px;
+}
+
+.switch span {
+  color: #60a5fa;
+  cursor: pointer;
+}
+.inputLabel {
+    color: white;
+}
+.department-wrapper {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+
+  transform: translateY(-8px);
+  transition:
+    max-height 0.4s ease,
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.department-wrapper.open {
+  max-height: 80px;
+  opacity: 1;
+  transform: translateY(0);
+}
+.alert-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+}
+
+.custom-alert {
+  background-color: rgba(200, 30, 30, 0.75) !important;
+  color: white !important;
+  backdrop-filter: blur(6px);
+  border-radius: 12px;
+  padding: 12px 18px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+
+  animation: fadeInOut 3s ease forwards;
+}
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
