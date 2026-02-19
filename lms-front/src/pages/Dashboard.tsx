@@ -5,6 +5,7 @@ import { CourseList } from "../components/CourseList";
 import type { Course } from "../lib/types/components"; // Предполагаем, что тип Course включает id, name, description, image_url, department, modules_count, user_progress (number | null)
 import { LoadCourses } from "../lib/api";
 import { useState, useEffect } from "react"; // Добавляем хуки для асинхронной загрузки
+import { replace, useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const [courses, setCourses] = useState<Course[]>([]); // Состояние для курсов
@@ -14,6 +15,7 @@ const Dashboard = () => {
   const user_id = localStorage.getItem("user"); // string | null
   const department = localStorage.getItem("department"); // string | null
   const username = localStorage.getItem("username"); // string | null
+  const navigate = useNavigate();
   const depsName = {
     'sales': "продажи",
     'marketing': "маркетинг",
@@ -26,7 +28,9 @@ const Dashboard = () => {
     const fetchCourses = async () => {
       if (!user_id || !department) {
         setError("Отсутствует информация о пользователе или отделе");
+        navigate("/dashboard", { replace: true });
         setLoading(false);
+        
         return;
       }
 
