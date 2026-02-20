@@ -5,7 +5,7 @@ import { CourseList } from "../components/CourseList";
 import type { Course } from "../lib/types/components"; // Предполагаем, что тип Course включает id, name, description, image_url, department, modules_count, user_progress (number | null)
 import { LoadCourses } from "../lib/api";
 import { useState, useEffect } from "react"; // Добавляем хуки для асинхронной загрузки
-import { replace, useNavigate } from "react-router-dom";
+import {  useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const [courses, setCourses] = useState<Course[]>([]); // Состояние для курсов
