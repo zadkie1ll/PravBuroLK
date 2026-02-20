@@ -1,0 +1,59 @@
+.course-card {
+  width: 320px;
+  background: white;
+  border-radius: 14px;
+  overflow: hidden;
+  color: black;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.course-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+}
+
+.course-image-wrapper {
+  height: 180px;
+  overflow: hidden;
+}
+
+.course-image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.course-card:hover img {
+  transform: tr;
+}
+
+.course-body {
+  padding: 18px;
+}
+
+.course-body h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+}
+
+.course-body p {
+  margin: 0 0 14px 0;
+  font-size: 14px;
+  color: #555;
+  line-height: 1.4;
+}
+
+.course-progress {
+  margin-top: 8px;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #666;
+}

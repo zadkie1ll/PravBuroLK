@@ -2,6 +2,102 @@ from django.conf import settings
 from django.db import models
 
 
+class Department(models.Model):
+    code = models.CharField(max_length=32, unique=True)
+    name = models.CharField(max_length=128)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+
+
+class Course(models.Model):
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    image_url = models.URLField(max_length=1000, blank=True)
+    photo_url = models.URLField(max_length=1000, blank=True)
+    departments = models.ManyToManyField(Department, related_name="courses", blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return self.name
+
+
+class Module(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="modules")
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    video_url = models.URLField(max_length=1000, blank=True)
+    order = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["course_id", "order", "id"]
+
+    def __str__(self):
+        return f"{self.course.name}: {self.name}"
+
+
+class ModuleTest(models.Model):
+    module = models.OneToOneField(Module, on_delete=models.CASCADE, related_name="test")
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    max_score = models.FloatField(default=0)
+    passing_score = models.FloatField(default=0)
+    max_attempts = models.PositiveIntegerField(default=3)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["module_id"]
+
+    def __str__(self):
+        return f"Test: {self.name}"
+
+
+class TestQuestion(models.Model):
+    class QuestionType(models.TextChoices):
+        CHOICE = "choice", "Choice"
+        MULTI_CHOICE = "multi_choice", "Multi choice"
+        TEXT = "text", "Text"
+
+    test = models.ForeignKey(ModuleTest, on_delete=models.CASCADE, related_name="questions")
+    text = models.TextField()
+    question_type = models.CharField(max_length=32, choices=QuestionType.choices, default=QuestionType.CHOICE)
+    score = models.FloatField(default=0)
+    order = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        ordering = ["test_id", "order", "id"]
+
+    def __str__(self):
+        return f"Q{self.order}: {self.text[:60]}"
+
+
+class QuestionOption(models.Model):
+    question = models.ForeignKey(TestQuestion, on_delete=models.CASCADE, related_name="options")
+    text = models.CharField(max_length=500)
+    is_correct = models.BooleanField(default=False)
+    order = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        ordering = ["question_id", "order", "id"]
+
+    def __str__(self):
+        return self.text
+
+
 class TraineeProfile(models.Model):
     """
     Профиль стажёра (надстройка над обычным Django User).
