@@ -19,7 +19,6 @@ class LeadSourceAdmin(admin.ModelAdmin):
     list_editable = ("is_active",)
     readonly_fields = ("created_at",)
 
-    # Подменяем шаблон списка, чтобы добавить кнопку
     change_list_template = "admin/leads/leadsource/change_list.html"  
 
     def get_urls(self):
