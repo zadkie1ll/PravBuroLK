@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "simple_history",
     "leadreport",
+    "communications",
 ]
 
 # ------------------------------------------------------------------
@@ -119,6 +120,52 @@ else:
             "PORT": os.getenv("DB_PORT", "5432"),
         }
     }
+
+# Дополнительные алиасы БД для модуля communications.
+# Если отдельные БД не заданы, используем безопасный fallback:
+# - sqlite: отдельные локальные файлы logs/archive
+# - postgres: ту же БД, что и default
+if DB_ENGINE == "sqlite":
+    DATABASES["logs"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.getenv("LOGS_DB_NAME", str(BASE_DIR / "logs.sqlite3")),
+    }
+    DATABASES["archive"] = {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.getenv("ARCHIVE_DB_NAME", str(BASE_DIR / "archive.sqlite3")),
+    }
+else:
+    DATABASES["logs"] = {
+        "ENGINE": os.getenv("LOGS_DB_ENGINE", DATABASES["default"]["ENGINE"]),
+        "NAME": os.getenv("LOGS_DB_NAME", DATABASES["default"]["NAME"]),
+        "USER": os.getenv("LOGS_DB_USER", DATABASES["default"]["USER"]),
+        "PASSWORD": os.getenv("LOGS_DB_PASSWORD", DATABASES["default"]["PASSWORD"]),
+        "HOST": os.getenv("LOGS_DB_HOST", DATABASES["default"]["HOST"]),
+        "PORT": os.getenv("LOGS_DB_PORT", DATABASES["default"]["PORT"]),
+    }
+    DATABASES["archive"] = {
+        "ENGINE": os.getenv("ARCHIVE_DB_ENGINE", DATABASES["default"]["ENGINE"]),
+        "NAME": os.getenv("ARCHIVE_DB_NAME", DATABASES["default"]["NAME"]),
+        "USER": os.getenv("ARCHIVE_DB_USER", DATABASES["default"]["USER"]),
+        "PASSWORD": os.getenv("ARCHIVE_DB_PASSWORD", DATABASES["default"]["PASSWORD"]),
+        "HOST": os.getenv("ARCHIVE_DB_HOST", DATABASES["default"]["HOST"]),
+        "PORT": os.getenv("ARCHIVE_DB_PORT", DATABASES["default"]["PORT"]),
+    }
+
+DATABASE_ROUTERS = ["communications.db_router.CommunicationsRouter"]
+COMMUNICATIONS_USE_CELERY = env_bool("COMMUNICATIONS_USE_CELERY", True)
+
+# ------------------------------------------------------------------
+# CELERY / REDIS
+# ------------------------------------------------------------------
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/1")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = os.getenv("DJANGO_TIME_ZONE", "UTC")
+CELERY_TASK_DEFAULT_QUEUE = os.getenv("CELERY_TASK_DEFAULT_QUEUE", "celery")
 
 # ------------------------------------------------------------------
 # AUTH / SECURITY

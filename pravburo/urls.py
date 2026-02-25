@@ -9,6 +9,7 @@ from payments.views import client_admin_view, create_other_payments, delete_othe
 from bitrix.views import referral_landing, referral_submit, application_success, referral_stats, build_consultation, sync_regions_from_bitrix, calc_km_for_deal
 from administration.views import casino_page, spin_view
 from documents.views import document_form, generate_document, dogovor, parse_legenda
+from communications.views import bitrix_call_webhook, download_call_to_server
 from education_platform.views import (
     auth_api_login,
     auth_api_register,
@@ -106,7 +107,9 @@ urlpatterns = [
     path("education/hr/option/<int:option_id>/delete/", hr_option_delete, name="education_hr_option_delete"),
     path("url/", generate_url, name="short_url"),
     path("url-stats/", show_stats, name="url-stats"),
-    path("yclients-webhook/", yclients_webhook)
+    path("yclients-webhook/", yclients_webhook),
+    path('bitrix/webhook/call-end/', bitrix_call_webhook),
+    path('download_call', download_call_to_server),
 ]
 
 

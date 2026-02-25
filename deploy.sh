@@ -7,6 +7,8 @@ PY="$VENV/bin/python"
 FRONT_DIR="$APP_DIR/lms-front"
 FRONT_STATIC_DIR="$APP_DIR/static/lms-front"
 DEPLOY_FRONTEND="${DEPLOY_FRONTEND:-1}"
+CELERY_SERVICE_NAME="${CELERY_SERVICE_NAME:-pravburo-celery.service}"
+CELERY_BEAT_SERVICE_NAME="${CELERY_BEAT_SERVICE_NAME:-pravburo-celerybeat.service}"
 
 cd "$APP_DIR"
 
@@ -48,6 +50,8 @@ fi
 
 echo "[6/9] Migrate"
 $PY manage.py migrate --noinput
+$PY manage.py migrate communications --database=logs --noinput
+$PY manage.py migrate communications --database=archive --noinput
 
 echo "[7/9] Collectstatic"
 $PY manage.py collectstatic --noinput
@@ -55,7 +59,20 @@ $PY manage.py collectstatic --noinput
 echo "[8/9] Restart service"
 sudo -n /usr/bin/systemctl restart pravburo.service
 
-echo "[9/9] Status"
+echo "[9/9] Restart celery workers (if present)"
+if /usr/bin/systemctl list-unit-files "$CELERY_SERVICE_NAME" --no-legend 2>/dev/null | /usr/bin/grep -q "$CELERY_SERVICE_NAME"; then
+  sudo -n /usr/bin/systemctl restart "$CELERY_SERVICE_NAME"
+else
+  echo "Skip: $CELERY_SERVICE_NAME not found"
+fi
+
+if /usr/bin/systemctl list-unit-files "$CELERY_BEAT_SERVICE_NAME" --no-legend 2>/dev/null | /usr/bin/grep -q "$CELERY_BEAT_SERVICE_NAME"; then
+  sudo -n /usr/bin/systemctl restart "$CELERY_BEAT_SERVICE_NAME"
+else
+  echo "Skip: $CELERY_BEAT_SERVICE_NAME not found"
+fi
+
+echo "[10/10] Status"
 /usr/bin/systemctl --no-pager --full status pravburo.service | head -n 50
 
 echo "DONE"
