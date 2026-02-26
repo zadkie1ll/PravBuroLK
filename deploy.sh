@@ -51,11 +51,14 @@ fi
 
 echo "[6/9] Migrate"
 $PY manage.py migrate --noinput
-if [[ "$COMMUNICATIONS_SPLIT_DATABASES" == "1" ]]; then
+SPLIT_DB_AVAILABLE="$(
+  $PY manage.py shell -c "from django.conf import settings; print(int({'logs','archive'}.issubset(set(settings.DATABASES.keys()))))" 2>/dev/null || echo 0
+)"
+if [[ "$COMMUNICATIONS_SPLIT_DATABASES" == "1" && "$SPLIT_DB_AVAILABLE" == "1" ]]; then
   $PY manage.py migrate communications --database=logs --noinput
   $PY manage.py migrate communications --database=archive --noinput
 else
-  echo "Skip split-db migrations (COMMUNICATIONS_SPLIT_DATABASES=$COMMUNICATIONS_SPLIT_DATABASES)"
+  echo "Skip split-db migrations (COMMUNICATIONS_SPLIT_DATABASES=$COMMUNICATIONS_SPLIT_DATABASES, SPLIT_DB_AVAILABLE=$SPLIT_DB_AVAILABLE)"
 fi
 
 echo "[7/9] Collectstatic"
