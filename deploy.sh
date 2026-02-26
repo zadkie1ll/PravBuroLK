@@ -9,6 +9,7 @@ FRONT_STATIC_DIR="$APP_DIR/static/lms-front"
 DEPLOY_FRONTEND="${DEPLOY_FRONTEND:-1}"
 CELERY_SERVICE_NAME="${CELERY_SERVICE_NAME:-pravburo-celery.service}"
 CELERY_BEAT_SERVICE_NAME="${CELERY_BEAT_SERVICE_NAME:-pravburo-celerybeat.service}"
+COMMUNICATIONS_SPLIT_DATABASES="${COMMUNICATIONS_SPLIT_DATABASES:-0}"
 
 cd "$APP_DIR"
 
@@ -50,8 +51,12 @@ fi
 
 echo "[6/9] Migrate"
 $PY manage.py migrate --noinput
-$PY manage.py migrate communications --database=logs --noinput
-$PY manage.py migrate communications --database=archive --noinput
+if [[ "$COMMUNICATIONS_SPLIT_DATABASES" == "1" ]]; then
+  $PY manage.py migrate communications --database=logs --noinput
+  $PY manage.py migrate communications --database=archive --noinput
+else
+  echo "Skip split-db migrations (COMMUNICATIONS_SPLIT_DATABASES=$COMMUNICATIONS_SPLIT_DATABASES)"
+fi
 
 echo "[7/9] Collectstatic"
 $PY manage.py collectstatic --noinput

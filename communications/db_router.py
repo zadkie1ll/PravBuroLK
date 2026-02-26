@@ -1,4 +1,4 @@
-from communications.models import CallProcessingLog, CallWebhookEvent, ProcessedCallArchive
+from django.conf import settings
 
 
 class CommunicationsRouter:
@@ -9,21 +9,39 @@ class CommunicationsRouter:
     """
 
     route_app_labels = {"communications"}
-    logs_models = {CallWebhookEvent, CallProcessingLog}
-    archive_models = {ProcessedCallArchive}
+    logs_models = {"callwebhookevent", "callprocessinglog"}
+    archive_models = {"processedcallarchive"}
+
+    def _enabled(self) -> bool:
+        return bool(getattr(settings, "COMMUNICATIONS_SPLIT_DATABASES", False))
+
+    def _logs_alias(self) -> str:
+        return str(getattr(settings, "COMMUNICATIONS_LOGS_DB_ALIAS", "logs"))
+
+    def _archive_alias(self) -> str:
+        return str(getattr(settings, "COMMUNICATIONS_ARCHIVE_DB_ALIAS", "archive"))
+
+    def _model_name(self, model) -> str:
+        return str(getattr(model._meta, "model_name", "")).lower()
 
     def db_for_read(self, model, **hints):
-        if model in self.archive_models:
-            return "archive"
-        if model in self.logs_models:
-            return "logs"
+        if not self._enabled():
+            return None
+        model_name = self._model_name(model)
+        if model_name in self.archive_models:
+            return self._archive_alias()
+        if model_name in self.logs_models:
+            return self._logs_alias()
         return None
 
     def db_for_write(self, model, **hints):
-        if model in self.archive_models:
-            return "archive"
-        if model in self.logs_models:
-            return "logs"
+        if not self._enabled():
+            return None
+        model_name = self._model_name(model)
+        if model_name in self.archive_models:
+            return self._archive_alias()
+        if model_name in self.logs_models:
+            return self._logs_alias()
         return None
 
     def allow_relation(self, obj1, obj2, **hints):
@@ -34,11 +52,15 @@ class CommunicationsRouter:
     def allow_migrate(self, db, app_label, model_name=None, **hints):
         if app_label != "communications":
             return None
+        if not self._enabled():
+            return None
 
-        if model_name == "processedcallarchive":
-            return db == "archive"
+        normalized_model_name = str(model_name or "").lower()
 
-        if model_name in {"callwebhookevent", "callprocessinglog"}:
-            return db == "logs"
+        if normalized_model_name == "processedcallarchive":
+            return db == self._archive_alias()
+
+        if normalized_model_name in {"callwebhookevent", "callprocessinglog"}:
+            return db == self._logs_alias()
 
         return None

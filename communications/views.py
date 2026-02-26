@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -10,27 +11,40 @@ from communications.services.call_queue import (
     spawn_background_processing,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @csrf_exempt
 @require_POST
 def bitrix_call_webhook(request):
-    payload = _extract_payload(request)
+    try:
+        payload = _extract_payload(request)
 
-    # 1) Фиксируем входящее событие в локальной БД.
-    event, queued = enqueue_call_webhook(payload)
-    # 2) Ставим в Celery только события, прошедшие дедупликацию и бизнес-фильтры.
-    if queued:
-        spawn_background_processing(event.id)
+        # 1) Фиксируем входящее событие в локальной БД.
+        event, queued = enqueue_call_webhook(payload)
+        # 2) Ставим в Celery только события, прошедшие дедупликацию и бизнес-фильтры.
+        if queued:
+            spawn_background_processing(event.id)
 
-    return JsonResponse(
-        {
-            "success": True,
-            "event_id": event.id,
-            "status": event.status,
-            "queued": queued,
-        },
-        status=202,
-    )
+        return JsonResponse(
+            {
+                "success": True,
+                "event_id": event.id,
+                "status": event.status,
+                "queued": queued,
+            },
+            status=202,
+        )
+    except Exception as exc:
+        logger.exception("bitrix_call_webhook failed")
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "webhook_processing_failed",
+                "details": str(exc),
+            },
+            status=200,
+        )
 
 
 @require_GET
@@ -39,22 +53,33 @@ def download_call_to_server(request):
     if not record_file_id:
         return JsonResponse({"error": "record_file_id is required"}, status=400)
 
-    event = CallWebhookEvent.objects.create(
-        event_name="manual_download",
-        record_file_id=str(record_file_id),
-        raw_payload={"record_file_id": record_file_id, "source": "manual"},
-    )
-    # Ручной эндпоинт для отладки: тоже отправляем в очередь, как и обычный вебхук.
-    spawn_background_processing(event.id)
+    try:
+        event = CallWebhookEvent.objects.create(
+            event_name="manual_download",
+            record_file_id=str(record_file_id),
+            raw_payload={"record_file_id": record_file_id, "source": "manual"},
+        )
+        # Ручной эндпоинт для отладки: тоже отправляем в очередь, как и обычный вебхук.
+        spawn_background_processing(event.id)
 
-    return JsonResponse(
-        {
-            "success": True,
-            "event_id": event.id,
-            "status": event.status,
-        },
-        status=202,
-    )
+        return JsonResponse(
+            {
+                "success": True,
+                "event_id": event.id,
+                "status": event.status,
+            },
+            status=202,
+        )
+    except Exception as exc:
+        logger.exception("download_call_to_server failed")
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "manual_download_failed",
+                "details": str(exc),
+            },
+            status=500,
+        )
 
 
 def _extract_payload(request):

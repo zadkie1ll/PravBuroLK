@@ -964,8 +964,9 @@ def _archive_processed_event(event: CallWebhookEvent) -> None:
     Копируем только успешно завершенные кейсы в archive DB.
     Это дает "чистую" выборку для последующей аналитики без шумовых webhook-событий.
     """
+    archive_alias = getattr(settings, "COMMUNICATIONS_ARCHIVE_DB_ALIAS", "archive")
     try:
-        ProcessedCallArchive.objects.using("archive").create(
+        ProcessedCallArchive.objects.using(archive_alias).create(
             source_event_id=event.id,
             call_id=event.call_id,
             lead_id=event.lead_id,
@@ -977,7 +978,12 @@ def _archive_processed_event(event: CallWebhookEvent) -> None:
             analysis=event.analysis or {},
             source_payload=event.raw_payload or {},
         )
-        _log(event, CallProcessingLog.Level.INFO, "Archived processed call to archive DB")
+        _log(
+            event,
+            CallProcessingLog.Level.INFO,
+            "Archived processed call",
+            {"archive_db_alias": archive_alias},
+        )
     except Exception as exc:
         _log(
             event,
