@@ -77,12 +77,28 @@ def _fetch_lawyer_info(bitrix_deal_id: str | int, debug_steps: list[str] | None 
         return None
 
     debug_steps.append(f"Шаг 2: найден ASSIGNED_BY_ID={assigned_by_id}, запрашиваем user.get")
-    users = _bitrix_call("user.get", {"filter": {"ID": assigned_by_id}})
+    # Для user.get фильтр через вложенный dict может быть проигнорирован.
+    # Передаем filter[ID] в плоском виде, чтобы Bitrix точно отфильтровал пользователя.
+    users = _bitrix_call("user.get", {"filter[ID]": assigned_by_id})
     if not users:
         debug_steps.append("Шаг 2 FAIL: user.get вернул пустой список")
         return None
 
-    user = users[0]
+    user = None
+    assigned_by_id_str = str(assigned_by_id).strip()
+    for candidate in users:
+        if str(candidate.get("ID", "")).strip() == assigned_by_id_str:
+            user = candidate
+            break
+    if user is None:
+        user = users[0]
+        debug_steps.append(
+            "Шаг 2 WARN: точное совпадение user.ID с ASSIGNED_BY_ID не найдено, взят первый элемент"
+        )
+
+    debug_steps.append(
+        f"Шаг 2: выбран user.ID='{user.get('ID', '')}', всего записей user.get={len(users)}"
+    )
     first_name = str(user.get("NAME") or "").strip()
     last_name = str(user.get("LAST_NAME") or "").strip()
     email = str(user.get("EMAIL") or "").strip()
