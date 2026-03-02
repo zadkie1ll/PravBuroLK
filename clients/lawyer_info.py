@@ -15,7 +15,7 @@ BITRIX_WEBHOOK_URL = getattr(
     "BITRIX_WEBHOOK_URL",
     "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/",
 ).rstrip("/")
-MEGAFON_VATS_WEBHOOK_URL = getattr(settings, "MEGAFON_VATS_WEBHOOK_URL", "")
+MEGAFON_VATS_WEBHOOK_URL = "https://vats671653.megapbx.ru/crmapi/v1"
 LAWYER_INFO_CACHE_TTL = int(getattr(settings, "LAWYER_INFO_CACHE_TTL", 300))
 
 

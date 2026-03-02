@@ -20,7 +20,7 @@ from clients.lawyer_info import get_client_lawyer_info
 from django.db import transaction
 from .models import Employee
 from payments.utilities import get_deal_data_from_bitrix
-
+BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
 
 def confident_police(request):
     return render(request, "policy.html")
