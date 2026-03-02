@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path
+from django.urls import include, path
 from clients.views import client_dashboard, redirect_handler, referral_page, mark_stage_popup_shown, employee_referral_view
 from clients.views import CustomLoginView, TestCreateClientView, stage_detail, dashboard_stats, confident_police, bitrix_deal_webhook
 from django.contrib.auth.views import LogoutView
@@ -36,6 +36,7 @@ from urlshorter.views import generate_url, show_stats
 from yclients.views import yclients_webhook
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path("march/", include("telki.urls")),
     path("api/calc-km/", calc_km_for_deal, name="calc_km_for_deal"),
     path("api/sync-regions/", sync_regions_from_bitrix, name="sync_regions_from_bitrix"),
     path("api/createpdf/", build_consultation, name="pdf"),

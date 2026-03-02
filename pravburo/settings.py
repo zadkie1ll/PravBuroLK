@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "documents",
     "education_platform",
     "urlshorter",
+    "telki",
 
     "corsheaders",
     "simple_history",
