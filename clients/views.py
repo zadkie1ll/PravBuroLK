@@ -16,6 +16,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.views import View
 from clients.services import ClientService
+from clients.lawyer_info import get_client_lawyer_info
 from django.db import transaction
 from .models import Employee
 from payments.utilities import get_deal_data_from_bitrix
@@ -50,6 +51,7 @@ def get_client_ip(request):
 @login_required
 def client_dashboard(request):
     client = request.user.client
+    lawyer_info = get_client_lawyer_info(client.bitrix_id)
 
     content_type = ContentType.objects.get_for_model(client)
     ip_address = request.META.get('REMOTE_ADDR')
@@ -156,6 +158,7 @@ def client_dashboard(request):
 
     context = {
         "client": client,
+        "lawyer_info": lawyer_info,
         "contract": contract,
         "contract_final_amount": contract_final_amount,
         "installment_plan": installment_plan,

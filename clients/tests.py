@@ -1,7 +1,11 @@
 import sys
 from decimal import Decimal
+from unittest.mock import Mock, patch
 from django.test import TestCase
+from django.test import SimpleTestCase, override_settings
+from django.core.cache import cache
 from clients.services import ClientService
+from clients.lawyer_info import get_client_lawyer_info
 from colorama import init, Fore, Style
 
 init(autoreset=True)
@@ -122,3 +126,87 @@ class ClientServiceFullTests(TestCase):
             self.fail("Ожидалось исключение")
         except ValueError:
             self._ok(f"{test_name}: OK (исключение поймано)")
+
+
+@override_settings(
+    MEGAFON_VATS_WEBHOOK_URL="https://megafon.test/webhook",
+    LAWYER_INFO_CACHE_TTL=60,
+)
+class ClientLawyerInfoTests(SimpleTestCase):
+    def setUp(self):
+        cache.clear()
+
+    @patch("clients.lawyer_info.requests.post")
+    @patch("clients.lawyer_info.requests.get")
+    def test_get_client_lawyer_info_merges_bitrix_and_megafon_data(self, mock_get, mock_post):
+        deal_response = Mock()
+        deal_response.raise_for_status.return_value = None
+        deal_response.json.return_value = {"result": {"ASSIGNED_BY_ID": "24"}}
+
+        user_response = Mock()
+        user_response.raise_for_status.return_value = None
+        user_response.json.return_value = {
+            "result": [
+                {
+                    "NAME": "Иван",
+                    "LAST_NAME": "Иванов",
+                    "EMAIL": "ivanov@example.com",
+                    "SECOND_NAME": "",
+                    "PERSONAL_PHOTO": "",
+                }
+            ]
+        }
+        mock_get.side_effect = [deal_response, user_response]
+
+        megafon_response = Mock()
+        megafon_response.raise_for_status.return_value = None
+        megafon_response.json.return_value = {
+            "result": [
+                {
+                    "first_name": "Иван",
+                    "last_name": "Иванов",
+                    "phone": "+79990001122",
+                    "otchestvo": "https://img.example.com/avatar.jpg",
+                }
+            ]
+        }
+        mock_post.return_value = megafon_response
+
+        data = get_client_lawyer_info("1001")
+
+        self.assertEqual(data["first_name"], "Иван")
+        self.assertEqual(data["last_name"], "Иванов")
+        self.assertEqual(data["email"], "ivanov@example.com")
+        self.assertEqual(data["phone"], "+79990001122")
+        self.assertEqual(data["avatar_url"], "https://img.example.com/avatar.jpg")
+
+    @patch("clients.lawyer_info.requests.post")
+    @patch("clients.lawyer_info.requests.get")
+    def test_get_client_lawyer_info_uses_cache(self, mock_get, mock_post):
+        deal_response = Mock()
+        deal_response.raise_for_status.return_value = None
+        deal_response.json.return_value = {"result": {"ASSIGNED_BY_ID": "99"}}
+
+        user_response = Mock()
+        user_response.raise_for_status.return_value = None
+        user_response.json.return_value = {
+            "result": [
+                {
+                    "NAME": "Анна",
+                    "LAST_NAME": "Смирнова",
+                    "EMAIL": "anna@example.com",
+                }
+            ]
+        }
+        mock_get.side_effect = [deal_response, user_response]
+
+        megafon_response = Mock()
+        megafon_response.raise_for_status.return_value = None
+        megafon_response.json.return_value = {"result": []}
+        mock_post.return_value = megafon_response
+
+        first = get_client_lawyer_info("2002")
+        second = get_client_lawyer_info("2002")
+
+        self.assertEqual(first, second)
+        self.assertEqual(mock_get.call_count, 2)
