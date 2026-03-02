@@ -80,6 +80,22 @@
   {% else %}
     <p class="text-slate-500">Данные по сопровождающему юристу пока недоступны.</p>
   {% endif %}
+
+  {% if lawyer_debug_enabled %}
+  <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-slate-700">
+    <p class="font-semibold mb-2">Debug lawyer_info:</p>
+    <p class="mb-2">Для принудительного обхода cache используйте `?lawyer_debug=1&lawyer_refresh=1`.</p>
+    {% if lawyer_debug_steps %}
+      <ul class="list-disc pl-5 space-y-1">
+        {% for step in lawyer_debug_steps %}
+          <li>{{ step }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Шаги дебага отсутствуют.</p>
+    {% endif %}
+  </div>
+  {% endif %}
 </section>
 
 <section id="stages-wrapper" class="bg-gradient-to-tr from-white to-blue-100 shadow-md rounded-2xl p-8">

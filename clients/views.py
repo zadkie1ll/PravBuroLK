@@ -51,7 +51,20 @@ def get_client_ip(request):
 @login_required
 def client_dashboard(request):
     client = request.user.client
-    lawyer_info = get_client_lawyer_info(client.bitrix_id)
+    lawyer_debug_enabled = request.GET.get("lawyer_debug") == "1"
+    lawyer_debug_force_refresh = request.GET.get("lawyer_refresh") == "1"
+
+    if lawyer_debug_enabled:
+        lawyer_payload = get_client_lawyer_info(
+            client.bitrix_id,
+            include_debug=True,
+            force_refresh=lawyer_debug_force_refresh,
+        ) or {}
+        lawyer_info = lawyer_payload.get("info")
+        lawyer_debug_steps = lawyer_payload.get("debug_steps", [])
+    else:
+        lawyer_info = get_client_lawyer_info(client.bitrix_id)
+        lawyer_debug_steps = []
 
     content_type = ContentType.objects.get_for_model(client)
     ip_address = request.META.get('REMOTE_ADDR')
@@ -159,6 +172,8 @@ def client_dashboard(request):
     context = {
         "client": client,
         "lawyer_info": lawyer_info,
+        "lawyer_debug_enabled": lawyer_debug_enabled,
+        "lawyer_debug_steps": lawyer_debug_steps,
         "contract": contract,
         "contract_final_amount": contract_final_amount,
         "installment_plan": installment_plan,

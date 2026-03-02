@@ -31,58 +31,93 @@ class LawyerInfo:
         return asdict(self)
 
 
-def get_client_lawyer_info(bitrix_deal_id: str | int | None) -> dict[str, str] | None:
+def get_client_lawyer_info(
+    bitrix_deal_id: str | int | None,
+    include_debug: bool = False,
+    force_refresh: bool = False,
+) -> dict[str, Any] | None:
     """
     Возвращает данные сопровождающего юриста клиента:
     - имя/фамилия/email из Bitrix ответственного по сделке
     - телефон из webhook Мегафона по имени + фамилии
     - avatar_url из поля отчества (если там URL) либо из Bitrix-фото
     """
+    debug_steps: list[str] = []
     if not bitrix_deal_id:
-        return None
+        debug_steps.append("Client.bitrix_id пустой: нельзя получить сделку в Bitrix")
+        return {"info": None, "debug_steps": debug_steps} if include_debug else None
 
     cache_key = f"client-lawyer-info:{bitrix_deal_id}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
+    if not force_refresh:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            debug_steps.append("Данные взяты из cache")
+            return {"info": cached, "debug_steps": debug_steps} if include_debug else cached
 
     try:
-        info = _fetch_lawyer_info(bitrix_deal_id)
-    except Exception:
+        info = _fetch_lawyer_info(bitrix_deal_id, debug_steps=debug_steps)
+    except Exception as exc:
         logger.exception("Failed to load lawyer info for deal %s", bitrix_deal_id)
+        debug_steps.append(f"Критическая ошибка: {exc}")
         info = None
 
     cache.set(cache_key, info, LAWYER_INFO_CACHE_TTL)
-    return info
+    return {"info": info, "debug_steps": debug_steps} if include_debug else info
 
 
-def _fetch_lawyer_info(bitrix_deal_id: str | int) -> dict[str, str] | None:
+def _fetch_lawyer_info(bitrix_deal_id: str | int, debug_steps: list[str] | None = None) -> dict[str, str] | None:
+    debug_steps = debug_steps if debug_steps is not None else []
+    debug_steps.append(f"Шаг 1: запрос сделки crm.deal.get по ID={bitrix_deal_id}")
     deal = _bitrix_call("crm.deal.get", {"ID": bitrix_deal_id})
+    debug_steps.append("Шаг 1 OK: сделка получена")
+
     assigned_by_id = (deal or {}).get("ASSIGNED_BY_ID")
     if not assigned_by_id:
+        debug_steps.append("Шаг 2 FAIL: в сделке нет ASSIGNED_BY_ID")
         return None
 
+    debug_steps.append(f"Шаг 2: найден ASSIGNED_BY_ID={assigned_by_id}, запрашиваем user.get")
     users = _bitrix_call("user.get", {"filter": {"ID": assigned_by_id}})
     if not users:
+        debug_steps.append("Шаг 2 FAIL: user.get вернул пустой список")
         return None
 
     user = users[0]
     first_name = str(user.get("NAME") or "").strip()
     last_name = str(user.get("LAST_NAME") or "").strip()
     email = str(user.get("EMAIL") or "").strip()
+    debug_steps.append(
+        "Шаг 2 OK: из Bitrix user получены "
+        f"NAME='{first_name}', LAST_NAME='{last_name}', EMAIL='{email}'"
+    )
 
     middle_raw = str(user.get("SECOND_NAME") or "").strip()
     avatar_url = middle_raw if _is_url(middle_raw) else ""
+    if avatar_url:
+        debug_steps.append("Шаг 3: avatar_url взят из SECOND_NAME (отчество)")
+    else:
+        debug_steps.append("Шаг 3: SECOND_NAME не содержит URL аватара")
 
     if not avatar_url:
         personal_photo = user.get("PERSONAL_PHOTO")
         if _is_url(personal_photo):
             avatar_url = str(personal_photo)
+            debug_steps.append("Шаг 3: avatar_url взят из PERSONAL_PHOTO")
 
-    megafon_row = _fetch_employee_from_megafon(first_name, last_name)
+    debug_steps.append("Шаг 4: запрос в Megafon VATS webhook по имени/фамилии")
+    megafon_row = _fetch_employee_from_megafon(first_name, last_name, debug_steps=debug_steps)
     phone = _extract_phone(megafon_row)
+    if phone:
+        debug_steps.append(f"Шаг 4 OK: найден телефон '{phone}'")
+    else:
+        debug_steps.append("Шаг 4: телефон не найден в ответе Мегафона")
+
     if not avatar_url:
         avatar_url = _extract_avatar_url(megafon_row) or ""
+        if avatar_url:
+            debug_steps.append("Шаг 5: avatar_url взят из ответа Мегафона")
+        else:
+            debug_steps.append("Шаг 5: avatar_url не найден в Мегафоне")
 
     info = LawyerInfo(
         first_name=first_name,
@@ -91,6 +126,7 @@ def _fetch_lawyer_info(bitrix_deal_id: str | int) -> dict[str, str] | None:
         phone=phone,
         avatar_url=avatar_url,
     )
+    debug_steps.append("Итог: профиль юриста собран")
     return info.as_dict()
 
 
@@ -104,8 +140,17 @@ def _bitrix_call(method: str, params: dict[str, Any]) -> Any:
     return payload.get("result")
 
 
-def _fetch_employee_from_megafon(first_name: str, last_name: str) -> dict[str, Any] | None:
+def _fetch_employee_from_megafon(
+    first_name: str,
+    last_name: str,
+    debug_steps: list[str] | None = None,
+) -> dict[str, Any] | None:
+    debug_steps = debug_steps if debug_steps is not None else []
     if not MEGAFON_VATS_WEBHOOK_URL or not first_name or not last_name:
+        if not MEGAFON_VATS_WEBHOOK_URL:
+            debug_steps.append("Megafon webhook URL не настроен (MEGAFON_VATS_WEBHOOK_URL пустой)")
+        if not first_name or not last_name:
+            debug_steps.append("Нельзя искать в Мегафоне: пустые имя или фамилия")
         return None
 
     payload = {
@@ -121,9 +166,15 @@ def _fetch_employee_from_megafon(first_name: str, last_name: str) -> dict[str, A
         data = response.json()
     except Exception:
         logger.exception("Megafon VATS webhook request failed")
+        debug_steps.append("Megafon webhook request завершился ошибкой")
         return None
 
-    return _find_employee_row(data, first_name, last_name)
+    row = _find_employee_row(data, first_name, last_name)
+    if row:
+        debug_steps.append("Megafon: сотрудник найден по имени/фамилии")
+    else:
+        debug_steps.append("Megafon: сотрудник по имени/фамилии не найден")
+    return row
 
 
 def _extract_phone(row: dict[str, Any] | None) -> str:
