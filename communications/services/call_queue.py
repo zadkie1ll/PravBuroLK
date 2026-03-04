@@ -15,7 +15,7 @@ from communications.models import CallProcessingLog, CallWebhookEvent, Processed
 load_dotenv(find_dotenv())
 
 logger = logging.getLogger(__name__)
-BITRIX_WEBHOOK = os.getenv("BITRIX_WEBHOOK", "")
+BITRIX_WEBHOOK = os.getenv("BITRIX_WEBHOOK", "https://prav-buro.bitrix24.ru/rest/24/kod9fyniu51siemd")
 MIN_CALL_DURATION_SECONDS = int(os.getenv("MIN_CALL_DURATION_SECONDS", "300"))
 BITRIX_STAT_POLL_TIMEOUT_SECONDS = float(os.getenv("BITRIX_STAT_POLL_TIMEOUT_SECONDS", "180"))
 BITRIX_STAT_POLL_INTERVAL_SECONDS = float(os.getenv("BITRIX_STAT_POLL_INTERVAL_SECONDS", "3"))
@@ -38,6 +38,18 @@ ALLOWED_CRM_ENTITY_TYPES = {
 
 class BitrixWebhookError(Exception):
     pass
+
+
+def _get_bitrix_webhook() -> str:
+    # Backward compatibility: some environments use BITRIX_WEBHOOK_URL.
+    value = (
+        os.getenv("BITRIX_WEBHOOK")
+        or os.getenv("BITRIX_WEBHOOK_URL")
+        or getattr(settings, "BITRIX_WEBHOOK", "")
+        or getattr(settings, "BITRIX_WEBHOOK_URL", "")
+        or BITRIX_WEBHOOK
+    )
+    return str(value or "").strip()
 
 
 def enqueue_call_webhook(payload: dict[str, Any]) -> tuple[CallWebhookEvent, bool]:
@@ -497,10 +509,11 @@ def _is_call_without_recording(event: CallWebhookEvent) -> bool:
 def _get_call_stat_by_call_id(call_id: str) -> dict[str, Any]:
     if not call_id:
         return {}
-    if not BITRIX_WEBHOOK:
+    bitrix_webhook = _get_bitrix_webhook()
+    if not bitrix_webhook:
         raise BitrixWebhookError("BITRIX_WEBHOOK is not configured")
 
-    url = f"{BITRIX_WEBHOOK.rstrip('/')}/voximplant.statistic.get"
+    url = f"{bitrix_webhook.rstrip('/')}/voximplant.statistic.get"
     params = {"FILTER[CALL_ID]": call_id}
     response = requests.get(url, params=params, timeout=20)
 
@@ -598,7 +611,8 @@ def _post_call_result_comment(
     transcript: list[Any],
     analysis: dict[str, Any],
 ) -> None:
-    if not BITRIX_WEBHOOK:
+    bitrix_webhook = _get_bitrix_webhook()
+    if not bitrix_webhook:
         raise BitrixWebhookError("BITRIX_WEBHOOK is not configured")
 
     transcript_text = _format_transcript_for_comment(transcript, analysis.get("speaker_map"))
@@ -615,7 +629,7 @@ def _post_call_result_comment(
         f"{transcript_text}"
     )
 
-    url = f"{BITRIX_WEBHOOK.rstrip('/')}/crm.timeline.comment.add"
+    url = f"{bitrix_webhook.rstrip('/')}/crm.timeline.comment.add"
     payload: dict[str, Any] = {
         "fields[ENTITY_ID]": str(entity_id),
         "fields[COMMENT]": comment,
@@ -807,10 +821,11 @@ def _seconds_to_mmss(seconds: float) -> str:
 
 
 def _download_record_file(record_file_id: str) -> str:
-    if not BITRIX_WEBHOOK:
+    bitrix_webhook = _get_bitrix_webhook()
+    if not bitrix_webhook:
         raise BitrixWebhookError("BITRIX_WEBHOOK is not configured")
 
-    external_link_url = f"{BITRIX_WEBHOOK.rstrip('/')}/disk.file.get"
+    external_link_url = f"{bitrix_webhook.rstrip('/')}/disk.file.get"
     link_response = requests.get(external_link_url, params={"id": record_file_id}, timeout=20)
     if not link_response.ok:
         raise BitrixWebhookError(f"Failed to get DOWNLOAD_URL: {link_response.text}")
