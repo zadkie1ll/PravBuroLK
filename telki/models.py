@@ -33,10 +33,11 @@ class March8Greeting(models.Model):
         null=True,
         verbose_name="Астрологическая картинка",
     )
-    certificate_url = models.URLField(
+    certificate_pdf = models.FileField(
+        upload_to="telki/certificates/",
         blank=True,
         null=True,
-        verbose_name="Ссылка на сертификат",
+        verbose_name="PDF-сертификат",
     )
 
     token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False, db_index=True)

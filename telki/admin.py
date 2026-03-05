@@ -14,7 +14,7 @@ class March8GreetingAdmin(admin.ModelAdmin):
         "zodiac_display",
         "numerology_display",
         "has_astrology_image",
-        "has_certificate_url",
+        "has_certificate_pdf",
         "is_active",
     )
     list_filter = ("is_active", "birth_date")
@@ -26,7 +26,7 @@ class March8GreetingAdmin(admin.ModelAdmin):
         "zodiac_display",
         "numerology_display",
         "preview_card_link",
-        "preview_certificate_link",
+        "preview_pdf_link",
     )
     actions = ("generate_selected_assets", "regenerate_selected_assets")
     autocomplete_fields = ("client",)
@@ -50,7 +50,7 @@ class March8GreetingAdmin(admin.ModelAdmin):
                 "fields": (
                     "custom_background",
                     "astrology_image",
-                    "certificate_url",
+                    "certificate_pdf",
                 )
             },
         ),
@@ -61,7 +61,7 @@ class March8GreetingAdmin(admin.ModelAdmin):
                     "zodiac_display",
                     "numerology_display",
                     "preview_card_link",
-                    "preview_certificate_link",
+                    "preview_pdf_link",
                 )
             },
         ),
@@ -80,9 +80,9 @@ class March8GreetingAdmin(admin.ModelAdmin):
     def has_astrology_image(self, obj):
         return bool(obj.astrology_image)
 
-    @admin.display(description="Сертификат")
-    def has_certificate_url(self, obj):
-        return bool(obj.certificate_url)
+    @admin.display(description="PDF")
+    def has_certificate_pdf(self, obj):
+        return bool(obj.certificate_pdf)
 
     @admin.display(description="Открыть карточку")
     def preview_card_link(self, obj):
@@ -91,14 +91,14 @@ class March8GreetingAdmin(admin.ModelAdmin):
         url = reverse("telki:card", args=[obj.token])
         return format_html('<a href="{}" target="_blank">Открыть</a>', url)
 
-    @admin.display(description="Открыть сертификат")
-    def preview_certificate_link(self, obj):
+    @admin.display(description="Скачать PDF")
+    def preview_pdf_link(self, obj):
         if not obj.pk:
             return "Сохраните объект"
-        url = reverse("telki:certificate-link", args=[obj.token])
-        return format_html('<a href="{}" target="_blank">Открыть</a>', url)
+        url = reverse("telki:certificate-pdf", args=[obj.token])
+        return format_html('<a href="{}" target="_blank">Скачать</a>', url)
 
-    @admin.action(description="Сгенерировать картинку")
+    @admin.action(description="Сгенерировать картинку и PDF")
     def generate_selected_assets(self, request, queryset):
         count = 0
         for obj in queryset:
@@ -106,7 +106,7 @@ class March8GreetingAdmin(admin.ModelAdmin):
             count += 1
         self.message_user(request, f"Готово: обработано {count} записей.")
 
-    @admin.action(description="Перегенерировать картинку")
+    @admin.action(description="Перегенерировать картинку и PDF")
     def regenerate_selected_assets(self, request, queryset):
         count = 0
         for obj in queryset:
