@@ -2,6 +2,7 @@ import os
 import json
 import tempfile
 import requests
+from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML
 
@@ -17,7 +18,7 @@ def rub(amount):
     if amount is None:
         return ""
     amount = int(float(amount))
-    return f"{amount:,}".replace(",", " ") + "Р"
+    return f"{amount:,}".replace(",", ".") + "₽"
 
 
 def parse_amount(val):
@@ -32,6 +33,16 @@ def parse_amount(val):
         return float(amt)
     except ValueError:
         return None
+
+
+def format_consultation_datetime(raw_value: str) -> tuple[str, str]:
+    if not raw_value:
+        return "", ""
+    try:
+        dt = datetime.strptime(str(raw_value), "%Y-%m-%d %H:%M")
+        return dt.strftime("%d.%m.%Y"), dt.strftime("%H:%M")
+    except ValueError:
+        return str(raw_value), ""
 
 
 def download_photo(url: str, filepath: str):
@@ -84,37 +95,6 @@ def generate_placeholder_avatar(filepath: str, size_px: int = 220) -> str:
     return filepath
 
 
-def generate_bar_chart(work_cost, installment, filepath: str):
-    """
-    Рисует график и сохраняет в filepath.
-    Возвращает filepath.
-    """
-    work_cost = work_cost or 0
-    installment = installment or 0
-
-    labels = ["Стоимость", "Сумма долга"]
-    values = [work_cost, installment]
-
-    fig, ax = plt.subplots(figsize=(6, 2))
-    ax.barh(labels, values, height=0.2)
-    ax.tick_params(axis="y", labelsize=26)
-
-    mx = max(values) if max(values) > 0 else 1
-    for i, v in enumerate(values):
-        ax.text(v + mx * 0.01, i, rub(v), va="center", ha="left", fontsize=26)
-
-    # Clean look
-    for s in ["top", "right", "bottom", "left"]:
-        ax.spines[s].set_visible(False)
-    ax.set_xticks([])
-    ax.tick_params(axis="y", length=0)
-
-    plt.tight_layout()
-    fig.savefig(filepath, bbox_inches="tight", transparent=True, dpi=150)
-    plt.close(fig)
-    return filepath
-
-
 # ---------- main PDF generator ----------
 def generate_pdf(data) -> bytes:
     """
@@ -141,6 +121,17 @@ def generate_pdf(data) -> bytes:
     data["finance"]["work_cost_rub"] = rub(work_cost)
     data["finance"]["work_bonus_rub"] = rub(work_bonus)
     data["finance"]["installment_plan"] = rub(installment)
+    max_finance_value = max(debt or 0, work_cost or 0, 1)
+    debt_ratio = max(4, min(((debt or 0) / max_finance_value) * 100, 96))
+    cost_ratio = max(4, min(((work_cost or 0) / max_finance_value) * 100, 96))
+    data["finance"]["debt_ratio_percent"] = f"{debt_ratio:.2f}%"
+    data["finance"]["cost_ratio_percent"] = f"{cost_ratio:.2f}%"
+    data["finance"]["debt_ratio_value"] = round(debt_ratio, 2)
+    data["finance"]["cost_ratio_value"] = round(cost_ratio, 2)
+
+    consult_date, consult_time = format_consultation_datetime(data["consultation"]["date"])
+    data["consultation"]["date_only"] = consult_date
+    data["consultation"]["time_only"] = consult_time
 
     # ---- income fields for template (official + after KM) ----
     show_km = bool(data.get("summary", {}).get("show_km", False))
@@ -172,11 +163,6 @@ def generate_pdf(data) -> bytes:
     data["summary"]["income_rub"] = data["summary"]["official_income_rub"]
 
     with tempfile.TemporaryDirectory() as tmp:
-        # chart
-        bar_chart_path = os.path.join(tmp, "bar_chart.png")
-        generate_bar_chart(work_cost, debt, bar_chart_path)
-        data["finance"]["bar_chart_file"] = "bar_chart.png"
-
         # photo: download or placeholder
         photo_url = data.get("manager", {}).get("photo")
         photo_path = os.path.join(tmp, "manager_photo.jpg")

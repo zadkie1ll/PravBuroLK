@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date
 from io import BytesIO
 import random
-import textwrap
 import uuid
 from pathlib import Path
 
@@ -11,11 +10,6 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.utils.text import slugify
 from PIL import Image, ImageDraw, ImageFont
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.utils import ImageReader
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfgen import canvas
 
 from .models import March8Greeting
 
@@ -36,7 +30,6 @@ _ZODIAC_RANGES = (
     ((12, 32), "Козерог"),
 )
 
-_FONT_NAME = "TelkiSFPro"
 _FONT_PATHS = (
     Path(settings.BASE_DIR) / "static/fonts/SF-Pro.ttf",
     Path(settings.BASE_DIR) / "static/fonts/tt-norms-medium.otf",
@@ -68,20 +61,6 @@ def _load_pillow_font(size: int) -> ImageFont.ImageFont:
             except OSError:
                 continue
     return ImageFont.load_default()
-
-
-def _ensure_reportlab_font() -> str:
-    if _FONT_NAME in pdfmetrics.getRegisteredFontNames():
-        return _FONT_NAME
-
-    for font_path in _FONT_PATHS:
-        if font_path.exists():
-            try:
-                pdfmetrics.registerFont(TTFont(_FONT_NAME, str(font_path)))
-                return _FONT_NAME
-            except Exception:
-                continue
-    return "Helvetica"
 
 
 def build_astrology_image_bytes(greeting: March8Greeting) -> bytes:
@@ -123,101 +102,6 @@ def build_astrology_image_bytes(greeting: March8Greeting) -> bytes:
     return output.getvalue()
 
 
-def _split_for_pdf(text: str, font_name: str, font_size: int, max_width: float) -> list[str]:
-    lines: list[str] = []
-    for paragraph in text.splitlines() or [""]:
-        if not paragraph.strip():
-            lines.append("")
-            continue
-        current = ""
-        for word in paragraph.split():
-            candidate = f"{current} {word}".strip()
-            width = pdfmetrics.stringWidth(candidate, font_name, font_size)
-            if width <= max_width:
-                current = candidate
-            else:
-                if current:
-                    lines.append(current)
-                # Если слово очень длинное, разбиваем принудительно.
-                if pdfmetrics.stringWidth(word, font_name, font_size) > max_width:
-                    for chunk in textwrap.wrap(word, 20):
-                        lines.append(chunk)
-                    current = ""
-                else:
-                    current = word
-        if current:
-            lines.append(current)
-    return lines
-
-
-def build_certificate_pdf_bytes(greeting: March8Greeting) -> bytes:
-    font_name = _ensure_reportlab_font()
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    page_w, page_h = A4
-
-    if greeting.custom_background and greeting.custom_background.name:
-        try:
-            c.drawImage(
-                ImageReader(greeting.custom_background.path),
-                0,
-                0,
-                width=page_w,
-                height=page_h,
-                preserveAspectRatio=True,
-                mask="auto",
-            )
-        except Exception:
-            pass
-    else:
-        c.setFillColorRGB(0.96, 0.90, 0.96)
-        c.rect(0, 0, page_w, page_h, fill=1, stroke=0)
-
-    c.setFillColorRGB(0.13, 0.12, 0.23)
-    c.setFont(font_name, 34)
-    c.drawCentredString(page_w / 2, page_h - 120, "Сертификат поздравления")
-
-    c.setFont(font_name, 28)
-    c.setFillColorRGB(0.37, 0.17, 0.34)
-    c.drawCentredString(page_w / 2, page_h - 180, "С 8 Марта")
-
-    c.setFillColorRGB(0.05, 0.05, 0.12)
-    c.setFont(font_name, 20)
-    c.drawCentredString(page_w / 2, page_h - 250, greeting.recipient_name)
-
-    zodiac = get_zodiac_sign(greeting.birth_date)
-    number = get_numerology_number(greeting.birth_date)
-
-    c.setFont(font_name, 14)
-    c.drawCentredString(
-        page_w / 2,
-        page_h - 285,
-        f"Знак зодиака: {zodiac}   |   Число судьбы: {number}",
-    )
-
-    left = 80
-    right = page_w - 80
-    text_box_top = page_h - 330
-    line_h = 20
-    c.setFont(font_name, 13)
-
-    lines = _split_for_pdf(greeting.personal_text, font_name, 13, right - left)
-    y = text_box_top
-    for line in lines:
-        if y < 120:
-            break
-        c.drawString(left, y, line)
-        y -= line_h
-
-    c.setFont(font_name, 12)
-    c.setFillColorRGB(0.3, 0.3, 0.4)
-    c.drawString(left, 70, "С любовью, команда ПравБюро")
-
-    c.showPage()
-    c.save()
-    return buffer.getvalue()
-
-
 def persist_generated_assets(greeting: March8Greeting, regenerate: bool = False) -> March8Greeting:
     changed_fields: list[str] = []
     slug_name = slugify(greeting.recipient_name or "pozdravlenie", allow_unicode=True) or "pozdravlenie"
@@ -228,12 +112,6 @@ def persist_generated_assets(greeting: March8Greeting, regenerate: bool = False)
         img_name = f"{slug_name}-{unique_suffix}-astro.png"
         greeting.astrology_image.save(img_name, ContentFile(img_bytes), save=False)
         changed_fields.append("astrology_image")
-
-    if regenerate or not greeting.certificate_pdf:
-        pdf_bytes = build_certificate_pdf_bytes(greeting)
-        pdf_name = f"{slug_name}-{unique_suffix}-8marta.pdf"
-        greeting.certificate_pdf.save(pdf_name, ContentFile(pdf_bytes), save=False)
-        changed_fields.append("certificate_pdf")
 
     if changed_fields:
         changed_fields.append("updated_at")

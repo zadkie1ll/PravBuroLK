@@ -142,7 +142,7 @@
     </section>
     <section class="right">
       <img class="astro" src="{% if greeting.astrology_image %}{{ greeting.astrology_image.url }}{% else %}{% url 'telki:astrology-image' greeting.token %}{% endif %}" alt="Астрологическая картинка">
-      <a class="btn" href="{% url 'telki:certificate-pdf' greeting.token %}">Скачать PDF-сертификат</a>
+      <a class="btn" href="{% url 'telki:certificate-link' greeting.token %}">Открыть сертификат</a>
     </section>
   </article>
 </body>
