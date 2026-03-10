@@ -45,23 +45,23 @@ class OtherPaymentInline(admin.TabularInline):
 @admin.register(Client)
 class ClientAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = (
-        'id', 'surname', 'name', 'middlename', 'bitrix_id', 'user',
-        'stage', 'referral_code', 'deal_id'
+        'id', 'surname', 'name', 'middlename', 'bitrix_id','bitrix_link', 'user',
+        'stage', 'referral_code',
         'need_stage_popup',       
         'stage_popup_shown',      
     )
     search_fields = ('surname', 'name', 'middlename', 'bitrix_id', 'user__username', 'referral_code')
     list_filter = ('bitrix_id', 'stage')
     ordering = ('surname', 'name')
-    readonly_fields = ('referral_code', 'installment_payments_list', 'deal_id')
+    readonly_fields = ('referral_code', 'installment_payments_list')
     inlines = [ContractInline, OtherPaymentInline]
     history_list_display = ['stage', 'user']  # 👈 доп. поля в истории
-
+    
     fieldsets = (
         (None, {
             "fields": (
                 'surname', 'name', 'middlename', 'bitrix_id', 'user',
-                'stage', 'referral_code', 'deal_id'
+                'stage', 'referral_code',
                 'need_stage_popup', 'stage_popup_shown',
                 'acquiring_enabled',   # ← добавлено
             ),
@@ -70,7 +70,14 @@ class ClientAdmin(SimpleHistoryAdmin):  # 👈 история включена
             "fields": ('installment_payments_list',),
         }),
     )
+    def bitrix_link(self, obj):
+        if not obj.bitrix_id:
+            return "-"
 
+        url = f"https://prav-buro.bitrix24.ru/crm/deal/details/{obj.bitrix_id}/"
+        return mark_safe(f'<a href="{url}" target="_blank">Открыть</a>')
+
+    bitrix_link.short_description = "Bitrix"
     def installment_payments_list(self, obj):
         payments = InstallmentPayment.objects.filter(plan__contract__client=obj).select_related("plan")
         if not payments.exists():
@@ -176,7 +183,7 @@ class OtherPaymentAdmin(SimpleHistoryAdmin):  # 👈 история включе
 
 @admin.register(Employee)
 class EmployeeAdmin(SimpleHistoryAdmin):  # 👈 история включена
-    list_display = ("id", "name", "bitrix_id", "referral_code", 'deal_id' "updated_at")
+    list_display = ("id", "name", "bitrix_id", "referral_code", "updated_at")
     search_fields = ("name", "bitrix_id", "referral_code")
     readonly_fields = ("referral_code", "updated_at")
     ordering = ("name",)
