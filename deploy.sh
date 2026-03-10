@@ -26,7 +26,7 @@ pip install -r requirements.txt
 
 if [[ "$DEPLOY_FRONTEND" == "1" ]]; then
   echo "[4/9] Build frontend (Vite)"
-
+  nvm use 24
   cd "$FRONT_DIR"
   VITE_BASE_PATH="${VITE_BASE_PATH:-/static/lms-front/}"
   VITE_APP_BASENAME="${VITE_APP_BASENAME:-/static/lms-front}"
