@@ -46,14 +46,14 @@ class OtherPaymentInline(admin.TabularInline):
 class ClientAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = (
         'id', 'surname', 'name', 'middlename', 'bitrix_id', 'user',
-        'stage', 'referral_code',
+        'stage', 'referral_code', 'deal_id'
         'need_stage_popup',       
         'stage_popup_shown',      
     )
     search_fields = ('surname', 'name', 'middlename', 'bitrix_id', 'user__username', 'referral_code')
     list_filter = ('bitrix_id', 'stage')
     ordering = ('surname', 'name')
-    readonly_fields = ('referral_code', 'installment_payments_list')
+    readonly_fields = ('referral_code', 'installment_payments_list', 'deal_id')
     inlines = [ContractInline, OtherPaymentInline]
     history_list_display = ['stage', 'user']  # 👈 доп. поля в истории
 
@@ -61,7 +61,7 @@ class ClientAdmin(SimpleHistoryAdmin):  # 👈 история включена
         (None, {
             "fields": (
                 'surname', 'name', 'middlename', 'bitrix_id', 'user',
-                'stage', 'referral_code',
+                'stage', 'referral_code', 'deal_id'
                 'need_stage_popup', 'stage_popup_shown',
                 'acquiring_enabled',   # ← добавлено
             ),
@@ -176,7 +176,7 @@ class OtherPaymentAdmin(SimpleHistoryAdmin):  # 👈 история включе
 
 @admin.register(Employee)
 class EmployeeAdmin(SimpleHistoryAdmin):  # 👈 история включена
-    list_display = ("id", "name", "bitrix_id", "referral_code", "updated_at")
+    list_display = ("id", "name", "bitrix_id", "referral_code", 'deal_id' "updated_at")
     search_fields = ("name", "bitrix_id", "referral_code")
     readonly_fields = ("referral_code", "updated_at")
     ordering = ("name",)
