@@ -45,7 +45,7 @@ class OtherPaymentInline(admin.TabularInline):
 @admin.register(Client)
 class ClientAdmin(SimpleHistoryAdmin):  # 👈 история включена
     list_display = (
-        'id', 'surname', 'name', 'middlename', 'bitrix_id','bitrix_link', 'user',
+        'id', 'surname', 'name', 'middlename', 'bitrix_id','bitrix_link', 'user', 'isBlocked',
         'stage', 'referral_code',
         'need_stage_popup',       
         'stage_popup_shown',      
@@ -60,7 +60,7 @@ class ClientAdmin(SimpleHistoryAdmin):  # 👈 история включена
     fieldsets = (
         (None, {
             "fields": (
-                'surname', 'name', 'middlename', 'bitrix_id', 'user',
+                'surname', 'name', 'middlename', 'bitrix_id', 'user', 'isBlocked',
                 'stage', 'referral_code',
                 'need_stage_popup', 'stage_popup_shown',
                 'acquiring_enabled',   # ← добавлено

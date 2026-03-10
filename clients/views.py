@@ -346,3 +346,39 @@ class CustomLogoutView(DjangoLogoutView):
             self.next_page = 'client_dashboard'
 
         return super().dispatch(request, *args, **kwargs)
+    
+@csrf_exempt
+@require_POST
+def setIsBlocked(request):
+    try:
+        bitrix_id = request.POST.get("bitrix_id")
+        if (not bitrix_id):
+            return JsonResponse({
+                "status" : 'error',
+                "message": "bitrix_id is required"},
+                status = 400
+                
+            )
+        try:
+            client = Client.objects.get(bitrix_id=bitrix_id)
+        except:
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": "No user with {bitrix_id} id found"
+                },
+                status=404
+            ) 
+        with transaction.atomic():
+            client.isBlocked = not client.isBlocked
+            client.save(update_fields=['isBlocked'])
+        return JsonResponse({
+            "status": "succeded",
+            "message": "user block status is changed"
+        },
+        status=200)
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e)
+        }, status=500)

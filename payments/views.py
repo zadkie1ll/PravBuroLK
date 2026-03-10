@@ -37,7 +37,6 @@ from .utilities import get_deal_data_from_bitrix, russian_to_translit, recreate_
 import telebot
 
 
-
 BOT_TOKEN = "8208949436:AAEIzi6eP5R04crpwpIchWnpqCCFv8TROvY"
 CHAT_ID = "-4907127148"
 
@@ -1339,8 +1338,8 @@ class BitrixCreateClientFromDealView(View):
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)
         
-        
-        
+
+
         
         
         

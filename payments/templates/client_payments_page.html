@@ -14,7 +14,21 @@
     ← Назад к поиску клиентов
 </a>
 
-
+{% if client.isBlocked %}
+<div style="
+    width:100%;
+    background:#d32f2f;
+    color:white;
+    text-align:center;
+    padding:12px;
+    font-weight:600;
+    font-size:16px;
+    position:relative;
+    z-index:1000;
+">
+    ⚠️ Этот клиент заблокирован.
+</div>
+{% endif %}
 <!-- Данные клиента -->
 <section class="bg-white rounded-2xl shadow p-6 mb-6">
   <h2 class="text-xl font-semibold mb-4">🧑‍💼 Данные клиента</h2>
