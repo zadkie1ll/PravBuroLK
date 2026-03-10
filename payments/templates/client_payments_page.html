@@ -29,6 +29,18 @@
       <span class="block text-gray-500">Имя</span>
       <span class="block font-medium text-gray-900">{{ client.name }}</span>
     </div>
+     <div>
+    <span class="block text-gray-500">Сделка в Bitrix</span>
+
+    <a href="https://prav-buro.bitrix24.ru/crm/deal/details/{{ client.bitrix_id }}/"
+       target="_blank"
+       class="inline-flex items-center gap-2 mt-1 px-4 py-2
+              bg-blue-600 text-white rounded-lg
+              hover:bg-blue-700 transition font-medium">
+
+        🔗 Открыть сделку
+    </a>
+</div>
 
     <div>
       <span class="block text-gray-500">Отчество</span>
