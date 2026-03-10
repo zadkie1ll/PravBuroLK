@@ -26,7 +26,7 @@ pip install -r requirements.txt
 
 if [[ "$DEPLOY_FRONTEND" == "1" ]]; then
   echo "[4/9] Build frontend (Vite)"
-  export PATH="/home/zadkiel/.nvm/versions/node/v24.14.0/bin/node:$PATH"
+  export PATH="/home/zadkiel/.nvm/versions/node/v24.14.0/bin:$PATH"
   cd "$FRONT_DIR"
   VITE_BASE_PATH="${VITE_BASE_PATH:-/static/lms-front/}"
   VITE_APP_BASENAME="${VITE_APP_BASENAME:-/static/lms-front}"
