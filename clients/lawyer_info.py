@@ -147,7 +147,7 @@ def _fetch_lawyer_info(bitrix_deal_id: str | int, debug_steps: list[str] | None 
 
 
 def _bitrix_call(method: str, params: dict[str, Any]) -> Any:
-    url = f"{BITRIX_WEBHOOK_URL}/{method}.json"
+    url = f"{BITRIX_WEBHOOK_URL}/{method}.json?"
     response = requests.get(url, params=params, timeout=15)
     response.raise_for_status()
     payload = response.json()
