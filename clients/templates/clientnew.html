@@ -29,7 +29,7 @@
   <img src="{% static 'img/logo1.svg' %}" alt="Логотип" class="w-56 h-auto">
 </div>
 
-{% if client.is_blocked %}
+{% if client.isBlocked %}
     <!-- Красная плашка сверху страницы -->
     <div style="background: #d32f2f; color: white; text-align: center; padding: 14px 20px; 
                 font-weight: bold; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; 
@@ -46,7 +46,7 @@
                     background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center;">
                     <div style="background: white; padding: 30px; border-radius: 12px; max-width: 420px; text-align: center;">
                         <h2 style="color: #d32f2f;">⛔ Клиент заблокирован</h2>
-                        <p>Доступ к карточке ограничен.<br>Обратитесь к администратору.</p>
+                        <p>Доступ к карточке ограничен.<br>Обратитесь к менеджеру.</p>
                         <button onclick="document.getElementById('blockModal').remove()" 
                                 style="margin-top: 20px; padding: 10px 30px; background: #d32f2f; color: white; border: none; border-radius: 6px; cursor: pointer;">
                             Понятно
