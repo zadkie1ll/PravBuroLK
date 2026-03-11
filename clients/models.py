@@ -82,7 +82,7 @@ class Client(models.Model):
         db_index=True,
         help_text="ID клиента в старой системе"
     )
-    isBlocked = models.BooleanField(null=True)
+    isBlocked = models.BooleanField(null=True, default=False)
 
     need_stage_popup = models.BooleanField(default=False, help_text="Нужно ли показать попап при входе")
     stage_popup_shown = models.BooleanField(default=False, help_text="Попап показан и закрыт пользователем")

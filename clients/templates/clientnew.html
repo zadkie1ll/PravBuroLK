@@ -29,7 +29,40 @@
   <img src="{% static 'img/logo1.svg' %}" alt="Логотип" class="w-56 h-auto">
 </div>
 
+{% if client.is_blocked %}
+    <!-- Красная плашка сверху страницы -->
+    <div style="background: #d32f2f; color: white; text-align: center; padding: 14px 20px; 
+                font-weight: bold; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; 
+                box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+        КЛИЕНТ ЗАБЛОКИРОВАН
+        {% if client.block_reason %}<br><small>{{ client.block_reason }}</small>{% endif %}
+    </div>
 
+    <!-- Автоматический popup при загрузке страницы -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const modalHTML = `
+                <div id="blockModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center;">
+                    <div style="background: white; padding: 30px; border-radius: 12px; max-width: 420px; text-align: center;">
+                        <h2 style="color: #d32f2f;">⛔ Клиент заблокирован</h2>
+                        <p>Доступ к карточке ограничен.<br>Обратитесь к администратору.</p>
+                        <button onclick="document.getElementById('blockModal').remove()" 
+                                style="margin-top: 20px; padding: 10px 30px; background: #d32f2f; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                            Понятно
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        });
+    </script>
+
+    <!-- Отступ сверху, чтобы контент не залезал под плашку -->
+    <style>
+        body { padding-top: 60px !important; }
+    </style>
+{% endif %}
 <section id="welcome" class="p-8 text-center space-y-4 mt-12">
   <h1 class="text-3xl md:text-4xl font-bold text-slate-700" style="font-family: 'TT Norms Medium', sans-serif;">
     Здравствуйте, {{ client.name }}
