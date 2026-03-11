@@ -51,6 +51,7 @@ fi
 
 echo "[6/9] Migrate"
 $PY manage.py makemigrations
+$PY manage.py makemigrations clients
 $PY manage.py migrate --noinput
 SPLIT_DB_AVAILABLE="$(
   $PY manage.py shell -c "from django.conf import settings; print(int({'logs','archive'}.issubset(set(settings.DATABASES.keys()))))" 2>/dev/null || echo 0
