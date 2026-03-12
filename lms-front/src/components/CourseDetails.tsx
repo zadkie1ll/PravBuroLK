@@ -1,5 +1,5 @@
 // CourseDetails.tsx
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { backend } from "../lib/utils";
 import {
@@ -101,6 +101,7 @@ const CourseDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const user_id = parseInt(localStorage.getItem("user") || "0", 10); // Получаем user_id
+  const navigate = useNavigate();
   const isSubmitDisabled =
   !test ||
   test.attempts_left <= 0 ||
@@ -337,6 +338,7 @@ const CourseDetails = () => {
           bgcolor: "white",
         }}
       >
+        <Button onClick={()=>navigate("/dashboard")}/>
         <Typography variant="h5" sx={{ fontWeight: "bold", mb: 1 }}>
           Модули курса
         </Typography>

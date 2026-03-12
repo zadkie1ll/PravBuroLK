@@ -28,7 +28,7 @@ const Dashboard = () => {
     const fetchCourses = async () => {
       if (!user_id || !department) {
         setError("Отсутствует информация о пользователе или отделе");
-        navigate("/dashboard", { replace: true });
+        navigate("/auth", { replace: true });
         setLoading(false);
         
         return;
