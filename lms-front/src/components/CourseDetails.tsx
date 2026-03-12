@@ -338,7 +338,7 @@ const CourseDetails = () => {
           bgcolor: "white",
         }}
       >
-        <Button onClick={()=>navigate("/dashboard")}/>
+        <Button onClick={()=>navigate("/dashboard")}>Вернуться в меню</Button>
         <Typography variant="h5" sx={{ fontWeight: "bold", mb: 1 }}>
           Модули курса
         </Typography>
