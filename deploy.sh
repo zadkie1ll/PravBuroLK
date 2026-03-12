@@ -25,28 +25,39 @@ echo "[3/9] Install deps"
 pip install -r requirements.txt
 
 if [[ "$DEPLOY_FRONTEND" == "1" ]]; then
-  echo "[4/9] Build frontend (Vite)"
-  export PATH="/home/zadkiel/.nvm/versions/node/v24.14.0/bin:$PATH"
-  cd "$FRONT_DIR"
-  VITE_BASE_PATH="${VITE_BASE_PATH:-/static/lms-front/}"
-  VITE_APP_BASENAME="${VITE_APP_BASENAME:-/static/lms-front}"
-  if [[ -f package-lock.json ]]; then
-    npm ci
-  else
-    npm install
-  fi
-  VITE_BACKEND_URL="${VITE_BACKEND_URL:-}" \
-  VITE_BASE_PATH="$VITE_BASE_PATH" \
-  VITE_APP_BASENAME="$VITE_APP_BASENAME" \
-  npm run build
+    echo "[4/9] Build frontend (Vite)"
+    export PATH="/home/zadkiel/.nvm/versions/node/v24.14.0/bin:$PATH"
+    cd "$FRONT_DIR"
 
-  echo "[5/9] Copy frontend dist to Django static"
-  rm -rf "$FRONT_STATIC_DIR"
-  mkdir -p "$FRONT_STATIC_DIR"
-  cp -R dist/. "$FRONT_STATIC_DIR/"
-  cd "$APP_DIR"
+    echo "=== Очистка кэша npm (убираем 'через раз') ==="
+    npm cache clean --force 2>/dev/null || true
+
+    echo "=== Установка пакетов (начало: $(date)) ==="
+    rm -rf node_modules .vite  # жёсткая очистка на всякий случай
+
+    if [[ -f package-lock.json ]]; then
+        echo "→ npm ci"
+        time npm ci --verbose --prefer-offline
+    else
+        echo "→ npm install"
+        time npm install --verbose --prefer-offline
+    fi
+
+    echo "=== Сборка Vite (начало: $(date)) ==="
+    VITE_BACKEND_URL="${VITE_BACKEND_URL:-}" \
+    VITE_BASE_PATH="${VITE_BASE_PATH:-/static/lms-front/}" \
+    VITE_APP_BASENAME="${VITE_APP_BASENAME:-/static/lms-front}" \
+    time npm run build
+
+    echo "=== Frontend готов (окончание: $(date)) ==="
+
+    echo "[5/9] Copy frontend dist to Django static"
+    rm -rf "$FRONT_STATIC_DIR"
+    mkdir -p "$FRONT_STATIC_DIR"
+    cp -R dist/. "$FRONT_STATIC_DIR/"
+    cd "$APP_DIR"
 else
-  echo "[4/9] Skip frontend (DEPLOY_FRONTEND=$DEPLOY_FRONTEND)"
+    echo "[4/9] Skip frontend (DEPLOY_FRONTEND=$DEPLOY_FRONTEND)"
 fi
 
 echo "[6/9] Migrate"
