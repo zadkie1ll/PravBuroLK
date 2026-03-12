@@ -5,7 +5,7 @@ import requests
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader
 from weasyprint import HTML
-
+import shutil
 import matplotlib
 matplotlib.use("Agg")  # важно: ДО pyplot
 import matplotlib.pyplot as plt
@@ -163,27 +163,38 @@ def generate_pdf(data) -> bytes:
     data["summary"]["income_rub"] = data["summary"]["official_income_rub"]
 
     with tempfile.TemporaryDirectory() as tmp:
-        # photo: download or placeholder
+    # ====================== ФОТО МЕНЕДЖЕРА (оставляем как было) ======================
         photo_url = data.get("manager", {}).get("photo")
         photo_path = os.path.join(tmp, "manager_photo.jpg")
         photo_file = download_photo(photo_url, photo_path) if photo_url else None
 
         if not photo_file:
-            # делаем плейсхолдер, чтобы img всегда был валидным
             placeholder_path = os.path.join(tmp, "manager_photo.png")
             generate_placeholder_avatar(placeholder_path)
             data["manager"]["photo_file"] = "manager_photo.png"
         else:
             data["manager"]["photo_file"] = "manager_photo.jpg"
 
-        # template
+        # ====================== QR-КОД (НОВЫЙ ПРАВИЛЬНЫЙ БЛОК) ======================
+        # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+        qr_source = "bitrix/svg/qr.png"          # ← верни .png (как было в <img src="../svg/qr.png"/>)
+        qr_path    = os.path.join(tmp, "qr.png")
+
+        if os.path.exists(qr_source):
+            shutil.copy2(qr_source, qr_path)               # ← правильный способ для локального файла
+            data["qr_file"] = "qr.png"
+            print("✅ QR скопирован в tmp")
+        else:
+            print(f"⚠️ Файл QR не найден: {qr_source}")
+            data["qr_file"] = None                         # шаблон сам обработает
+
+        # ====================== РЕНДЕР ======================
         env = Environment(loader=FileSystemLoader("bitrix/templates"))
         template = env.get_template("template.html")
         html_content = template.render(data=data)
 
         pdf_bytes = HTML(string=html_content, base_url=tmp).write_pdf()
-
-    return pdf_bytes
+        return pdf_bytes
 
 
 # ---------- RUN ----------
