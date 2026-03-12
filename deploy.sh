@@ -29,18 +29,18 @@ if [[ "$DEPLOY_FRONTEND" == "1" ]]; then
     export PATH="/home/zadkiel/.nvm/versions/node/v24.14.0/bin:$PATH"
     cd "$FRONT_DIR"
 
-    echo "=== Очистка кэша npm (убираем 'через раз') ==="
+    echo "=== ПОЛНАЯ ОЧИСТКА (решаем ENOTEMPTY навсегда) ==="
+    rm -rf node_modules .vite 2>/dev/null || true
+    rm -rf "$HOME/.npm/_cacache" "$HOME/.npm/_logs" 2>/dev/null || true
     npm cache clean --force 2>/dev/null || true
 
     echo "=== Установка пакетов (начало: $(date)) ==="
-    rm -rf node_modules .vite  # жёсткая очистка на всякий случай
-
     if [[ -f package-lock.json ]]; then
         echo "→ npm ci"
-        time npm ci --verbose --prefer-offline
+        time npm ci --prefer-offline --no-audit
     else
         echo "→ npm install"
-        time npm install --verbose --prefer-offline
+        time npm install --prefer-offline --no-audit
     fi
 
     echo "=== Сборка Vite (начало: $(date)) ==="
