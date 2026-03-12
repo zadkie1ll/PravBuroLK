@@ -18,34 +18,34 @@ def transcribe(file_path: str):
     - TRANSCRIPTION_PROVIDER=whisper (по умолчанию)
     - TRANSCRIPTION_PROVIDER=yandex_async
     """
-    provider = os.getenv("TRANSCRIPTION_PROVIDER", "whisper").strip().lower()
+    provider = os.getenv("TRANSCRIPTION_PROVIDER", "openai_whisper").strip().lower()
 
     if provider == "yandex_async":
         return _transcribe_yandex_async(file_path)
     if provider == "openai_whisper":
         return _transcribe_openai_whisper(file_path)
-    return _transcribe_whisper(file_path)
 
 
-def _transcribe_whisper(file_path: str):
-    # Ленивая загрузка heavy-зависимостей:
-    # так Django/Celery стартуют даже если ML-стек еще не установлен.
-    from faster_whisper import WhisperModel
-    from tqdm import tqdm
 
-    hf_token = os.getenv("HF_TOKEN", "").strip()
-    model_kwargs = {"device": "cpu"}
-    # Не передаем пустой токен, иначе huggingface_hub отправляет "Bearer " и падает.
-    if hf_token:
-        model_kwargs["use_auth_token"] = hf_token
+# def _transcribe_whisper(file_path: str):
+#     # Ленивая загрузка heavy-зависимостей:
+#     # так Django/Celery стартуют даже если ML-стек еще не установлен.
+#     from faster_whisper import WhisperModel
+#     from tqdm import tqdm
 
-    model = WhisperModel("base", **model_kwargs)
-    segments, _ = model.transcribe(file_path, vad_filter=True)
+#     hf_token = os.getenv("HF_TOKEN", "").strip()
+#     model_kwargs = {"device": "cpu"}
+#     # Не передаем пустой токен, иначе huggingface_hub отправляет "Bearer " и падает.
+#     if hf_token:
+#         model_kwargs["use_auth_token"] = hf_token
 
-    transcript = []
-    for segment in tqdm(segments, desc="Транскрипция Whisper..."):
-        transcript.append([segment.text, segment.start])
-    return transcript
+#     model = WhisperModel("base", **model_kwargs)
+#     segments, _ = model.transcribe(file_path, vad_filter=True)
+
+#     transcript = []
+#     for segment in tqdm(segments, desc="Транскрипция Whisper..."):
+#         transcript.append([segment.text, segment.start])
+#     return transcript
 
 
 def _transcribe_yandex_async(file_path: str):
