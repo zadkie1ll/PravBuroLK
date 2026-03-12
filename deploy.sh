@@ -23,24 +23,36 @@ source "$VENV/bin/activate"
 
 echo "[3/9] Install deps"
 pip install -r requirements.txt
-
 if [[ "$DEPLOY_FRONTEND" == "1" ]]; then
     echo "[4/9] Build frontend (Vite)"
     export PATH="/home/zadkiel/.nvm/versions/node/v24.14.0/bin:$PATH"
     cd "$FRONT_DIR"
 
-    echo "=== ПОЛНАЯ ОЧИСТКА (решаем ENOTEMPTY навсегда) ==="
+    echo "=== АГРЕССИВНАЯ ОЧИСТКА (убираем ENOTEMPTY и rm-ошибки навсегда) ==="
+    # 1. Делаем всё writable
+    chmod -R u+w node_modules 2>/dev/null || true
+    
+    # 2. Основная очистка
     rm -rf node_modules .vite 2>/dev/null || true
+    
+    # 3. Если что-то осталось — добиваем find-ом (самый надёжный способ)
+    if [[ -d "node_modules" ]]; then
+        echo "→ Добиваем остатки через find..."
+        find node_modules -mindepth 1 -delete 2>/dev/null || true
+        rm -rf node_modules 2>/dev/null || true
+    fi
+
+    # 4. Полный кэш npm
     rm -rf "$HOME/.npm/_cacache" "$HOME/.npm/_logs" 2>/dev/null || true
     npm cache clean --force 2>/dev/null || true
 
     echo "=== Установка пакетов (начало: $(date)) ==="
     if [[ -f package-lock.json ]]; then
         echo "→ npm ci"
-        time npm ci --prefer-offline --no-audit
+        time npm ci --prefer-offline --no-audit --ignore-scripts
     else
         echo "→ npm install"
-        time npm install --prefer-offline --no-audit
+        time npm install --prefer-offline --no-audit --ignore-scripts
     fi
 
     echo "=== Сборка Vite (начало: $(date)) ==="
