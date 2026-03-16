@@ -175,7 +175,7 @@ def generate_pdf(data) -> bytes:
         else:
             data["manager"]["photo_file"] = "manager_photo.jpg"
 
-        # ====================== QR-КОД (НОВЫЙ ПРАВИЛЬНЫЙ БЛОК) ======================
+    # ====================== QR-КОД (НОВЫЙ ПРАВИЛЬНЫЙ БЛОК) ======================
         # ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
         qr_source = "bitrix/svg/qr.png"          # ← верни .png (как было в <img src="../svg/qr.png"/>)
         qr_path    = os.path.join(tmp, "qr.png")
@@ -187,6 +187,21 @@ def generate_pdf(data) -> bytes:
         else:
             print(f"⚠️ Файл QR не найден: {qr_source}")
             data["qr_file"] = None                         # шаблон сам обработает
+
+        # ====================== ИКОНКИ СОЦСЕТЕЙ ======================
+        def copy_social_icon(name: str):
+            for ext in (".png", ".svg", ".jpg", ".jpeg"):
+                src = os.path.join("bitrix", "svg", f"{name}{ext}")
+                if os.path.exists(src):
+                    dst_name = f"{name}{ext}"
+                    shutil.copy2(src, os.path.join(tmp, dst_name))
+                    return dst_name
+            return None
+
+        data.setdefault("social_icons", {})
+        data["social_icons"]["telegram"] = copy_social_icon("telegram")
+        data["social_icons"]["vk"] = copy_social_icon("vk")
+        data["social_icons"]["youtube"] = copy_social_icon("youtube")
 
         # ====================== РЕНДЕР ======================
         env = Environment(loader=FileSystemLoader("bitrix/templates"))
