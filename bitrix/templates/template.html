@@ -210,10 +210,14 @@
         }
 
         .property-card {
-            background: #b8efc8;
+            background: #eef1f4;
             border-radius: 20px;
             padding: 14px 18px;
             width: 100%;
+        }
+
+        .property-card--highlight {
+            background: #b8efc8;
         }
 
         .property-save {
@@ -224,10 +228,14 @@
         }
 
         .income-card {
-            background: #a8d0f4;
+            background: #eef1f4;
             border-radius: 20px;
             padding: 12px 16px;
             width: 100%;
+        }
+
+        .income-card--highlight {
+            background: #a8d0f4;
         }
 
         .income-save {
@@ -328,7 +336,7 @@
                         <tr>
                             <td class="label-cell"><span class="block-label">Имущество:</span></td>
                             <td>
-                                <div class="property-card">
+                                <div class="property-card{% if data.risks.no_property_loss_risk %} property-card--highlight{% endif %}">
                                     <div class="block-value">{{ data.summary.property or '-' }}</div>
                                     {% if data.risks.no_property_loss_risk %}
                                         <div class="property-save">✓ Подлежит сохранению</div>
@@ -343,7 +351,7 @@
                         <tr>
                             <td class="label-cell"><span class="block-label">Доход:</span></td>
                             <td>
-                                <div class="income-card">
+                                <div class="income-card{% if data.summary.show_km and data.summary.income_after_km_rub %} income-card--highlight{% endif %}">
                                     <div class="block-value">Официальный заработок {{ data.summary.official_income_rub or '-' }}</div>
                                     {% if data.summary.show_km and data.summary.income_after_km_rub %}
                                         <div class="income-save">Подлежит сохранению в процедуре: {{ data.summary.income_after_km_rub or '-' }}</div>
