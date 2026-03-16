@@ -208,6 +208,7 @@
             line-height: 1.15;
             overflow-wrap: anywhere;
             word-break: break-word;
+            text-align: start;
         }
 
         .property-card {
@@ -386,7 +387,7 @@
                     <table class="pair-table">
                         <tr>
                             <td class="label-cell"><span class="block-label">Дети:</span></td>
-                            <td><div class="block-value">{{ data.summary.children or '-' }}</div></td>
+                            <td><div class="block-value" style="margin-left: -212px">{{ data.summary.children or '-' }}</div></td>
                         </tr>
                     </table>
                 </td>
