@@ -166,12 +166,12 @@
             border-collapse: separate;
             border-spacing: 14px 14px;
             margin-left: -10px;
-            table-layout: fixed;
+            table-layout: auto;
             margin-top: 8px;
         }
 
         .client-layout td {
-            width: 50%;
+            width: auto;
             vertical-align: top;
         }
 
@@ -184,6 +184,7 @@
 
         .pair-table td {
             vertical-align: top;
+            min-width: 0;
         }
 
         .label-cell {
@@ -214,6 +215,7 @@
             border-radius: 20px;
             padding: 14px 18px;
             width: 100%;
+            max-width: 100%;
         }
 
         .property-card--highlight {
@@ -232,6 +234,7 @@
             border-radius: 20px;
             padding: 12px 16px;
             width: 100%;
+            max-width: 100%;
         }
 
         .income-card--highlight {
