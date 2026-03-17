@@ -509,3 +509,8 @@ def calc_km_for_deal(request):
 
     except Exception as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
+    
+@require_POST
+def test(request):
+    print(request)
+    print(request.text)
