@@ -102,10 +102,10 @@ const CourseDetails = () => {
   const [error, setError] = useState<string | null>(null);
   const user_id = parseInt(localStorage.getItem("user") || "0", 10); // Получаем user_id
   const navigate = useNavigate();
-  const isSubmitDisabled =
-  !test ||
-  test.attempts_left <= 0 ||
-  Object.keys(answers).length < test.questions.length;
+  // const isSubmitDisabled =
+  // !test ||
+  // test.attempts_left <= 0 ||
+  // Object.keys(answers).length < test.questions.length;
   // Вычисляем прогресс курса
   const completedModules = modules.filter((mod) => mod.status === "completed").length;
   const progress = (completedModules / modules.length) * 100 || 0;
