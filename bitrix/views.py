@@ -513,5 +513,28 @@ def calc_km_for_deal(request):
 @require_POST
 @csrf_exempt
 def test(request):
-    print(request)
-    print(request.text)
+    print("Method:", request.method)
+    print("Path:", request.path)
+    print("GET params:", request.GET)
+    print("POST params (form):", request.POST)
+    print("FILES:", request.FILES)
+    print("Content-Type:", request.headers.get("Content-Type"))
+    print("Headers:", dict(request.headers))           # все заголовки
+
+    # ─────────────── Самое важное ───────────────
+    try:
+        body_bytes = request.body          # ← сырые байты
+        print("Raw body (bytes):", body_bytes)
+        print("Raw body (str):", body_bytes.decode("utf-8", errors="replace"))
+    except Exception as e:
+        print("Не удалось прочитать body:", str(e))
+
+    # Если ожидаешь JSON — почти всегда так делают:
+    try:
+        import json
+        data = json.loads(request.body)
+        print("Parsed JSON:", data)
+    except Exception as e:
+        print("Не JSON или пусто/битый:", str(e))
+
+    return HttpResponse("OK", status=200)
