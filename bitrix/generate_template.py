@@ -202,7 +202,7 @@ def generate_pdf(data) -> bytes:
         data["social_icons"]["telegram"] = copy_social_icon("telegram")
         data["social_icons"]["vk"] = copy_social_icon("vk")
         data["social_icons"]["youtube"] = copy_social_icon("youtube")
-
+        data["support_file"] = copy_social_icon("support")
         # ====================== РЕНДЕР ======================
         env = Environment(loader=FileSystemLoader("bitrix/templates"))
         template = env.get_template("template.html")
