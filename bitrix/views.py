@@ -511,6 +511,7 @@ def calc_km_for_deal(request):
         return JsonResponse({"ok": False, "error": str(e)}, status=500)
     
 @require_POST
+@csrf_exempt
 def test(request):
     print(request)
     print(request.text)
