@@ -61,6 +61,7 @@ if [[ "$DEPLOY_FRONTEND" == "1" ]]; then
     
     # Самое важное — УДАЛЯЕМ СТАРУЮ ПАПКУ ЦЕЛИКОМ
     rm -rf "$FRONT_STATIC_DIR"
+    rm -rf "$APP_DIR/staticfiles/lms-front"
     mkdir -p "$FRONT_STATIC_DIR"
     
     # Копируем заново
