@@ -5,6 +5,7 @@ import json
 from communications.models import CallProcessingLog, CallWebhookEvent, ProcessedCallArchive
 
 
+# ─── Inline для логов (оставляем как было) ───
 class CallProcessingLogInline(admin.TabularInline):
     model = CallProcessingLog
     extra = 0
@@ -59,25 +60,21 @@ class CallWebhookEventAdmin(admin.ModelAdmin):
     inlines = [CallProcessingLogInline]
     ordering = ("-created_at",)
 
-    def pretty_raw_payload(self, obj: CallWebhookEvent) -> str:
+    def pretty_raw_payload(self, obj):
         return self._as_pretty_json(obj.raw_payload)
 
-    pretty_raw_payload.short_description = "Raw payload"
-
-    def pretty_transcript(self, obj: CallWebhookEvent) -> str:
+    def pretty_transcript(self, obj):
         return self._as_pretty_json(obj.transcript)
 
-    pretty_transcript.short_description = "Transcript"
-
-    def pretty_analysis(self, obj: CallWebhookEvent) -> str:
+    def pretty_analysis(self, obj):
         return self._as_pretty_json(obj.analysis)
-
-    pretty_analysis.short_description = "Analysis"
 
     @staticmethod
     def _as_pretty_json(value) -> str:
+        if value is None:
+            return mark_safe("<pre>{}</pre>")
         rendered = json.dumps(value, ensure_ascii=False, indent=2)
-        return mark_safe(f"<pre style='white-space:pre-wrap;max-width:900px'>{rendered}</pre>")
+        return mark_safe(f"<pre style='white-space:pre-wrap; max-width:900px;'>{rendered}</pre>")
 
 
 @admin.register(CallProcessingLog)
@@ -88,38 +85,9 @@ class CallProcessingLogAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
 
-class ArchiveDBModelAdmin(admin.ModelAdmin):
-    """
-    ModelAdmin, который заставляет все операции читать/писать в базу 'archive'.
-    Для просмотра достаточно переопределить только get_queryset и несколько других методов.
-    Запись (add/change/delete) можно отключить, если архив только для чтения.
-    """
-    # Название базы данных (должно совпадать с ключом в settings.DATABASES)
-    using = 'bd'
 
-    def get_queryset(self, request):
-        # Все запросы списка объектов идём в нужную базу
-        return super().get_queryset(request).using(self.using)
-
-    def get_form(self, request, obj=None, **kwargs):
-        # Если вдруг кто-то попытается редактировать — тоже укажем базу
-        form = super().get_form(request, obj, **kwargs)
-        form._meta.model.objects = form._meta.model.objects.using(self.using)
-        return form
-
-    # Отключаем возможность добавления/изменения/удаления (архив read-only)
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-
-@admin.register(ProcessedCallArchive, site=admin.site)
-class ProcessedCallArchiveAdmin(ArchiveDBModelAdmin):
+@admin.register(ProcessedCallArchive)
+class ProcessedCallArchiveAdmin(admin.ModelAdmin):  # ← было ArchiveDBModelAdmin — подставь свой класс, если нужно
     list_display = (
         "id",
         "created_at",
@@ -153,32 +121,11 @@ class ProcessedCallArchiveAdmin(ArchiveDBModelAdmin):
         "contact_id",
         "record_file_id",
         "audio_file_path",
-        "transcript",
-        "analysis",
-        "source_payload",
+        "pretty_transcript",
+        "pretty_analysis",
+        "pretty_source_payload",
     )
     ordering = ("-created_at",)
-    # Показываем JSON-поля красиво (как у вас уже сделано для других моделей)
-    def pretty_transcript(self, obj):
-        import json
-        from django.utils.safestring import mark_safe
-        rendered = json.dumps(obj.transcript, ensure_ascii=False, indent=2)
-        return mark_safe(f"<pre style='white-space:pre-wrap;max-width:900px'>{rendered}</pre>")
-    pretty_transcript.short_description = "Transcript"
-
-    def pretty_analysis(self, obj):
-        import json
-        from django.utils.safestring import mark_safe
-        rendered = json.dumps(obj.analysis, ensure_ascii=False, indent=2)
-        return mark_safe(f"<pre style='white-space:pre-wrap;max-width:900px'>{rendered}</pre>")
-    pretty_analysis.short_description = "Analysis"
-
-    def pretty_source_payload(self, obj):
-        import json
-        from django.utils.safestring import mark_safe
-        rendered = json.dumps(obj.source_payload, ensure_ascii=False, indent=2)
-        return mark_safe(f"<pre style='white-space:pre-wrap;max-width:900px'>{rendered}</pre>")
-    pretty_source_payload.short_description = "Source Payload"
 
     fields = (
         "created_at",
@@ -193,3 +140,28 @@ class ProcessedCallArchiveAdmin(ArchiveDBModelAdmin):
         "pretty_analysis",
         "pretty_source_payload",
     )
+
+    # ─── Красивая отрисовка JSON-полей ───
+    def pretty_transcript(self, obj):
+        return self._as_pretty_json(obj.transcript)
+
+    def pretty_analysis(self, obj):
+        return self._as_pretty_json(obj.analysis)
+
+    def pretty_source_payload(self, obj):
+        return self._as_pretty_json(obj.source_payload)
+
+    pretty_transcript.short_description = "Transcript"
+    pretty_analysis.short_description = "Analysis"
+    pretty_source_payload.short_description = "Source Payload"
+
+    # Можно вынести в один статический метод, как в CallWebhookEventAdmin
+    @staticmethod
+    def _as_pretty_json(value) -> str:
+        if value is None:
+            return mark_safe("<pre style='color:#888'>null</pre>")
+        try:
+            rendered = json.dumps(value, ensure_ascii=False, indent=2)
+            return mark_safe(f"<pre style='white-space:pre-wrap; max-width:960px; background:#f8f9fa; padding:8px; border-radius:4px;'>{rendered}</pre>")
+        except (TypeError, ValueError):
+            return mark_safe(f"<pre style='color:#c00'>Cannot serialize value: {repr(value)}</pre>")
