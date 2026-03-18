@@ -28,25 +28,15 @@ if [[ "$DEPLOY_FRONTEND" == "1" ]]; then
     export PATH="/home/zadkiel/.nvm/versions/node/v24.14.0/bin:$PATH"
     cd "$FRONT_DIR"
 
-    echo "=== АГРЕССИВНАЯ ОЧИСТКА (убираем ENOTEMPTY и rm-ошибки навсегда) ==="
-    # 1. Делаем всё writable
-    chmod -R u+w node_modules 2>/dev/null || true
-    
-    # 2. Основная очистка
-    rm -rf node_modules .vite 2>/dev/null || true
-    
-    # 3. Если что-то осталось — добиваем find-ом (самый надёжный способ)
-    if [[ -d "node_modules" ]]; then
-        echo "→ Добиваем остатки через find..."
-        find node_modules -mindepth 1 -delete 2>/dev/null || true
-        rm -rf node_modules 2>/dev/null || true
-    fi
+    # ── АГРЕССИВНАЯ ОЧИСТКА ────────────────────────────────────────────────
+    echo "→ Полная очистка старого билда и node_modules"
+    rm -rf dist node_modules .vite 2>/dev/null || true
+    find . -maxdepth 1 -name "dist*" -exec rm -rf {} + 2>/dev/null || true
 
-    # 4. Полный кэш npm
-    rm -rf "$HOME/.npm/_cacache" "$HOME/.npm/_logs" 2>/dev/null || true
+    # Очистка npm-кэша (опционально, но полезно при странностях)
     npm cache clean --force 2>/dev/null || true
 
-    echo "=== Установка пакетов (начало: $(date)) ==="
+    echo "=== Установка пакетов ==="
     if [[ -f package-lock.json ]]; then
         echo "→ npm ci"
         time npm ci --prefer-offline --no-audit --ignore-scripts
@@ -55,21 +45,36 @@ if [[ "$DEPLOY_FRONTEND" == "1" ]]; then
         time npm install --prefer-offline --no-audit --ignore-scripts
     fi
 
-    echo "=== Сборка Vite (начало: $(date)) ==="
+    echo "=== Сборка Vite ==="
     VITE_BACKEND_URL="${VITE_BACKEND_URL:-}" \
     VITE_BASE_PATH="${VITE_BASE_PATH:-/static/lms-front/}" \
     VITE_APP_BASENAME="${VITE_APP_BASENAME:-/static/lms-front}" \
     time npm run build
 
-    echo "=== Frontend готов (окончание: $(date)) ==="
+    if [[ ! -d "dist" || ! -f "dist/index.html" ]]; then
+        echo "!!! Ошибка: dist не создался или пустой !!!"
+        exit 1
+    fi
 
+    echo "=== Frontend готов ==="
     echo "[5/9] Copy frontend dist to Django static"
+    
+    # Самое важное — УДАЛЯЕМ СТАРУЮ ПАПКУ ЦЕЛИКОМ
     rm -rf "$FRONT_STATIC_DIR"
     mkdir -p "$FRONT_STATIC_DIR"
+    
+    # Копируем заново
     cp -R dist/. "$FRONT_STATIC_DIR/"
+    
+    # Проверяем, что скопировалось (диагностика)
+    echo "→ Содержимое после копирования:"
+    ls -la "$FRONT_STATIC_DIR" | head -n 15
+    echo "→ Кол-во файлов в static/lms-front:"
+    find "$FRONT_STATIC_DIR" -type f | wc -l
+
     cd "$APP_DIR"
 else
-    echo "[4/9] Skip frontend (DEPLOY_FRONTEND=$DEPLOY_FRONTEND)"
+    ...
 fi
 
 echo "[6/9] Migrate"
