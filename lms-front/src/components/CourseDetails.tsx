@@ -1,4 +1,3 @@
-// CourseDetails.tsx
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { backend } from "../lib/utils";
@@ -21,24 +20,22 @@ import {
   TextField,
   Alert,
 } from "@mui/material";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle"; // Иконка для завершённых модулей
-import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked"; // Иконка для не начатых
-import TimelapseIcon from "@mui/icons-material/Timelapse"; // Иконка для в процессе
-import { LoadModules } from "../lib/api"; // Ваша функция для загрузки модулей
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
+import TimelapseIcon from "@mui/icons-material/Timelapse";
+import { LoadModules } from "../lib/api";
 
-// Новые API функции (предполагаем, что они реализованы в ../lib/api)
+// API-функции
 async function LoadTest(moduleId: number, userId: number) {
-  // Вызов /api/get_test?module=moduleId&user=userId
   const response = await fetch(`${backend}/api/get_test?module=${moduleId}&user=${userId}`);
   if (!response.ok) {
-    if (response.status === 404) return null; // Нет теста
+    if (response.status === 404) return null;
     throw new Error("Ошибка загрузки теста");
   }
   return await response.json();
 }
 
 async function SubmitTest(moduleId: number, userId: number, answers: Record<number, any>) {
-  // Вызов /api/submit_test с POST {user_id, module_id, answers}
   const response = await fetch(`${backend}/api/submit_test/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -49,7 +46,6 @@ async function SubmitTest(moduleId: number, userId: number, answers: Record<numb
 }
 
 async function UpdateModuleStatus(moduleId: number, userId: number, status: string) {
-  // POST /api/update_module_progress {user_id, module_id, status}
   const response = await fetch(`${backend}/api/update_module_progress/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -89,26 +85,24 @@ interface Test {
 }
 
 const CourseDetails = () => {
-  const { id } = useParams<{ id: string }>(); // ID курса из URL
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const user_id = parseInt(localStorage.getItem("user") || "0", 10);
+
   const [modules, setModules] = useState<Module[]>([]);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
-  const [currentStep, setCurrentStep] = useState<"video" | "test">("video");
   const [test, setTest] = useState<Test | null>(null);
   const [answers, setAnswers] = useState<Record<number, any>>({});
-  const [testLoading, setTestLoading] = useState(false);
-  const [testError, setTestError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ score: number; passed: boolean; attempts_left: number } | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const user_id = parseInt(localStorage.getItem("user") || "0", 10); // Получаем user_id
-  const navigate = useNavigate();
-  // const isSubmitDisabled =
-  // !test ||
-  // test.attempts_left <= 0 ||
-  // Object.keys(answers).length < test.questions.length;
-  // Вычисляем прогресс курса
-  const completedModules = modules.filter((mod) => mod.status === "completed").length;
-  const progress = (completedModules / modules.length) * 100 || 0;
+  const [testLoading, setTestLoading] = useState(false);
+  const [step, setStep] = useState<"video" | "test">("video");
+
+  // Прогресс
+  const completedModules = modules.filter((m) => m.status === "completed").length;
+  const progress = modules.length > 0 ? (completedModules / modules.length) * 100 : 0;
 
   useEffect(() => {
     const fetchModules = async () => {
@@ -117,15 +111,13 @@ const CourseDetails = () => {
         setLoading(false);
         return;
       }
+
       try {
         let loadedModules = await LoadModules(parseInt(id, 10), user_id);
-        // Сортируем модули по order (на всякий случай)
         loadedModules = loadedModules.sort((a, b) => a.order - b.order);
         setModules(loadedModules);
-        // Выбираем первый не завершённый модуль по умолчанию
-        const firstIncomplete = loadedModules.find(
-          (mod) => mod.status !== "completed"
-        ) || loadedModules[0];
+
+        const firstIncomplete = loadedModules.find((mod) => mod.status !== "completed") || loadedModules[0];
         setSelectedModule(firstIncomplete);
       } catch (err) {
         setError((err as Error).message || "Ошибка загрузки модулей");
@@ -133,110 +125,100 @@ const CourseDetails = () => {
         setLoading(false);
       }
     };
+
     fetchModules();
   }, [id]);
 
   useEffect(() => {
-    if (selectedModule) {
-      setCurrentStep("video");
-      setTest(null);
-      setAnswers({});
-      setTestResult(null);
-      setTestError(null);
-      fetchTest();
-      // Set to in_progress if not started
-      if (selectedModule.status === "not_started") {
-        UpdateModuleStatus(selectedModule.id, user_id, "in_progress").catch((err) => console.error(err));
-        updateLocalStatus(selectedModule.id, "in_progress");
-      }
-    }
-  }, [selectedModule]);
-
-  const fetchTest = async () => {
     if (!selectedModule) return;
-    setTestLoading(true);
-    try {
-      const testData = await LoadTest(selectedModule.id, user_id);
-      setTest(testData?.test || null);
-    } catch (err) {
-      setTestError((err as Error).message);
-    } finally {
-      setTestLoading(false);
-    }
-  };
 
-  // Функция для перехода к следующему модулю
-  const goToNextModule = () => {
-    if (!selectedModule) return;
-    const currentIndex = modules.findIndex((mod) => mod.id === selectedModule.id);
-    if (currentIndex < modules.length - 1) {
-      const nextModule = modules[currentIndex + 1];
-      setSelectedModule(nextModule);
-    }
-  };
+    setStep("video");
+    setTest(null);
+    setAnswers({});
+    setTestResult(null);
+    setTestError(null);
 
-  // Обработка завершения видео (кнопкой)
-// Обработка завершения видео
-const handleCompleteVideo = async () => {
-  if (!selectedModule) return;
-
-  try {
-    // Отмечаем, что модуль в процессе (если ещё не стоит)
-    if (selectedModule.status !== "in_progress" && selectedModule.status !== "completed") {
-      await UpdateModuleStatus(selectedModule.id, user_id, "in_progress");
+    // Если модуль только начали — отмечаем "in_progress"
+    if (selectedModule.status === "not_started") {
+      UpdateModuleStatus(selectedModule.id, user_id, "in_progress").catch(console.error);
       updateLocalStatus(selectedModule.id, "in_progress");
     }
 
-    if (test) {
-      // Есть тест → переходим к нему
-      setCurrentStep("test");
-    } else {
-      // Нет теста → сразу завершаем модуль
-      await UpdateModuleStatus(selectedModule.id, user_id, "completed");
-      updateLocalStatus(selectedModule.id, "completed");
-      goToNextModule();
-    }
-  } catch (err) {
-    setError((err as Error).message || "Ошибка при обновлении статуса");
-  }
-};
+    // Загружаем тест
+    const load = async () => {
+      setTestLoading(true);
+      try {
+        const data = await LoadTest(selectedModule.id, user_id);
+        setTest(data?.test || null);
+      } catch (err) {
+        setTestError((err as Error).message || "Не удалось загрузить тест");
+      } finally {
+        setTestLoading(false);
+      }
+    };
 
-  // Обновление локального статуса
+    load();
+  }, [selectedModule]);
+
   const updateLocalStatus = (moduleId: number, newStatus: string) => {
     setModules((prev) =>
       prev.map((mod) => (mod.id === moduleId ? { ...mod, status: newStatus } : mod))
     );
   };
 
-  // Обработка изменения ответа
+  const goToNextModule = () => {
+    if (!selectedModule) return;
+    const idx = modules.findIndex((m) => m.id === selectedModule.id);
+    if (idx >= 0 && idx < modules.length - 1) {
+      setSelectedModule(modules[idx + 1]);
+    }
+  };
+
+  const handleVideoWatched = async () => {
+    if (!selectedModule) return;
+
+    // Если тест существует и в нём есть хотя бы один вопрос → показываем тест
+    if (test && test.questions?.length > 0) {
+      setStep("test");
+    } else {
+      // Нет теста или пустой → сразу завершаем
+      try {
+        await UpdateModuleStatus(selectedModule.id, user_id, "completed");
+        updateLocalStatus(selectedModule.id, "completed");
+        goToNextModule();
+      } catch (err) {
+        setError((err as Error).message || "Не удалось завершить модуль");
+      }
+    }
+  };
+
   const handleAnswerChange = (questionId: number, value: any) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   };
 
-  // Отправка теста
   const handleSubmitTest = async () => {
     if (!selectedModule || !test) return;
+
     try {
       const result = await SubmitTest(selectedModule.id, user_id, answers);
       setTestResult(result);
+
       if (result.passed) {
         updateLocalStatus(selectedModule.id, "completed");
-        setTimeout(goToNextModule, 2000); // Задержка для показа результата
+        setTimeout(goToNextModule, 1800);
       } else {
-        // Обновить attempts_left в test
-        setTest((prev) => prev ? { ...prev, attempts_left: result.attempts_left } : null);
+        setTest((prev) => (prev ? { ...prev, attempts_left: result.attempts_left } : null));
       }
     } catch (err) {
-      setTestError((err as Error).message);
+      setTestError((err as Error).message || "Ошибка при отправке теста");
     }
   };
 
-  // Рендер вопроса
   const renderQuestion = (question: Question) => {
     switch (question.question_type) {
       case "choice":
         return (
-          <Box>
+          <Box sx={{ mt: 1 }}>
             {question.options.map((opt) => (
               <FormControlLabel
                 key={opt.id}
@@ -247,51 +229,54 @@ const handleCompleteVideo = async () => {
                   />
                 }
                 label={opt.text}
-                color="black"
-                sx={{color: 'black'}}
               />
             ))}
           </Box>
         );
+
       case "multi_choice":
         return (
-          <Box>
+          <Box sx={{ mt: 1 }}>
             {question.options.map((opt) => (
               <FormControlLabel
                 key={opt.id}
                 control={
                   <Checkbox
-                    
                     checked={answers[question.id]?.ids?.includes(opt.id) || false}
                     onChange={(e) => {
                       const ids = answers[question.id]?.ids || [];
-                      const newIds = e.target.checked ? [...ids, opt.id] : ids.filter((id: number) => id !== opt.id);
+                      const newIds = e.target.checked
+                        ? [...ids, opt.id]
+                        : ids.filter((id: number) => id !== opt.id);
                       handleAnswerChange(question.id, { ids: newIds });
                     }}
                   />
                 }
                 label={opt.text}
-                color="black"
-                sx={{color:'black'}}
               />
             ))}
           </Box>
         );
+
       case "text":
         return (
           <TextField
             fullWidth
-            sx={{color:'black'}}
+            multiline
+            rows={3}
             value={answers[question.id]?.text || ""}
             onChange={(e) => handleAnswerChange(question.id, { text: e.target.value })}
+            placeholder="Введите ответ..."
+            variant="outlined"
+            sx={{ mt: 1 }}
           />
         );
+
       default:
         return null;
     }
   };
 
-  // Функция для получения иконки статуса
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
@@ -314,49 +299,58 @@ const handleCompleteVideo = async () => {
   if (error) {
     return (
       <Box sx={{ p: 4, textAlign: "center" }}>
-        <Typography color="error">Ошибка: {error}</Typography>
+        <Typography color="error">{error}</Typography>
       </Box>
     );
   }
 
   return (
-    <Box sx={{
-      display: "flex",
-      flexDirection: { xs: "column", sm: "row" },
-      width: "100vw", // Change to 100vw for full viewport width
-      maxWidth: "none", // Override any max-width
-      height: "100vh",
-      bgcolor: "background.default",
-      overflow: "hidden",
-      margin: 0, // Remove any implicit margins
-      padding: 0,
-    }}>
-      {/* Левая часть: Список модулей (sidebar как в Khan Academy) */}
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: { xs: "column", sm: "row" },
+        height: "100vh",
+        width: "100vw",
+        overflow: "hidden",
+        bgcolor: "background.default",
+        m: 0,
+        p: 0,
+      }}
+    >
+      {/* Sidebar */}
       <Paper
         elevation={3}
         sx={{
-          width: { xs: "100%", sm: "30%" },
-          borderRight: { sm: 0 },
-          borderBottom: { xs: 1, sm: 0 },
-          borderColor: "divider",
-          pr: 2,
+          width: { xs: "100%", sm: "320px" },
           overflowY: "auto",
-          p: 2,
+          p: 3,
+          borderRight: { sm: "1px solid" },
+          borderColor: "divider",
           bgcolor: "white",
         }}
       >
-        <Button onClick={()=>navigate("/dashboard")}>Вернуться в меню</Button>
-        <Typography variant="h5" sx={{ fontWeight: "bold", mb: 1 }}>
+        <Button variant="outlined" onClick={() => navigate("/dashboard")} sx={{ mb: 3 }}>
+          ← Назад в меню
+        </Button>
+
+        <Typography variant="h5" fontWeight="bold" gutterBottom>
           Модули курса
         </Typography>
-        <Box sx={{ mb: 2 }}>
+
+        <Box sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary">
-            Прогресс: {completedModules}/{modules.length} модулей завершено
+            Прогресс: {completedModules} / {modules.length}
           </Typography>
-          <LinearProgress variant="determinate" value={progress} sx={{ mt: 1, height: 8, borderRadius: 4 }} />
+          <LinearProgress
+            variant="determinate"
+            value={progress}
+            sx={{ mt: 1, height: 8, borderRadius: 4 }}
+          />
         </Box>
-        <Divider sx={{ mb: 2 }} />
-        <List>
+
+        <Divider sx={{ my: 2 }} />
+
+        <List disablePadding>
           {modules.map((module) => (
             <ListItem disablePadding key={module.id}>
               <ListItemButton
@@ -365,24 +359,18 @@ const handleCompleteVideo = async () => {
                 sx={{
                   borderRadius: 2,
                   mb: 1,
-                  "&.Mui-selected": {
-                    bgcolor: "primary.light",
-                    color: "primary.main",
-                  },
-                  "&:hover": {
-                    bgcolor: "action.hover",
-                  },
+                  "&.Mui-selected": { bgcolor: "primary.light", color: "primary.main" },
                 }}
               >
-                <ListItemIcon>
-                  {getStatusIcon(module.status)}
-                </ListItemIcon>
+                <ListItemIcon>{getStatusIcon(module.status)}</ListItemIcon>
                 <ListItemText
-                  primary={<Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>{module.name}</Typography>}
+                  primary={module.name}
                   secondary={
-                    <Typography variant="body2" color="text.secondary">
-                      Статус: {module.status === "completed" ? "Завершено" : module.status === "in_progress" ? "В процессе" : "Не начато"}
-                    </Typography>
+                    module.status === "completed"
+                      ? "Завершено"
+                      : module.status === "in_progress"
+                      ? "В процессе"
+                      : "Не начато"
                   }
                 />
               </ListItemButton>
@@ -390,105 +378,119 @@ const handleCompleteVideo = async () => {
           ))}
         </List>
       </Paper>
-      {/* Правая часть: Видео или тест (основной контент) */}
+
+      {/* Основной контент */}
       <Box
         sx={{
-          width: { xs: "100%", sm: "70%" },
-          pl: { sm: 4 },
-          pr: 2,
-          py: 4,
+          flex: 1,
+          p: { xs: 2, sm: 4 },
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          flexGrow: 1,
         }}
       >
         {selectedModule ? (
           <>
-            <Typography variant="h4" sx={{ fontWeight: "bold", mb: 2, textAlign: "center", color: 'black' }}>
+            <Typography variant="h4" fontWeight="bold" gutterBottom sx={{ color: "black", textAlign: "center" }}>
               {selectedModule.name}
             </Typography>
-            <Typography variant="body1" sx={{ mb: 4, color: "black", lineHeight: 1.6, maxWidth: 800, textAlign: "center" }}>
+
+            <Typography
+              variant="body1"
+              sx={{ mb: 4, maxWidth: 800, textAlign: "center", color: "text.primary", lineHeight: 1.6 }}
+            >
               {selectedModule.description}
             </Typography>
-            {currentStep === "video" ? (
-              <Box sx={{ width: "100%", maxWidth: 800, mb: 4 }}>
-                <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: 2 }}>
+
+            {step === "video" ? (
+              <Box sx={{ width: "100%", maxWidth: 880, mb: 5 }}>
+                <div
+                  style={{
+                    position: "relative",
+                    paddingBottom: "56.25%",
+                    height: 0,
+                    overflow: "hidden",
+                    borderRadius: 12,
+                    background: "#000",
+                  }}
+                >
                   <iframe
                     src={selectedModule.video_url}
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: "#000" }}
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}
                     frameBorder="0"
-                    allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                    allow="autoplay; fullscreen; picture-in-picture"
                     allowFullScreen
-                  ></iframe>
+                  />
                 </div>
 
-                {testError && <Alert severity="error" sx={{ mt: 2 }}>{testError}</Alert>}
+                <Box sx={{ mt: 4, textAlign: "center" }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={handleVideoWatched}
+                    disabled={testLoading}
+                    sx={{ minWidth: 240, py: 1.5, fontSize: "1.1rem" }}
+                  >
+                    Посмотрел
+                  </Button>
 
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleCompleteVideo}
-                  disabled={testLoading}  // отключаем пока грузится тест
-                  sx={{ mt: 3, display: 'block', mx: 'auto', minWidth: 220 }}
-                >
-                  {test ? "Завершить видео и перейти к тесту" : "Завершить модуль"}
-                </Button>
-              </Box>
-            ) : test ? (
-              // ── блок с тестом остаётся без изменений ──
-              <Box sx={{ width: "100%", maxWidth: 800 }}>
-                <Typography variant="h5" sx={{ mb: 2, color: 'black' }}>
-                  {test.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-                  {test.description} | Попыток осталось: {test.attempts_left}
-                </Typography>
-
-                {test.questions.map((question) => (
-                  <Box key={question.id} sx={{ mb: 4, p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}>
-                    <Typography variant="subtitle1" sx={{ mb: 1, color: 'black' }}>
-                      {question.text}
+                  {testLoading && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                      Проверка наличия теста...
                     </Typography>
-                    {renderQuestion(question)}
-                  </Box>
+                  )}
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ width: "100%", maxWidth: 800 }}>
+                <Typography variant="h5" gutterBottom sx={{ color: "black" }}>
+                  {test?.name || "Проверка знаний"}
+                </Typography>
+
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+                  {test?.description} • Попыток осталось: {test?.attempts_left ?? "?"}
+                </Typography>
+
+                {test?.questions.map((q) => (
+                  <Paper key={q.id} variant="outlined" sx={{ p: 3, mb: 3, borderRadius: 2 }}>
+                    <Typography variant="subtitle1" fontWeight={500} gutterBottom sx={{ color: "black" }}>
+                      {q.text}
+                    </Typography>
+                    {renderQuestion(q)}
+                  </Paper>
                 ))}
 
-                {testError && <Alert severity="error" sx={{ mb: 2 }}>{testError}</Alert>}
+                {testError && <Alert severity="error" sx={{ mb: 3 }}>{testError}</Alert>}
+
                 {testResult && (
-                  <Alert severity={testResult.passed ? "success" : "warning"} sx={{ mb: 2 }}>
-                    Баллы: {testResult.score} | {testResult.passed ? "Пройдено!" : "Не пройдено"} | Попыток осталось: {testResult.attempts_left}
+                  <Alert severity={testResult.passed ? "success" : "warning"} sx={{ mb: 3 }}>
+                    {testResult.passed
+                      ? `Поздравляем! Набрано ${testResult.score} баллов`
+                      : `Не пройдено (${testResult.score} / ${test?.max_score}). Осталось попыток: ${testResult.attempts_left}`}
                   </Alert>
                 )}
 
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleSubmitTest}
-                  disabled={test.attempts_left <= 0 || Object.keys(answers).length < test.questions.length}
-                  sx={{ minWidth: 220 }}
-                >
-                  Отправить тест
-                </Button>
+                <Box sx={{ textAlign: "center", mt: 4 }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    onClick={handleSubmitTest}
+                    disabled={
+                      !!test?.attempts_left && test.attempts_left <= 0 ||
+                      Object.keys(answers).length < (test?.questions.length || 1)
+                    }
+                    sx={{ minWidth: 240, py: 1.5, fontSize: "1.1rem" }}
+                  >
+                    Отправить ответы
+                  </Button>
+                </Box>
               </Box>
-            ) : (
-              <Typography color="text.secondary" sx={{ mt: 4 }}>
-                Нет теста для этого модуля. Модуль можно завершить.
-              </Typography>
-            )}            {currentStep === "video" && test && (
-              <Button
-                variant="outlined"
-                onClick={() => setCurrentStep("test")}
-                sx={{ mt: 2 }}
-              >
-                Перейти к тесту (если видео просмотрено)
-              </Button>
             )}
           </>
         ) : (
-          <Typography variant="h6" sx={{ mt: 4 }}>
-            Выберите модуль из списка слева
+          <Typography variant="h6" color="text.secondary" sx={{ mt: 8 }}>
+            Выберите модуль слева
           </Typography>
         )}
       </Box>
