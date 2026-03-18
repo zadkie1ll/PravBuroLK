@@ -530,7 +530,13 @@ def diarize_transcript(transcription: Any) -> dict[str, str]:
 
     timeout_seconds = float(os.getenv("OPENAI_REQUEST_TIMEOUT_SECONDS", "180"))
     model_name = os.getenv("OPENAI_DIARIZATION_MODEL", "gpt-4.1-mini").strip() or "gpt-4.1-mini"
-    client = OpenAI(api_key=api_key, timeout=timeout_seconds, http_client=httpx.Client(proxy="socks5h://127.0.0.1:9050"))
+    client = OpenAI(api_key=api_key, timeout=timeout_seconds, http_client=httpx.Client(proxy="socks5h://127.0.0.1:9050", headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+        "Accept-Language": "en-US,en;q=0.9",
+    },
+    http1=True,           # иногда помогает отключить http2
+    http2=False,))
 
     dialog_for_model = "\n".join(
         f"{_seconds_to_mmss(start)} | {text}"
