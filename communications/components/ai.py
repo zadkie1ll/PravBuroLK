@@ -519,7 +519,7 @@ def diarize_transcript(transcription: Any) -> dict[str, str]:
     }
     """
     from openai import OpenAI
-
+    import httpx
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is empty. Set it in environment or disable diarization step.")
@@ -530,7 +530,7 @@ def diarize_transcript(transcription: Any) -> dict[str, str]:
 
     timeout_seconds = float(os.getenv("OPENAI_REQUEST_TIMEOUT_SECONDS", "180"))
     model_name = os.getenv("OPENAI_DIARIZATION_MODEL", "gpt-4.1-mini").strip() or "gpt-4.1-mini"
-    client = OpenAI(api_key=api_key, timeout=timeout_seconds)
+    client = OpenAI(api_key=api_key, timeout=timeout_seconds, http_client=httpx.Client(proxy="socks5h://127.0.0.1:9050"))
 
     dialog_for_model = "\n".join(
         f"{_seconds_to_mmss(start)} | {text}"
@@ -590,13 +590,13 @@ def diarize_transcript(transcription: Any) -> dict[str, str]:
 # === Анализ ===
 def ai_analysis(transcribtion, speaker_map: dict[str, str] | None = None):
     from openai import OpenAI
-
+    import httpx
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is empty. Set it in environment or disable analysis step.")
 
     timeout_seconds = float(os.getenv("OPENAI_REQUEST_TIMEOUT_SECONDS", "180"))
-    client = OpenAI(api_key=api_key, timeout=timeout_seconds)
+    client = OpenAI(api_key=api_key, timeout=timeout_seconds, http_client=httpx.Client(proxy="socks5h://127.0.0.1:9050"))
     model_name = os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-4.1-mini").strip() or "gpt-4.1-mini"
 
     normalized = _normalize_transcript_segments(transcribtion)
