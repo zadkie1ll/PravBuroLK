@@ -94,8 +94,6 @@ class ArchiveDBModelAdmin(admin.ModelAdmin):
     Для просмотра достаточно переопределить только get_queryset и несколько других методов.
     Запись (add/change/delete) можно отключить, если архив только для чтения.
     """
-    # Название базы данных (должно совпадать с ключом в settings.DATABASES)
-    using = 'archive'
 
     def get_queryset(self, request):
         # Все запросы списка объектов идём в нужную базу
