@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.safestring import mark_safe
 import json
 
-from communications.models import CallProcessingLog, CallWebhookEvent
+from communications.models import CallProcessingLog, CallWebhookEvent, ProcessedCallArchive
 
 
 class CallProcessingLogInline(admin.TabularInline):
@@ -87,3 +87,109 @@ class CallProcessingLogAdmin(admin.ModelAdmin):
     search_fields = ("message", "event__call_id", "event__lead_id", "event__deal_id", "event__contact_id")
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
+
+class ArchiveDBModelAdmin(admin.ModelAdmin):
+    """
+    ModelAdmin, который заставляет все операции читать/писать в базу 'archive'.
+    Для просмотра достаточно переопределить только get_queryset и несколько других методов.
+    Запись (add/change/delete) можно отключить, если архив только для чтения.
+    """
+    # Название базы данных (должно совпадать с ключом в settings.DATABASES)
+    using = 'archive'
+
+    def get_queryset(self, request):
+        # Все запросы списка объектов идём в нужную базу
+        return super().get_queryset(request).using(self.using)
+
+    def get_form(self, request, obj=None, **kwargs):
+        # Если вдруг кто-то попытается редактировать — тоже укажем базу
+        form = super().get_form(request, obj, **kwargs)
+        form._meta.model.objects = form._meta.model.objects.using(self.using)
+        return form
+
+    # Отключаем возможность добавления/изменения/удаления (архив read-only)
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ProcessedCallArchive, site=admin.site)
+class ProcessedCallArchiveAdmin(ArchiveDBModelAdmin):
+    list_display = (
+        "id",
+        "created_at",
+        "source_event_id",
+        "call_id",
+        "lead_id",
+        "deal_id",
+        "contact_id",
+        "record_file_id",
+    )
+    list_filter = (
+        "created_at",
+        "call_id",
+        "lead_id",
+        "deal_id",
+    )
+    search_fields = (
+        "call_id",
+        "lead_id",
+        "deal_id",
+        "contact_id",
+        "record_file_id",
+        "source_event_id",
+    )
+    readonly_fields = (
+        "created_at",
+        "source_event_id",
+        "call_id",
+        "lead_id",
+        "deal_id",
+        "contact_id",
+        "record_file_id",
+        "audio_file_path",
+        "transcript",
+        "analysis",
+        "source_payload",
+    )
+    ordering = ("-created_at",)
+    # Показываем JSON-поля красиво (как у вас уже сделано для других моделей)
+    def pretty_transcript(self, obj):
+        import json
+        from django.utils.safestring import mark_safe
+        rendered = json.dumps(obj.transcript, ensure_ascii=False, indent=2)
+        return mark_safe(f"<pre style='white-space:pre-wrap;max-width:900px'>{rendered}</pre>")
+    pretty_transcript.short_description = "Transcript"
+
+    def pretty_analysis(self, obj):
+        import json
+        from django.utils.safestring import mark_safe
+        rendered = json.dumps(obj.analysis, ensure_ascii=False, indent=2)
+        return mark_safe(f"<pre style='white-space:pre-wrap;max-width:900px'>{rendered}</pre>")
+    pretty_analysis.short_description = "Analysis"
+
+    def pretty_source_payload(self, obj):
+        import json
+        from django.utils.safestring import mark_safe
+        rendered = json.dumps(obj.source_payload, ensure_ascii=False, indent=2)
+        return mark_safe(f"<pre style='white-space:pre-wrap;max-width:900px'>{rendered}</pre>")
+    pretty_source_payload.short_description = "Source Payload"
+
+    fields = (
+        "created_at",
+        "source_event_id",
+        "call_id",
+        "lead_id",
+        "deal_id",
+        "contact_id",
+        "record_file_id",
+        "audio_file_path",
+        "pretty_transcript",
+        "pretty_analysis",
+        "pretty_source_payload",
+    )
