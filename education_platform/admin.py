@@ -80,26 +80,6 @@ class QuestionOptionAdmin(admin.ModelAdmin):
     short_text.short_description = "Вариант"
 
 
-@admin.register(TraineeProfile)
-class TraineeProfileAdmin(admin.ModelAdmin):
-    list_display = ('full_name', 'user', 'started_at', 'is_active', 'progress_count', 'attempts_count')
-    list_filter = ('is_active',)
-    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__email')
-    readonly_fields = ('created_at', 'updated_at')
-
-    def full_name(self, obj):
-        return obj.user.get_full_name() or obj.user.username
-    full_name.short_description = "Стажёр"
-
-    def progress_count(self, obj):
-        return obj.learning_progress.count()
-    progress_count.short_description = "Прогресс"
-
-    def attempts_count(self, obj):
-        return obj.test_attempts.count()
-    attempts_count.short_description = "Попытки"
-
-
 @admin.register(LearningProgress)
 class LearningProgressAdmin(admin.ModelAdmin):
     list_display = ('trainee_link', 'block_id', 'status', 'started_at', 'completed_at', 'last_activity_at')
