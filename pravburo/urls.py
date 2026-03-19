@@ -10,7 +10,7 @@ from bitrix.views import referral_landing, referral_submit, application_success,
 from administration.views import casino_page, spin_view
 from leadreport.views import get_stats
 from documents.views import document_form, generate_document, dogovor, parse_legenda
-from communications.views import bitrix_call_webhook, download_call_to_server
+from communications.views import bitrix_call_webhook, download_call_to_server, manual_analyze_last_call
 from education_platform.views import (
     auth_api_login,
     auth_api_register,
@@ -114,7 +114,8 @@ urlpatterns = [
     path('download_call', download_call_to_server),
     path('api/setIsBlocked/', setIsBlocked),
     path('api/testt/', test),
-    path('api/getManagerCalls/', get_stats)
+    path('api/getManagerCalls/', get_stats),
+    path('api/manualAnalyze/', manual_analyze_last_call)
 ]
 
 
