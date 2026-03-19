@@ -8,6 +8,7 @@ from django.contrib.auth.views import LogoutView
 from payments.views import client_admin_view, create_other_payments, delete_other_payment, update_other_payments, update_contract_info, create_installment_payment, create_actual_payments, delete_installment_payment, update_installment_payments, delete_actual_payment, update_actual_payments, client_payments_page, create_other_payment, delete_actual_payment_view, save_actual_payment, create_actual_payment, create_payment, payment_callback, BitrixCreateClientFromDealView, recalculate_installment, update_custom_payments, payments_dashboard, client_search_view, BitrixWebhookCreateClientView, admin_dashboard
 from bitrix.views import referral_landing, referral_submit, application_success, referral_stats, build_consultation, sync_regions_from_bitrix, calc_km_for_deal, test
 from administration.views import casino_page, spin_view
+from leadreport.views import get_stats
 from documents.views import document_form, generate_document, dogovor, parse_legenda
 from communications.views import bitrix_call_webhook, download_call_to_server
 from education_platform.views import (
@@ -112,7 +113,8 @@ urlpatterns = [
     path('bitrix/webhook/call-end/', bitrix_call_webhook),
     path('download_call', download_call_to_server),
     path('api/setIsBlocked/', setIsBlocked),
-    path('api/testt/', test)
+    path('api/testt/', test),
+    path('api/getManagerCalls/', get_stats)
 ]
 
 
