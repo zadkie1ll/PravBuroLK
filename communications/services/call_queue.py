@@ -652,37 +652,69 @@ def _post_call_result_comment(
 
 def _format_transcript_for_comment(transcript: list[Any], speaker_map: dict[str, Any] | None = None) -> str:
     if not transcript:
-        return "-"
+        return "Транскрипт отсутствует или пустой."
 
     normalized_speaker_map = speaker_map if isinstance(speaker_map, dict) else {}
     lines: list[str] = []
+    current_speaker = None
+    current_block: list[str] = []
+
+    def flush_block():
+        if not current_block:
+            return
+        block_text = " ".join(current_block).strip()
+        if len(block_text) > 300:  # разбиваем очень длинные монологи
+            block_text = block_text[:280] + "… [длинный фрагмент]"
+        prefix = f"[{_format_role_label(current_speaker)}]" if current_speaker else ""
+        lines.append(f"{prefix} {block_text}")
+        current_block.clear()
+
     for item in transcript:
         if isinstance(item, dict):
             text = str(item.get("text") or item.get("TEXT") or "").strip()
             start = _coerce_seconds(item.get("start") or item.get("start_seconds"))
-            stamp = _seconds_to_mmss(start)
-            role = str(normalized_speaker_map.get(stamp) or "unknown")
-            if text:
-                lines.append(f"{_format_role_label(role)}: {text}" if role != "unknown" else text)
-                continue
-        if isinstance(item, list) and len(item) >= 2:
+        elif isinstance(item, (list, tuple)) and len(item) >= 2:
             text = str(item[0] or "").strip()
             start = _coerce_seconds(item[1])
-            stamp = _seconds_to_mmss(start)
-            role = str(normalized_speaker_map.get(stamp) or "unknown")
-            if text:
-                lines.append(f"{_format_role_label(role)}: {text}" if role != "unknown" else text)
-                continue
-        text = str(item or "").strip()
-        if text:
-            lines.append(text)
+        else:
+            text = str(item or "").strip()
+            start = 0.0
 
-    merged = "\n".join(lines).strip()
-    if not merged:
-        return "-"
-    if len(merged) > BITRIX_COMMENT_TRANSCRIPT_MAX_CHARS:
-        return f"{merged[:BITRIX_COMMENT_TRANSCRIPT_MAX_CHARS].rstrip()}\n...[обрезано]"
-    return merged
+        if not text:
+            continue
+
+        ts = _seconds_to_mmss(start)
+        speaker = normalized_speaker_map.get(ts, "unknown")
+        role_label = _format_role_label(speaker)
+
+        # новый спикер → завершаем предыдущий блок
+        if speaker != current_speaker and current_block:
+            flush_block()
+
+        current_speaker = speaker
+        current_block.append(text)
+
+        # принудительно разбиваем, если реплика очень длинная
+        if len(" ".join(current_block)) > 450:
+            flush_block()
+
+    flush_block()  # не забываем последний блок
+
+    if not lines:
+        return "Транскрипт пустой после обработки."
+
+    formatted = "\n".join(lines)
+
+    if len(formatted) > BITRIX_COMMENT_TRANSCRIPT_MAX_CHARS:
+        formatted = formatted[:BITRIX_COMMENT_TRANSCRIPT_MAX_CHARS - 30].rstrip() + "\n… (обрезано)"
+
+    # Добавляем заголовок и немного воздуха
+    return (
+        "Транскрипция звонка (с таймкодами и разделением по спикерам):\n"
+        "────────────────────────────────────────\n"
+        f"{formatted}\n"
+        "────────────────────────────────────────"
+    )
 
 
 def _format_summary_for_comment(analysis: dict[str, Any]) -> str:
