@@ -108,7 +108,7 @@ def generate_pdf(data) -> bytes:
 
     data["consultation"] = {
         "date": data["document"]["generated_at"],
-        "contract_link": None
+        "isContract": data['summary']['contract'] != None
     }
 
     # Parse finance amounts

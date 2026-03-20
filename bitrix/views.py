@@ -360,7 +360,7 @@ def build_consultation(request):
             },
             "summary": {
                 "client_name": pick(deal_data, UF_CLIENT_NAME) or "Клиент",
-
+                "contract" : pick(deal_data, "UF_CRM_1745888352245"),
                 "property": pick(deal_data, "UF_CRM_1754647601622"),
                 "deals": pick(deal_data, "UF_CRM_1754647663541"),
                 "marriage": pick(deal_data, "UF_CRM_1754647902223"),

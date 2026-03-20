@@ -352,7 +352,7 @@
             </div>
             <div class="line-row">
                 <span class="label">Договор:</span>
-                <span class="value">{% if data.consultation.contract_link %}{{ data.consultation.contract_link }}{% else %}Отсутствует{% endif %}</span>
+                <span class="value">{% if data.consultation.isContract %}Оформлен{% else %}Отсутствует{% endif %}</span>
             </div>
         </div>
     </section>
