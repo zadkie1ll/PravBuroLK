@@ -95,37 +95,55 @@ def _extract_payload(request):
         return request.POST.dict()
 
     return {}
-@csrf_exempt   # только если используете токены / api-key, иначе уберите
+@csrf_exempt
 @require_POST
 def manual_analyze_last_call(request):
-    """
-    Запустить анализ последнего звонка по сущности Bitrix.
-    
-    Пример тела запроса (json):
-    {
-      "entity_type": "lead",      // "lead", "deal", "contact"
-      "entity_id": "12345678",
-      "force": false              // если true — анализировать даже уже обработанные
-    }
-    """
     try:
-        if request.content_type and 'application/json' in request.content_type.lower():
+        # ── Unified payload extraction ──────────────────────────────────────
+        content_type = (request.content_type or '').lower()
+
+        if 'application/json' in content_type:
             try:
-                data = json.loads(request.body)
+                data = json.loads(request.body.decode('utf-8') if request.body else '{}')
             except json.JSONDecodeError:
-                return JsonResponse({"error": "Invalid JSON!"}, status=400)
+                return JsonResponse({"error": "Invalid JSON body"}, status=400)
         else:
+            # form-urlencoded (Bitrix default) or multipart/form-data
             data = request.POST.dict()
+
+        # ── Now safely extract parameters ───────────────────────────────────
         entity_type = str(data.get("entity_type", "")).strip().lower()
         entity_id   = str(data.get("entity_id", "")).strip()
-        force       = data.get("force", False)
+        force       = data.get("force", False)  # works for bool in dict
 
         if not entity_type or not entity_id:
-            return JsonResponse({"error": "entity_type и entity_id обязательны"}, status=400)
+            # For Bitrix webhook case — try to auto-detect from document_id[]
+            document_id_parts = [
+                data.get(f"document_id[{i}]") 
+                for i in range(10)  # safety limit
+                if f"document_id[{i}]" in data
+            ]
+
+            if len(document_id_parts) >= 3 and document_id_parts[0] == "crm":
+                crm_type = document_id_parts[1]  # e.g. CCrmDocumentContact
+                raw_id   = document_id_parts[2]  # e.g. CONTACT_13210
+
+                if crm_type == "CCrmDocumentContact":
+                    entity_type = "contact"
+                    entity_id   = raw_id.replace("CONTACT_", "")
+                elif crm_type == "CCrmDocumentDeal":
+                    entity_type = "deal"
+                    entity_id   = raw_id.replace("DEAL_", "")
+                elif crm_type == "CCrmDocumentLead":
+                    entity_type = "lead"
+                    entity_id   = raw_id.replace("LEAD_", "")
+                # add other types if needed
+
+        if not entity_type or not entity_id:
+            return JsonResponse({"error": "entity_type и entity_id обязательны (или document_id[] из Bitrix)"}, status=400)
 
         if entity_type not in ("lead", "deal", "contact"):
             return JsonResponse({"error": "entity_type должен быть lead/deal/contact"}, status=400)
-
         # Ищем самый свежий подходящий обработанный звонок
         filters = {
             "status": CallWebhookEvent.Status.DONE,
