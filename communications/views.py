@@ -109,7 +109,13 @@ def manual_analyze_last_call(request):
     }
     """
     try:
-        data = request.data
+        if request.content_type and 'application/json' in request.content_type.lower():
+            try:
+                data = json.loads(request.body)
+            except json.JSONDecodeError:
+                return JsonResponse({"error": "Invalid JSON!"}, status=400)
+        else:
+            data = request.POST.dict()
         entity_type = str(data.get("entity_type", "")).strip().lower()
         entity_id   = str(data.get("entity_id", "")).strip()
         force       = data.get("force", False)
