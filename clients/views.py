@@ -48,17 +48,17 @@ class CustomLoginView(LoginView):
 
 
 def get_user_redirect_url(user):
-    if hasattr(user, "trainee_profile") and user.trainee_profile.is_active:
-        return "/static/lms-front"
-
-    if user.is_staff or user.is_superuser:
-        return resolve_url("admin_dashboard")
-
-    if hasattr(user, "sales_manager_profile") and user.sales_manager_profile.is_active:
-        return resolve_url("my_stats")
-
     if hasattr(user, "client"):
         return resolve_url("client_dashboard")
+    
+    if user.is_staff or user.is_superuser:
+        return resolve_url("admin_dashboard")
+    
+    if hasattr(user, "sales_manager_profile") and user.sales_manager_profile.is_active:
+        return resolve_url("my_stats")
+    
+    if hasattr(user, "trainee_profile") and user.trainee_profile.is_active:
+        return "/static/lms-front"
 
     return resolve_url("client_dashboard")
 
