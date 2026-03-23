@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lead Report | Статистика менеджеров</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100">
+  <div class="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.14),_transparent_24%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)]"></div>
+
+  <header class="border-b border-white/10 bg-slate-950/80 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
+      <div>
+        <p class="text-xs uppercase tracking-[0.35em] text-cyan-300">Lead Report</p>
+        <h1 class="mt-2 text-2xl font-semibold text-white">Статистика менеджеров</h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="{% url 'admin_dashboard' %}" class="rounded-full border border-white/15 px-4 py-2 text-sm text-slate-200 transition hover:border-cyan-300 hover:text-cyan-200">
+          Админ-панель
+        </a>
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="rounded-full bg-cyan-400 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-cyan-300">
+            Выйти
+          </button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-6 py-10">
+    <section class="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+      <div class="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-cyan-950/20 backdrop-blur">
+        <p class="text-sm text-slate-300">Сводка по звонкам менеджеров за выбранный период.</p>
+        <div class="mt-6 grid gap-4 sm:grid-cols-3">
+          <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+            <p class="text-sm text-slate-400">Менеджеров</p>
+            <p class="mt-2 text-3xl font-semibold text-white">{{ stats|length }}</p>
+          </div>
+          <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+            <p class="text-sm text-slate-400">Период с</p>
+            <p class="mt-2 text-lg font-medium text-white">{{ period_start|date:'d.m.Y' }}</p>
+          </div>
+          <div class="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+            <p class="text-sm text-slate-400">Период по</p>
+            <p class="mt-2 text-lg font-medium text-white">{{ period_end|date:'d.m.Y' }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-3xl border border-cyan-400/20 bg-cyan-400/10 p-8 shadow-2xl shadow-cyan-950/20">
+        <p class="text-sm uppercase tracking-[0.28em] text-cyan-200">Фильтр</p>
+        <form method="get" class="mt-5 space-y-4">
+          <div>
+            <label for="start" class="mb-2 block text-sm text-slate-300">С даты</label>
+            <input id="start" type="date" name="start" value="{{ period_start|date:'Y-m-d' }}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-300">
+          </div>
+          <div>
+            <label for="end" class="mb-2 block text-sm text-slate-300">По дату</label>
+            <input id="end" type="date" name="end" value="{{ period_end|date:'Y-m-d' }}" class="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-300">
+          </div>
+          <button type="submit" class="w-full rounded-2xl bg-white px-4 py-3 font-medium text-slate-950 transition hover:bg-cyan-100">
+            Обновить отчет
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <section class="mt-8 overflow-hidden rounded-3xl border border-white/10 bg-slate-900/70 shadow-2xl shadow-slate-950/30 backdrop-blur">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-white/10">
+          <thead class="bg-white/5">
+            <tr class="text-left text-sm uppercase tracking-[0.18em] text-slate-400">
+              <th class="px-6 py-4">Менеджер</th>
+              <th class="px-6 py-4">Bitrix ID</th>
+              <th class="px-6 py-4 text-center">Звонки</th>
+              <th class="px-6 py-4 text-center">Время</th>
+              <th class="px-6 py-4 text-right">Детали</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/10 text-sm text-slate-200">
+            {% for item in stats %}
+            <tr class="transition hover:bg-white/5">
+              <td class="px-6 py-4">
+                <div class="font-medium text-white">{{ item.manager.name }}</div>
+              </td>
+              <td class="px-6 py-4 text-slate-400">{{ item.manager.bitrix_user_id }}</td>
+              <td class="px-6 py-4 text-center">
+                <span class="inline-flex min-w-16 justify-center rounded-full bg-cyan-400/15 px-3 py-1 font-semibold text-cyan-200">{{ item.call_count }}</span>
+              </td>
+              <td class="px-6 py-4 text-center font-medium text-white">{{ item.total_time }}</td>
+              <td class="px-6 py-4 text-right">
+                <a href="{% url 'admin_manager_detail' item.manager.id %}" class="inline-flex rounded-full border border-cyan-400/30 px-4 py-2 text-sm text-cyan-200 transition hover:border-cyan-300 hover:bg-cyan-400/10">
+                  Подробно
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="px-6 py-12 text-center text-slate-400">Нет активных менеджеров с Bitrix ID.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
