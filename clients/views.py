@@ -1,5 +1,5 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, resolve_url
 from django.contrib.contenttypes.models import ContentType
 from django.http import JsonResponse
 from django.utils.decorators import method_decorator
@@ -38,6 +38,29 @@ def employee_referral_view(request, employee_id):
 
 class CustomLoginView(LoginView):
     template_name = 'login.html'
+    redirect_authenticated_user = True
+
+    def get_success_url(self):
+        redirect_to = self.get_redirect_url()
+        if redirect_to:
+            return redirect_to
+        return get_user_redirect_url(self.request.user)
+
+
+def get_user_redirect_url(user):
+    if hasattr(user, "trainee_profile") and user.trainee_profile.is_active:
+        return "/static/lms-front"
+
+    if user.is_staff or user.is_superuser:
+        return resolve_url("admin_dashboard")
+
+    if hasattr(user, "sales_manager_profile") and user.sales_manager_profile.is_active:
+        return resolve_url("my_stats")
+
+    if hasattr(user, "client"):
+        return resolve_url("client_dashboard")
+
+    return resolve_url("client_dashboard")
 
 def get_client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -201,10 +224,7 @@ def stage_detail(request, slug):
 @csrf_exempt
 @login_required
 def redirect_handler(request):
-    if request.user.is_staff or request.user.is_superuser:
-        return redirect('admin_dashboard')  
-    else:
-        return redirect('client_dashboard')
+    return redirect(get_user_redirect_url(request.user))
     
     
 @require_POST

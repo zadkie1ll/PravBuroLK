@@ -116,7 +116,7 @@ urlpatterns = [
     path('api/testt/', test),
     path("my/", lead_my_stats_page, name="my_stats"),
     path("leadreport/managerdashboard/", lead_admin_dashboard, name="lead_admin_dashboard"),
-    path("admin/manager/<int:manager_id>/", lead_admin_manager_detail, name="admin_manager_detail"),
+    path("leadreport/manager/<int:manager_id>/", lead_admin_manager_detail, name="admin_manager_detail"),
     path('api/manualAnalyze/', manual_analyze_last_call)
 ]
 
