@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "simple_history",
     "leadreport",
     "communications",
+    "lead_control"
 ]
 
 # ------------------------------------------------------------------
@@ -242,3 +243,23 @@ BITRIX_REDIRECT_URI = os.getenv("BITRIX_REDIRECT_URI", "http://localhost:8000/au
 BITRIX_OAUTH_BASE_URL = os.getenv("BITRIX_OAUTH_BASE_URL", "https://oauth.bitrix.info/oauth")
 BITRIX_WEBHOOK = os.getenv("BITRIX_WEBHOOK", os.getenv("BITRIX_WEBHOOK_URL", ""))
 BITRIX_WEBHOOK_URL = os.getenv("BITRIX_WEBHOOK_URL", BITRIX_WEBHOOK)
+
+
+# ------------------------------------------------------------------
+# lead_control
+# ------------------------------------------------------------------
+
+BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
+
+LEAD_CONTROL_DISABLE_FIELD = "UF_CRM_1774361781838"
+
+LEAD_CONTROL_MONITORED_STAGES = [
+    "NEW",
+    "UC_EXAMPLE_STAGE",
+]
+
+LEAD_CONTROL_TYPICAL_TASK_TITLE = "Связаться с клиентом"
+LEAD_CONTROL_TYPICAL_TASK_DESCRIPTION = "Необходимо повторно связаться с клиентом по сделке."
+
+LEAD_CONTROL_WORKDAY_START_HOUR = 10
+LEAD_CONTROL_WORKDAY_END_HOUR = 19

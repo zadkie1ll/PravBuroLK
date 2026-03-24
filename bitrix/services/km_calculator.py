@@ -77,30 +77,43 @@ class PmValues:
 
 def calculate_km(inp: KmInput, pm: PmValues) -> Dict[str, Any]:
     """
-    Формула по ТЗ:
-    keep = PM(по типу дохода) + PM_CHILD * children_count
-    contest_mass = max(0, base_income - keep)
+    Расчет конкурсной массы.
 
-    Тип ПМ:
-      - зарплата -> pm_working
-      - пенсия -> pm_pensioner
-      - зарплата+пенсия -> pm_working
+    Формула:
+
+    base_income = salary + pension
+
+    excluded_total =
+        benefits +
+        child_payments +
+        alimony +
+        social +
+        other
+
+    keep = PM + PM_CHILD * children_count
+
+    contest_mass =
+        max(0, base_income - excluded_total - keep)
+
+    remain_to_person =
+        base_income - contest_mass
     """
 
     salary = _clamp_non_negative(_to_decimal(inp.salary))
     pension = _clamp_non_negative(_to_decimal(inp.pension))
+
     children_count_raw = _to_decimal(inp.children_count)
-    # дети — целое и неотрицательное
     children_count = int(children_count_raw) if children_count_raw > 0 else 0
 
     base_income = salary + pension
 
-    # доходы "не входят" — справочно
+    # выплаты, которые не входят в конкурсную массу
     benefits = _clamp_non_negative(_to_decimal(inp.benefits))
     child_payments = _clamp_non_negative(_to_decimal(inp.child_payments))
     alimony = _clamp_non_negative(_to_decimal(inp.alimony))
     social = _clamp_non_negative(_to_decimal(inp.social))
     other = _clamp_non_negative(_to_decimal(inp.other))
+
     excluded_total = benefits + child_payments + alimony + social + other
 
     # определяем тип дохода
@@ -122,13 +135,17 @@ def calculate_km(inp: KmInput, pm: PmValues) -> Dict[str, Any]:
     if income_type in ("SALARY", "MIXED"):
         pm_base = pm_working
         pm_type: PmType = "WORKING"
+
         if pm_working == 0:
             warnings.append("pm_working_is_zero_or_missing")
+
     elif income_type == "PENSION":
         pm_base = pm_pensioner
         pm_type = "PENSIONER"
+
         if pm_pensioner == 0:
             warnings.append("pm_pensioner_is_zero_or_missing")
+
     else:
         pm_base = Decimal("0")
         pm_type = "NONE"
@@ -136,11 +153,14 @@ def calculate_km(inp: KmInput, pm: PmValues) -> Dict[str, Any]:
 
     keep_amount = pm_base + (pm_child * Decimal(children_count))
 
-    # сколько уходит в конкурсную массу
-    contest_mass = _clamp_non_negative(base_income - keep_amount)
+    # доход после исключённых выплат
+    income_after_excluded = _clamp_non_negative(base_income - excluded_total)
 
-    # сколько остаётся должнику из base_income
-    remain_to_person = base_income - contest_mass  # эквивалент min(base_income, keep_amount)
+    # конкурсная масса
+    contest_mass = _clamp_non_negative(income_after_excluded - keep_amount)
+
+    # сколько остаётся должнику
+    remain_to_person = base_income - contest_mass
 
     return {
         "region_bitrix_id": inp.region_bitrix_id,
@@ -171,6 +191,7 @@ def calculate_km(inp: KmInput, pm: PmValues) -> Dict[str, Any]:
 
         "result": {
             "base_income": float(base_income),
+            "income_after_excluded": float(income_after_excluded),
             "keep_amount": float(keep_amount),
             "remain_to_person": float(remain_to_person),
             "contest_mass": float(contest_mass),

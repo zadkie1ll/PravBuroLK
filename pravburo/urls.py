@@ -10,6 +10,7 @@ from bitrix.views import referral_landing, referral_submit, application_success,
 from administration.views import casino_page, spin_view
 from leadreport.views import lead_admin_dashboard, lead_admin_manager_detail, lead_my_stats_page
 from documents.views import document_form, generate_document, dogovor, parse_legenda
+from lead_control.views import deal_webhook_handler
 from communications.views import bitrix_call_webhook, download_call_to_server, manual_analyze_last_call
 from education_platform.views import (
     auth_api_login,
@@ -44,6 +45,7 @@ urlpatterns = [
     path('ai/', parse_legenda, name='ai_engine'),
     # path('casino/', casino_page, name='casino'),
     path("spin/", spin_view, name="spin"),
+    path("webhook/deal/", deal_webhook_handler, name="parsedealdataOM"),
     path("ref/<uuid:referral_code>/", referral_landing, name="referral_landing"),
     path('ref/success/', application_success, name='application_success'),
     path("employee/<int:employee_id>/referral/", employee_referral_view, name="employee_referral"),

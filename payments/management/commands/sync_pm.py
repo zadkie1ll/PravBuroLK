@@ -19,7 +19,6 @@ class Command(BaseCommand):
 
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # ищем таблицу по указанному пути (tbody)
         tbody = soup.select_one(
             "body > main > section.re-container.re-container--grazhdanam > div > div.re-container__inner-main-container > div.re-container__inner-left > div > div > div > table > tbody"
         )
