@@ -112,7 +112,7 @@ urlpatterns = [
     path("yclients-webhook/", yclients_webhook),
     path('bitrix/webhook/call-end/', bitrix_call_webhook),
     path('download_call', download_call_to_server),
-    path('api/setIsBlocked/', setIsBlocked),
+    path('api/setIsBlocked/', setIsBlocked, name='set_is_blocked'),
     path('api/testt/', test),
     path("my/", lead_my_stats_page, name="my_stats"),
     path("leadreport/managerdashboard/", lead_admin_dashboard, name="lead_admin_dashboard"),

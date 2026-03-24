@@ -1,9 +1,12 @@
 import sys
 from decimal import Decimal
 from unittest.mock import Mock, patch
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.test import SimpleTestCase, override_settings
 from django.core.cache import cache
+from django.urls import reverse
+from clients.models import Client
 from clients.services import ClientService
 from clients.lawyer_info import get_client_lawyer_info
 from colorama import init, Fore, Style
@@ -210,3 +213,35 @@ class ClientLawyerInfoTests(SimpleTestCase):
 
         self.assertEqual(first, second)
         self.assertEqual(mock_get.call_count, 2)
+
+
+class SetIsBlockedTests(TestCase):
+    @patch("clients.views.requests.post")
+    def test_set_is_blocked_updates_client_from_bitrix_field(self, mock_post):
+        user = User.objects.create_user(username="blocked-user", password="pwd")
+        client = Client.objects.create(
+            user=user,
+            name="Ivan",
+            surname="Ivanov",
+            bitrix_id="12345",
+            isBlocked=False,
+        )
+
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "result": {
+                "UF_CRM_1772457154217": 1,
+            }
+        }
+        mock_post.return_value = response
+
+        result = self.client.post(
+            reverse("set_is_blocked"),
+            {"document_id[2]": "12345"},
+        )
+
+        client.refresh_from_db()
+
+        self.assertEqual(result.status_code, 200)
+        self.assertTrue(client.isBlocked)

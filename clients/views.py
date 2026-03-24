@@ -383,33 +383,52 @@ def setIsBlocked(request):
             )
         try:
             client = Client.objects.get(bitrix_id=bitrix_id)
-        except:
+        except Client.DoesNotExist:
             return JsonResponse(
                 {
                     "status": "error",
-                    "message": "No user with {bitrix_id} id found"
+                    "message": f"No user with {bitrix_id} id found"
                 },
                 status=404
-            ) 
+            )
+
+        value = None
         try:
-            response = requests.post("https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/crm.deal.get?ID={bitrix_id}", timeout=10)
-            if (response.status_code == 200):
-                data=response.json()
+            response = requests.post(
+                f"{BITRIX_WEBHOOK_URL}crm.deal.get",
+                data={"ID": bitrix_id},
+                timeout=10,
+            )
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, dict):
                 value = data.get("result", {}).get("UF_CRM_1772457154217")
         except Exception as e:
             return JsonResponse({
                 "status": "error",
-                "message": "There is error fetching bool field of block: "+e,
+                "message": f"There is error fetching bool field of block: {e}",
             })
+
+        if value is None:
+            return JsonResponse({
+                "status": "error",
+                "message": "Bitrix field UF_CRM_1772457154217 was not found"
+            }, status=400)
+
         with transaction.atomic():
-            match(value):
-                case 0:
+            match value:
+                case 0 | "0" | False:
                     client.isBlocked = False
-                case 1:
+                case 1 | "1" | True:
                     client.isBlocked = True
+                case _:
+                    return JsonResponse({
+                        "status": "error",
+                        "message": f"Unsupported Bitrix block value: {value}"
+                    }, status=400)
             client.save(update_fields=['isBlocked'])
         return JsonResponse({
-            "status": "succeded",
+            "status": "succeeded",
             "message": "user block status is changed"
         },
         status=200)
