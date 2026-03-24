@@ -383,7 +383,7 @@ def setIsBlocked(request):
             request.META.get("CONTENT_TYPE"),
             request.META.get("REMOTE_ADDR"),
         )
-        bitrix_id = request.POST.get("document_id[2]")
+        bitrix_id = request.POST.get("document_id[2]").split("_")[1]
 
         if not bitrix_id and request.content_type == "application/json":
             try:
