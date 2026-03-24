@@ -19,6 +19,7 @@ from clients.services import ClientService
 from clients.lawyer_info import get_client_lawyer_info
 from django.db import transaction
 from .models import Employee
+import requests
 from payments.utilities import get_deal_data_from_bitrix
 BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
 
@@ -371,7 +372,8 @@ class CustomLogoutView(DjangoLogoutView):
 @require_POST
 def setIsBlocked(request):
     try:
-        bitrix_id = request.POST.get("bitrix_id")
+        bitrix_id = request.POST.get("document_id[2]")
+        
         if (not bitrix_id):
             return JsonResponse({
                 "status" : 'error',
@@ -389,8 +391,22 @@ def setIsBlocked(request):
                 },
                 status=404
             ) 
+        try:
+            response = requests.post("https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/crm.deal.get?ID={bitrix_id}", timeout=10)
+            if (response.status_code == 200):
+                data=response.json()
+                value = data.get("result", {}).get("UF_CRM_1772457154217")
+        except Exception as e:
+            return JsonResponse({
+                "status": "error",
+                "message": "There is error fetching bool field of block: "+e,
+            })
         with transaction.atomic():
-            client.isBlocked = not client.isBlocked
+            match(value):
+                case 0:
+                    client.isBlocked = False
+                case 1:
+                    client.isBlocked = True
             client.save(update_fields=['isBlocked'])
         return JsonResponse({
             "status": "succeded",
