@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import include, path
+from django.urls import include, path, re_path
 from clients.views import client_dashboard, redirect_handler, referral_page, mark_stage_popup_shown, employee_referral_view
 from clients.views import CustomLoginView, TestCreateClientView, stage_detail, dashboard_stats, confident_police, bitrix_deal_webhook, setIsBlocked
 from django.contrib.auth.views import LogoutView
@@ -112,7 +112,7 @@ urlpatterns = [
     path("yclients-webhook/", yclients_webhook),
     path('bitrix/webhook/call-end/', bitrix_call_webhook),
     path('download_call', download_call_to_server),
-    path('api/setIsBlocked/', setIsBlocked, name='set_is_blocked'),
+    re_path(r'^api/setIsBlocked/*$', setIsBlocked, name='set_is_blocked'),
     path('api/testt/', test),
     path("my/", lead_my_stats_page, name="my_stats"),
     path("leadreport/managerdashboard/", lead_admin_dashboard, name="lead_admin_dashboard"),

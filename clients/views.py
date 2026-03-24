@@ -10,6 +10,7 @@ from django.contrib.auth.views import LogoutView as DjangoLogoutView
 from django.contrib.auth.views import LoginView
 from payments.models import Contract, InstallmentPlan, ActualPayment
 from .models import DashboardVisit
+import json
 import time
 from django.shortcuts import redirect
 from django.utils import timezone
@@ -19,9 +20,11 @@ from clients.services import ClientService
 from clients.lawyer_info import get_client_lawyer_info
 from django.db import transaction
 from .models import Employee
+import logging
 import requests
 from payments.utilities import get_deal_data_from_bitrix
 BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
+logger = logging.getLogger(__name__)
 
 def confident_police(request):
     return render(request, "policy.html")
@@ -372,9 +375,30 @@ class CustomLogoutView(DjangoLogoutView):
 @require_POST
 def setIsBlocked(request):
     try:
+        logger.info(
+            "setIsBlocked request path=%s full_path=%s method=%s content_type=%s remote_addr=%s",
+            request.path,
+            request.get_full_path(),
+            request.method,
+            request.META.get("CONTENT_TYPE"),
+            request.META.get("REMOTE_ADDR"),
+        )
         bitrix_id = request.POST.get("document_id[2]")
+
+        if not bitrix_id and request.content_type == "application/json":
+            try:
+                payload = json.loads(request.body.decode("utf-8") or "{}")
+            except Exception:
+                payload = {}
+            if isinstance(payload, dict):
+                document_id = payload.get("document_id")
+                if isinstance(document_id, list) and len(document_id) >= 3:
+                    bitrix_id = document_id[2]
+                else:
+                    bitrix_id = payload.get("document_id[2]")
         
         if (not bitrix_id):
+            logger.warning("setIsBlocked missing bitrix_id. POST keys=%s", list(request.POST.keys()))
             return JsonResponse({
                 "status" : 'error',
                 "message": "bitrix_id is required"},
@@ -384,6 +408,7 @@ def setIsBlocked(request):
         try:
             client = Client.objects.get(bitrix_id=bitrix_id)
         except Client.DoesNotExist:
+            logger.warning("setIsBlocked client not found for bitrix_id=%s", bitrix_id)
             return JsonResponse(
                 {
                     "status": "error",
@@ -404,12 +429,14 @@ def setIsBlocked(request):
             if isinstance(data, dict):
                 value = data.get("result", {}).get("UF_CRM_1772457154217")
         except Exception as e:
+            logger.exception("setIsBlocked failed to fetch Bitrix field for bitrix_id=%s", bitrix_id)
             return JsonResponse({
                 "status": "error",
                 "message": f"There is error fetching bool field of block: {e}",
             })
 
         if value is None:
+            logger.warning("setIsBlocked missing UF_CRM_1772457154217 for bitrix_id=%s", bitrix_id)
             return JsonResponse({
                 "status": "error",
                 "message": "Bitrix field UF_CRM_1772457154217 was not found"
@@ -422,6 +449,7 @@ def setIsBlocked(request):
                 case 1 | "1" | True:
                     client.isBlocked = True
                 case _:
+                    logger.warning("setIsBlocked unsupported value=%s for bitrix_id=%s", value, bitrix_id)
                     return JsonResponse({
                         "status": "error",
                         "message": f"Unsupported Bitrix block value: {value}"
