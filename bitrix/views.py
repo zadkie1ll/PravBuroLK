@@ -20,7 +20,7 @@ from .services.regions_sync import sync_regions_from_bitrix_logic
 from django.conf import settings
 from .services.km_calculator import KmInput, PmValues, calculate_km
 from .models import PmRate
-
+import datetime
 BITRIX_REGION_FIELD = "UF_CRM_1745886887592"
 
 BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
@@ -344,7 +344,7 @@ def build_consultation(request):
         payload = {
             "document": {
                 "document_id": f"CONS-{deal_id}",
-                "generated_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
+                "generated_at": timezone.localtime().strftime("%Y-%m-%d %H:%M") + datetime.datetime.hour*3,
             },
             "manager": {
                 "bitrix_user_id": assigned_id,
