@@ -651,7 +651,7 @@ def get_deal_data_from_bitrix(post_data):
     if not document_id_2:
         return None, 'document_id[2] not found'
 
-    deal_id_match = re.search(r'DEAL_(\d+)', document_id_2)
+    deal_id_match = re.search(r'(?:DEAL[_-])?(\d+)', str(document_id_2))
     if not deal_id_match:
         return None, 'Invalid deal ID format'
 

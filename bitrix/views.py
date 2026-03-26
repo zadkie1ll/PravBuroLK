@@ -344,7 +344,7 @@ def build_consultation(request):
         payload = {
             "document": {
                 "document_id": f"CONS-{deal_id}",
-                "generated_at": timezone.localtime().strftime("%Y-%m-%d %H:%M") + datetime.datetime.hour*3,
+                "generated_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
             },
             "manager": {
                 "bitrix_user_id": assigned_id,

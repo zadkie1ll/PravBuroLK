@@ -12,6 +12,7 @@ from payments.models import Contract, InstallmentPlan, ActualPayment
 from .models import DashboardVisit
 import json
 import time
+import re
 from django.shortcuts import redirect
 from django.utils import timezone
 from datetime import timedelta
@@ -25,6 +26,21 @@ import requests
 from payments.utilities import get_deal_data_from_bitrix
 BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
 logger = logging.getLogger(__name__)
+
+
+def extract_bitrix_deal_id(raw_value):
+    if raw_value is None:
+        return None
+
+    value = str(raw_value).strip()
+    if not value:
+        return None
+
+    match = re.search(r"(?:DEAL[_-])?(\d+)", value)
+    if match:
+        return match.group(1)
+
+    return None
 
 def confident_police(request):
     return render(request, "policy.html")
@@ -383,9 +399,9 @@ def setIsBlocked(request):
             request.META.get("CONTENT_TYPE"),
             request.META.get("REMOTE_ADDR"),
         )
-        bitrix_id = request.POST.get("document_id[2]").split("_")[1]
+        bitrix_id = extract_bitrix_deal_id(request.POST.get("document_id[2]"))
 
-        if not bitrix_id and request.content_type == "application/json":
+        if not bitrix_id and request.content_type and "application/json" in request.content_type:
             try:
                 payload = json.loads(request.body.decode("utf-8") or "{}")
             except Exception:
@@ -393,9 +409,9 @@ def setIsBlocked(request):
             if isinstance(payload, dict):
                 document_id = payload.get("document_id")
                 if isinstance(document_id, list) and len(document_id) >= 3:
-                    bitrix_id = document_id[2]
+                    bitrix_id = extract_bitrix_deal_id(document_id[2])
                 else:
-                    bitrix_id = payload.get("document_id[2]")
+                    bitrix_id = extract_bitrix_deal_id(payload.get("document_id[2]"))
         
         if (not bitrix_id):
             logger.warning("setIsBlocked missing bitrix_id. POST keys=%s", list(request.POST.keys()))

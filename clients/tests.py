@@ -245,3 +245,33 @@ class SetIsBlockedTests(TestCase):
 
         self.assertEqual(result.status_code, 200)
         self.assertTrue(client.isBlocked)
+
+    @patch("clients.views.requests.post")
+    def test_set_is_blocked_accepts_deal_prefixed_document_id(self, mock_post):
+        user = User.objects.create_user(username="blocked-user-2", password="pwd")
+        client = Client.objects.create(
+            user=user,
+            name="Petr",
+            surname="Petrov",
+            bitrix_id="12345",
+            isBlocked=True,
+        )
+
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "result": {
+                "UF_CRM_1772457154217": 0,
+            }
+        }
+        mock_post.return_value = response
+
+        result = self.client.post(
+            reverse("set_is_blocked"),
+            {"document_id[2]": "DEAL_12345"},
+        )
+
+        client.refresh_from_db()
+
+        self.assertEqual(result.status_code, 200)
+        self.assertFalse(client.isBlocked)
