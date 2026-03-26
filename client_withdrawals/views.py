@@ -1,4 +1,4 @@
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -9,6 +9,15 @@ from clients.models import Client
 
 from .models import ClientWithdrawalRecord
 from .services import sync_withdrawals_to_bitrix
+
+
+def _parse_money(value: str, *, allow_empty: bool = False):
+    raw = (value or "").strip()
+    if not raw:
+        if allow_empty:
+            return None
+        raise InvalidOperation
+    return Decimal(raw.replace(",", ".")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 @login_required
@@ -32,10 +41,10 @@ def create_withdrawal_record(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
 
     try:
-        withdrawal_amount = Decimal(request.POST.get("withdrawal_amount", "0").replace(",", "."))
-        transferred_amount_raw = (request.POST.get("transferred_amount") or "").strip()
-        transferred_amount = (
-            Decimal(transferred_amount_raw.replace(",", ".")) if transferred_amount_raw else None
+        withdrawal_amount = _parse_money(request.POST.get("withdrawal_amount"))
+        transferred_amount = _parse_money(
+            request.POST.get("transferred_amount"),
+            allow_empty=True,
         )
     except InvalidOperation:
         messages.error(request, "Суммы должны быть в числовом формате.")
@@ -68,10 +77,10 @@ def update_withdrawal_record(request, record_id):
     client = record.client
 
     try:
-        withdrawal_amount = Decimal(request.POST.get("withdrawal_amount", "0").replace(",", "."))
-        transferred_amount_raw = (request.POST.get("transferred_amount") or "").strip()
-        transferred_amount = (
-            Decimal(transferred_amount_raw.replace(",", ".")) if transferred_amount_raw else None
+        withdrawal_amount = _parse_money(request.POST.get("withdrawal_amount"))
+        transferred_amount = _parse_money(
+            request.POST.get("transferred_amount"),
+            allow_empty=True,
         )
     except InvalidOperation:
         messages.error(request, "Суммы должны быть в числовом формате.")
