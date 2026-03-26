@@ -35,6 +35,7 @@ from django.db import connection
 import re
 from .utilities import get_deal_data_from_bitrix, russian_to_translit, recreate_actual_payment, delete_actual_payment
 import telebot
+from client_withdrawals.services import build_withdrawals_bitrix_fields
 
 
 BOT_TOKEN = "8208949436:AAEIzi6eP5R04crpwpIchWnpqCCFv8TROvY"
@@ -1198,7 +1199,7 @@ class BitrixCreateClientFromDealView(View):
         from clients.services import ClientService
         from clients.models import Client
 
-        BITRIX_WEBHOOK = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
+        BITRIX_WEBHOOK = settings.BITRIX_WEBHOOK_URL.rstrip("/") + "/"
 
         def generate_password(length=8):
             """Генерация простого пароля"""
@@ -1315,7 +1316,8 @@ class BitrixCreateClientFromDealView(View):
                 payload = {
                     "id": deal_id,
                     "fields": {
-                        "UF_CRM_1745888913952": auth_text  
+                        "UF_CRM_1745888913952": auth_text,
+                        **build_withdrawals_bitrix_fields(client),
                     }
                 }
 

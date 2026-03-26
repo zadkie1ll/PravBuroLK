@@ -29,6 +29,9 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-dev-key")
 DEBUG = env_bool("DJANGO_DEBUG", True)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", default=["*"])
 SITE_BASE_URL = os.getenv("SITE_BASE_URL", "https://prav-buro.ru")
+BITRIX_WEBHOOK_URL = os.getenv("BITRIX_WEBHOOK_URL", "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27")
+BITRIX_CLIENT_WITHDRAWALS_LINK_FIELD = os.getenv("BITRIX_CLIENT_WITHDRAWALS_LINK_FIELD", "UF_CRM_1774516783")
+BITRIX_CLIENT_WITHDRAWALS_FIELD = os.getenv("BITRIX_CLIENT_WITHDRAWALS_FIELD", "UF_CRM_1774516806")
 
 # ------------------------------------------------------------------
 # APPLICATIONS
@@ -55,7 +58,8 @@ INSTALLED_APPS = [
     "simple_history",
     "leadreport",
     "communications",
-    "lead_control"
+    "lead_control",
+    "client_withdrawals",
 ]
 
 # ------------------------------------------------------------------
