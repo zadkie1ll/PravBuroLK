@@ -49,7 +49,7 @@
         </div>
         <div>
           <label class="block text-sm text-slate-600 mb-1">Сумма перевода</label>
-          <input type="number" step="0.01" min="0" name="transferred_amount" required class="w-full border border-slate-300 rounded-xl p-3">
+          <input type="number" step="0.01" min="0" name="transferred_amount" class="w-full border border-slate-300 rounded-xl p-3" placeholder="Можно заполнить позже">
         </div>
         <div class="flex items-end">
           <button type="submit" class="w-full rounded-xl bg-emerald-600 text-white p-3 hover:bg-emerald-700">
@@ -70,38 +70,49 @@
       </div>
 
       {% if records %}
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-slate-200 text-slate-500">
-                <th class="text-left py-3 pr-4">Дата снятия</th>
-                <th class="text-left py-3 pr-4">Дата перевода</th>
-                <th class="text-left py-3 pr-4">Сумма снятия</th>
-                <th class="text-left py-3 pr-4">Сумма перевода</th>
-                <th class="text-left py-3 pr-4">Хвост</th>
-                <th class="text-left py-3 pr-4">Комментарий</th>
-                <th class="text-right py-3">Действие</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for record in records %}
-                <tr class="border-b border-slate-100">
-                  <td class="py-3 pr-4">{{ record.withdrawal_date|date:"d.m.Y" }}</td>
-                  <td class="py-3 pr-4">{% if record.transfer_date %}{{ record.transfer_date|date:"d.m.Y" }}{% else %}-{% endif %}</td>
-                  <td class="py-3 pr-4">{{ record.withdrawal_amount }}</td>
-                  <td class="py-3 pr-4">{{ record.transferred_amount }}</td>
-                  <td class="py-3 pr-4 font-semibold {% if record.tail_amount > 0 %}text-amber-600{% else %}text-emerald-600{% endif %}">{{ record.tail_amount }}</td>
-                  <td class="py-3 pr-4">{{ record.comment|default:"-" }}</td>
-                  <td class="py-3 text-right">
-                    <form method="post" action="{% url 'delete_withdrawal_record' record.id %}">
-                      {% csrf_token %}
-                      <button type="submit" class="text-red-600 hover:text-red-800">Удалить</button>
-                    </form>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="space-y-4">
+          {% for record in records %}
+            <div class="rounded-2xl border border-slate-200 p-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3 items-end">
+              <form method="post" action="{% url 'update_withdrawal_record' record.id %}" class="contents">
+                {% csrf_token %}
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">Дата снятия</label>
+                  <input type="date" name="withdrawal_date" value="{{ record.withdrawal_date|date:'Y-m-d' }}" required class="w-full border border-slate-300 rounded-xl p-2">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">Дата перевода</label>
+                  <input type="date" name="transfer_date" value="{{ record.transfer_date|date:'Y-m-d' }}" class="w-full border border-slate-300 rounded-xl p-2">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">Сумма снятия</label>
+                  <input type="number" step="0.01" min="0" name="withdrawal_amount" value="{{ record.withdrawal_amount|stringformat:'f' }}" required class="w-full border border-slate-300 rounded-xl p-2">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">Сумма перевода</label>
+                  <input type="number" step="0.01" min="0" name="transferred_amount" value="{% if record.transferred_amount is not None %}{{ record.transferred_amount|stringformat:'f' }}{% endif %}" class="w-full border border-slate-300 rounded-xl p-2" placeholder="Позже">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">Хвост</label>
+                  <div class="w-full rounded-xl p-2 bg-slate-100 font-semibold {% if record.tail_amount > 0 %}text-amber-600{% else %}text-emerald-600{% endif %}">
+                    {{ record.tail_amount }}
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-500 mb-1">Комментарий</label>
+                  <input type="text" name="comment" value="{{ record.comment }}" maxlength="255" class="w-full border border-slate-300 rounded-xl p-2">
+                </div>
+                <div class="md:col-span-2 xl:col-span-6 flex gap-3 justify-end">
+                  <button type="submit" class="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Сохранить</button>
+                </div>
+              </form>
+              <form method="post" action="{% url 'delete_withdrawal_record' record.id %}">
+                {% csrf_token %}
+                <button type="submit" class="px-4 py-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100">Удалить</button>
+              </form>
+              </div>
+            </div>
+          {% endfor %}
         </div>
       {% else %}
         <p class="text-slate-500">Записей пока нет.</p>

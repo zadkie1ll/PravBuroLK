@@ -51,16 +51,25 @@ class Command(BaseCommand):
         delay = options["delay"]
         dry_run = options["dry_run"]
 
-        queryset = Client.objects.all().order_by("id")
-        queryset = queryset.exclude(bitrix_id__isnull=True).exclude(bitrix_id__exact="")
+        base_queryset = Client.objects.all().order_by("id")
+        skipped_without_bitrix = base_queryset.filter(bitrix_id__isnull=True) | base_queryset.filter(bitrix_id__exact="")
+        queryset = base_queryset.exclude(bitrix_id__isnull=True).exclude(bitrix_id__exact="")
 
         if client_id is not None:
+            skipped_without_bitrix = skipped_without_bitrix.filter(id=client_id)
             queryset = queryset.filter(id=client_id)
         if limit:
             queryset = queryset[:limit]
 
         total = queryset.count()
         self.stdout.write(f"Найдено клиентов для синхронизации списаний: {total}")
+        skipped_count = skipped_without_bitrix.count()
+        if skipped_count:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Пропущено клиентов без bitrix_id: {skipped_count}"
+                )
+            )
 
         success = 0
         failed = 0

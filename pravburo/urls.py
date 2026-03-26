@@ -36,7 +36,7 @@ from education_platform.views import (
 )
 from urlshorter.views import generate_url, show_stats
 from yclients.views import yclients_webhook
-from client_withdrawals.views import client_withdrawals_page, create_withdrawal_record, delete_withdrawal_record
+from client_withdrawals.views import client_withdrawals_page, create_withdrawal_record, update_withdrawal_record, delete_withdrawal_record
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("march/", include("telki.urls")),
@@ -80,6 +80,7 @@ urlpatterns = [
     path('client_admin/<int:client_id>/', client_payments_page, name='client_admin_view'),
     path("client-withdrawals/<int:client_id>/", client_withdrawals_page, name="client_withdrawals_page"),
     path("client-withdrawals/<int:client_id>/create/", create_withdrawal_record, name="create_withdrawal_record"),
+    path("client-withdrawals/update/<int:record_id>/", update_withdrawal_record, name="update_withdrawal_record"),
     path("client-withdrawals/delete/<int:record_id>/", delete_withdrawal_record, name="delete_withdrawal_record"),
     path('client_search/', client_search_view, name='client_search'),
     path('other/create/', create_other_payments, name='create_other_payments'),

@@ -21,6 +21,8 @@ class ClientWithdrawalRecord(models.Model):
     transferred_amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
+        blank=True,
+        null=True,
         verbose_name="Сумма перевода",
     )
     tail_amount = models.DecimalField(
@@ -60,7 +62,8 @@ class ClientWithdrawalRecord(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
-        self.tail_amount = (self.withdrawal_amount or Decimal("0.00")) - (
-            self.transferred_amount or Decimal("0.00")
-        )
+        if self.transferred_amount is None:
+            self.tail_amount = self.withdrawal_amount or Decimal("0.00")
+        else:
+            self.tail_amount = (self.withdrawal_amount or Decimal("0.00")) - self.transferred_amount
         super().save(*args, **kwargs)

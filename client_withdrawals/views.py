@@ -33,7 +33,10 @@ def create_withdrawal_record(request, client_id):
 
     try:
         withdrawal_amount = Decimal(request.POST.get("withdrawal_amount", "0").replace(",", "."))
-        transferred_amount = Decimal(request.POST.get("transferred_amount", "0").replace(",", "."))
+        transferred_amount_raw = (request.POST.get("transferred_amount") or "").strip()
+        transferred_amount = (
+            Decimal(transferred_amount_raw.replace(",", ".")) if transferred_amount_raw else None
+        )
     except InvalidOperation:
         messages.error(request, "Суммы должны быть в числовом формате.")
         return redirect("client_withdrawals_page", client_id=client.id)
@@ -60,6 +63,41 @@ def create_withdrawal_record(request, client_id):
 
 @login_required
 @require_POST
+def update_withdrawal_record(request, record_id):
+    record = get_object_or_404(ClientWithdrawalRecord, pk=record_id)
+    client = record.client
+
+    try:
+        withdrawal_amount = Decimal(request.POST.get("withdrawal_amount", "0").replace(",", "."))
+        transferred_amount_raw = (request.POST.get("transferred_amount") or "").strip()
+        transferred_amount = (
+            Decimal(transferred_amount_raw.replace(",", ".")) if transferred_amount_raw else None
+        )
+    except InvalidOperation:
+        messages.error(request, "Суммы должны быть в числовом формате.")
+        return redirect("client_withdrawals_page", client_id=client.id)
+
+    try:
+        record.withdrawal_date = request.POST.get("withdrawal_date")
+        record.transfer_date = request.POST.get("transfer_date") or None
+        record.withdrawal_amount = withdrawal_amount
+        record.transferred_amount = transferred_amount
+        record.comment = request.POST.get("comment", "").strip()
+        record.save()
+
+        try:
+            sync_withdrawals_to_bitrix(client)
+            messages.success(request, "Запись обновлена и синхронизирована с Битрикс.")
+        except Exception as exc:
+            messages.warning(request, f"Запись обновлена, но Битрикс не обновлен: {exc}")
+    except Exception as exc:
+        messages.error(request, f"Не удалось обновить запись: {exc}")
+
+    return redirect("client_withdrawals_page", client_id=client.id)
+
+
+@login_required
+@require_POST
 def delete_withdrawal_record(request, record_id):
     record = get_object_or_404(ClientWithdrawalRecord, pk=record_id)
     client = record.client
@@ -72,4 +110,3 @@ def delete_withdrawal_record(request, record_id):
         messages.warning(request, f"Запись удалена, но Битрикс не обновлен: {exc}")
 
     return redirect("client_withdrawals_page", client_id=client.id)
-
