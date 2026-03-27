@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -184,9 +185,9 @@ LEAD_CONTROL_SCHEDULE_ENABLED = env_bool("LEAD_CONTROL_SCHEDULE_ENABLED", True)
 CELERY_BEAT_SCHEDULE = {}
 
 if LEAD_CONTROL_SCHEDULE_ENABLED:
-    CELERY_BEAT_SCHEDULE["lead-control-hourly-monitoring"] = {
+    CELERY_BEAT_SCHEDULE["lead-control-working-hours-monitoring"] = {
         "task": "lead_control.tasks.run_lead_monitoring_task",
-        "schedule": 60 * 60,
+        "schedule": crontab(minute=0, hour="10,13,16,19"),
     }
 
 # ------------------------------------------------------------------
