@@ -51,7 +51,7 @@ def is_within_working_hours(now=None) -> bool:
 def get_end_of_today_deadline(now=None) -> str:
     now = now or timezone.localtime()
     end_of_day = now.replace(hour=23, minute=59, second=0, microsecond=0)
-    return end_of_day.strftime("%Y-%m-%dT%H:%M:%S")
+    return end_of_day.isoformat(timespec="seconds")
 
 
 def get_allowed_attempts_for_today(monitor: LeadMonitor, now=None) -> int:

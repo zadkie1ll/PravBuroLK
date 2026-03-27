@@ -117,7 +117,11 @@ def _extract_task_id(result) -> int:
 
 
 def _get_deal_binding(deal_id: int) -> str:
-    return f"D_{deal_id}"
+    return f"CRM_DEAL_{deal_id}"
+
+
+def _get_deal_bindings(deal_id: int) -> list[str]:
+    return [_get_deal_binding(deal_id), f"D_{deal_id}"]
 
 
 def _extract_crm_bindings(task_data: dict) -> set[str]:
@@ -131,7 +135,17 @@ def _extract_crm_bindings(task_data: dict) -> set[str]:
     if isinstance(raw_bindings, str):
         raw_bindings = [raw_bindings]
 
-    return {str(item) for item in raw_bindings if item}
+    bindings = set()
+    for item in raw_bindings:
+        if not item:
+            continue
+        if isinstance(item, dict):
+            for value in item.values():
+                if value:
+                    bindings.add(str(value))
+            continue
+        bindings.add(str(item))
+    return bindings
 
 
 def _extract_deal_specific_bindings(task_data: dict) -> set[str]:
@@ -149,16 +163,16 @@ def _extract_deal_specific_bindings(task_data: dict) -> set[str]:
 
 
 def _is_task_bound_to_deal(task_data: dict, deal_id: int) -> bool:
-    binding = _get_deal_binding(deal_id)
     deal_id_str = str(deal_id)
+    crm_bindings = _extract_crm_bindings(task_data)
     return (
-        binding in _extract_crm_bindings(task_data)
+        any(binding in crm_bindings for binding in _get_deal_bindings(deal_id))
         or deal_id_str in _extract_deal_specific_bindings(task_data)
     )
 
 
 def ensure_task_bound_to_deal(task_id: int, deal_id: int) -> None:
-    binding = _get_deal_binding(deal_id)
+    bindings = _get_deal_bindings(deal_id)
     task_data = get_task_by_id(task_id)
 
     if _is_task_bound_to_deal(task_data, deal_id):
@@ -168,7 +182,19 @@ def ensure_task_bound_to_deal(task_id: int, deal_id: int) -> None:
         {
             "taskId": task_id,
             "fields": {
-                "UF_CRM_TASK": [binding],
+                "UF_CRM_TASK": bindings,
+            },
+        },
+        {
+            "taskId": task_id,
+            "fields": {
+                "UF_CRM_TASK": [bindings[0]],
+            },
+        },
+        {
+            "taskId": task_id,
+            "fields": {
+                "UF_CRM_TASK": [bindings[1]],
             },
         },
         {
@@ -180,7 +206,7 @@ def ensure_task_bound_to_deal(task_id: int, deal_id: int) -> None:
         {
             "taskId": task_id,
             "fields": {
-                "UF_CRM_TASK": [binding],
+                "UF_CRM_TASK": bindings,
                 "UF_CRM_TASK_DEAL": [str(deal_id)],
             },
         },
@@ -213,8 +239,14 @@ def ensure_task_bound_to_deal(task_id: int, deal_id: int) -> None:
         if _is_task_bound_to_deal(refreshed_task_data, deal_id):
             return
 
-    raise BitrixAPIError(
-        f"Task {task_id} was created, but deal binding {binding} was not saved"
+    logger.warning(
+        "Task %s was created, but deal binding was not confirmed for deal_id=%s. "
+        "Expected one of %s or UF_CRM_TASK_DEAL=%s. Last task data keys: %s",
+        task_id,
+        deal_id,
+        bindings,
+        deal_id,
+        sorted(task_data.keys()),
     )
 
 
@@ -240,7 +272,7 @@ def _create_task(
         fields["AUDITORS"] = [auditor_id]
 
     if deal_id:
-        fields["UF_CRM_TASK"] = [_get_deal_binding(deal_id)]
+        fields["UF_CRM_TASK"] = _get_deal_bindings(deal_id)
         fields["UF_CRM_TASK_DEAL"] = [str(deal_id)]
 
     data = _post("tasks.task.add", {"fields": fields})
