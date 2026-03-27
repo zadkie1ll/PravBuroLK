@@ -179,6 +179,15 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = os.getenv("DJANGO_TIME_ZONE", "UTC")
 CELERY_TASK_DEFAULT_QUEUE = os.getenv("CELERY_TASK_DEFAULT_QUEUE", "celery")
+LEAD_CONTROL_SCHEDULE_ENABLED = env_bool("LEAD_CONTROL_SCHEDULE_ENABLED", True)
+
+CELERY_BEAT_SCHEDULE = {}
+
+if LEAD_CONTROL_SCHEDULE_ENABLED:
+    CELERY_BEAT_SCHEDULE["lead-control-hourly-monitoring"] = {
+        "task": "lead_control.tasks.run_lead_monitoring_task",
+        "schedule": 60 * 60,
+    }
 
 # ------------------------------------------------------------------
 # AUTH / SECURITY
