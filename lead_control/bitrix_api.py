@@ -255,6 +255,7 @@ def _create_task(
     title: str,
     description: str,
     responsible_id: int,
+    created_by_id: int | None = None,
     auditor_id: int | None = None,
     deal_id: int | None = None,
     deadline: str | None = None,
@@ -267,6 +268,9 @@ def _create_task(
 
     if deadline:
         fields["DEADLINE"] = deadline
+
+    if created_by_id:
+        fields["CREATED_BY"] = created_by_id
 
     if auditor_id:
         fields["AUDITORS"] = [auditor_id]
@@ -288,6 +292,7 @@ def create_typical_task(
     *,
     deal_id: int,
     responsible_id: int,
+    created_by_id: int | None = None,
     auditor_id: int | None = None,
     title: str,
     description: str,
@@ -297,6 +302,7 @@ def create_typical_task(
         title=title,
         description=description,
         responsible_id=responsible_id,
+        created_by_id=created_by_id,
         auditor_id=auditor_id,
         deal_id=deal_id,
         deadline=deadline,
@@ -307,6 +313,7 @@ def create_bitrix_task(
     title: str,
     description: str,
     responsible_id: int,
+    created_by_id: int | None = None,
     auditor_id: int | None = None,
     deal_id: int | None = None,
 ) -> int:
@@ -317,6 +324,7 @@ def create_bitrix_task(
         title=title,
         description=description,
         responsible_id=responsible_id,
+        created_by_id=created_by_id,
         auditor_id=auditor_id,
         deal_id=deal_id,
     )

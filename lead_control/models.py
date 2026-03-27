@@ -101,6 +101,16 @@ class LeadMonitor(models.Model):
         blank=True,
         verbose_name="Когда в последний раз закрыли задачу"
     )
+    last_moderator_task_created_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Когда в последний раз создали задачу модератору"
+    )
+    last_moderator_task_id = models.BigIntegerField(
+        null=True,
+        blank=True,
+        verbose_name="ID последней задачи модератору в Bitrix24"
+    )
     last_checked_at = models.DateTimeField(
         null=True,
         blank=True,

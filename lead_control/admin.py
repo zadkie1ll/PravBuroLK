@@ -17,6 +17,7 @@ class LeadMonitorAdmin(admin.ModelAdmin):
         "is_active",
         "responsible_bitrix_user_id",
         "bitrix_task_id",
+        "last_moderator_task_id",
         "attempts_today",
         "attempts_total",
         "last_checked_at",
@@ -24,7 +25,14 @@ class LeadMonitorAdmin(admin.ModelAdmin):
     )
     list_filter = ("status", "is_active", "current_stage_id", "created_at", "updated_at")
     search_fields = ("bitrix_deal_id", "bitrix_task_id", "responsible_bitrix_user_id")
-    readonly_fields = ("created_at", "updated_at", "last_checked_at", "raw_deal_data")
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "last_checked_at",
+        "last_moderator_task_id",
+        "last_moderator_task_created_at",
+        "raw_deal_data",
+    )
     actions = ("run_selected_monitors",)
 
     fieldsets = (
@@ -36,6 +44,8 @@ class LeadMonitorAdmin(admin.ModelAdmin):
                 "moderator_bitrix_user_id",
                 "responsible_bitrix_user_id",
                 "task_description",
+                "last_moderator_task_id",
+                "last_moderator_task_created_at",
                 "raw_deal_data",
             ),
         }),
@@ -83,20 +93,25 @@ class LeadMonitorAdmin(admin.ModelAdmin):
             "waiting_task": 0,
             "waiting_time": 0,
             "task_created": 0,
+            "moderator_task_created": 0,
             "error": 0,
         }
 
         for monitor in queryset.order_by("id"):
             stats["total"] += 1
-            result = process_monitor(monitor)
+            result_payload = process_monitor(monitor)
+            result = result_payload.get("result")
             if result in stats:
                 stats[result] += 1
+            if result_payload.get("moderator_task_created"):
+                stats["moderator_task_created"] += 1
 
         self.message_user(
             request,
             (
                 "Выбранные мониторинги обработаны. "
-                f"Всего: {stats['total']}, создано задач: {stats['task_created']}, "
+                f"Всего: {stats['total']}, создано задач прозвона: {stats['task_created']}, "
+                f"создано задач модератору: {stats['moderator_task_created']}, "
                 f"ожидают задачу: {stats['waiting_task']}, ожидают время: {stats['waiting_time']}, "
                 f"успешно: {stats['success']}, пропущено: {stats['skipped']}, ошибок: {stats['error']}."
             ),
@@ -118,7 +133,8 @@ class LeadMonitorAdmin(admin.ModelAdmin):
             request,
             (
                 "Сервис lead_control запущен вручную. "
-                f"Всего: {stats['total']}, создано задач: {stats['task_created']}, "
+                f"Всего: {stats['total']}, создано задач прозвона: {stats['task_created']}, "
+                f"создано задач модератору: {stats['moderator_task_created']}, "
                 f"ожидают задачу: {stats['waiting_task']}, ожидают время: {stats['waiting_time']}, "
                 f"успешно: {stats['success']}, пропущено: {stats['skipped']}, ошибок: {stats['error']}."
             ),
