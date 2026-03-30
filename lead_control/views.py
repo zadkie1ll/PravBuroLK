@@ -167,3 +167,5 @@ def deal_webhook_handler(request):
             {"error": "Internal server error", "details": str(exc)},
             status=500
         )
+    
+    #TODO handler for VIKATASTKS
