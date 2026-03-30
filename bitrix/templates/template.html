@@ -368,29 +368,33 @@
             <div class="finance-item">Рассрочка: <span class="chip">{{ data.finance.installment_plan }}</span></div>
         </div>
 
-        <div class="viz-title">Пропорциональная визуализация:</div>
+<div class="viz-title">Пропорциональная визуализация:</div>
 
-        <div class="viz-row">
-            <div class="track">
-                <svg class="track-svg" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true">
-                    <rect x="0" y="0" width="100" height="16" rx="8" fill="#1780eb"></rect>
-                    <rect x="0" y="0" width="{{ data.finance.debt_ratio_value }}" height="16" rx="8" fill="#e22a2a"></rect>
-                    <circle cx="{{ data.finance.debt_ratio_value }}" cy="8" r="3.4" fill="#e22a2a"></circle>
-                </svg>
-            </div>
-            <div class="viz-value">{{ data.finance.debt_amount_rub }}<br>сумма долга</div>
-        </div>
+<!-- Долг -->
+<div class="viz-row">
+  <div class="track">
+    <svg class="track-svg" viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true">
+      <!-- Фон -->
+      <rect x="0" y="0" width="100" height="14" rx="7" fill="#e5e9f0"></rect>
+      <!-- Заполнение -->
+      <rect x="0" y="0" width="{{ data.finance.debt_ratio_value }}" height="14" rx="7" fill="#e22a2a"></rect>
+    </svg>
+  </div>
+  <div class="viz-value">{{ data.finance.debt_amount_rub }}<br>сумма долга</div>
+</div>
 
-        <div class="viz-row">
-            <div class="track">
-                <svg class="track-svg" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true">
-                    <rect x="0" y="0" width="100" height="16" rx="8" fill="#1780eb"></rect>
-                    <rect x="0" y="0" width="{{ data.finance.cost_ratio_value }}" height="16" rx="8" fill="#28c55a"></rect>
-                    <circle cx="{{ data.finance.cost_ratio_value }}" cy="8" r="3.4" fill="#28c55a"></circle>
-                </svg>
-            </div>
-            <div class="viz-value">{{ data.finance.work_cost_rub }}<br>стоимость</div>
-        </div>
+<!-- Стоимость работ -->
+<div class="viz-row">
+  <div class="track">
+    <svg class="track-svg" viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true">
+      <!-- Фон -->
+      <rect x="0" y="0" width="100" height="14" rx="7" fill="#e5e9f0"></rect>
+      <!-- Заполнение -->
+      <rect x="0" y="0" width="{{ data.finance.cost_ratio_value }}" height="14" rx="7" fill="#28c55a"></rect>
+    </svg>
+  </div>
+  <div class="viz-value">{{ data.finance.work_cost_rub }}<br>стоимость</div>
+</div>
     </section>
 
     <div class="separator"></div>
