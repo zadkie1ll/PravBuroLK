@@ -106,9 +106,19 @@ class LeadEntryAdmin(admin.ModelAdmin):
     
 @admin.register(SalesManager)
 class SalesManagerAdmin(admin.ModelAdmin):
-    list_display = ("name", "bitrix_user_id", "email", "phone", "user", "is_active", "updated_at")
+    list_display = (
+        "name",
+        "bitrix_user_id",
+        "megafon_user",
+        "megafon_clid",
+        "email",
+        "phone",
+        "user",
+        "is_active",
+        "updated_at",
+    )
     list_filter = ("is_active",)
-    search_fields = ("name", "email", "user", "phone", "bitrix_user_id")
+    search_fields = ("name", "email", "user", "phone", "bitrix_user_id", "megafon_user", "megafon_group", "megafon_clid")
     ordering = ("name",)
     list_editable = ("is_active",)
     list_per_page = 50

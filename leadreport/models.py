@@ -10,6 +10,9 @@ class SalesManager(models.Model):
 
     email = models.EmailField(blank=True, default="")
     phone = models.CharField(max_length=64, blank=True, default="")
+    megafon_user = models.CharField(max_length=128, blank=True, default="")
+    megafon_group = models.CharField(max_length=128, blank=True, default="")
+    megafon_clid = models.CharField(max_length=64, blank=True, default="")
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,

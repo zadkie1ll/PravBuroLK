@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import tempfile
 from celery.schedules import crontab
 from dotenv import load_dotenv
 
@@ -61,6 +62,7 @@ INSTALLED_APPS = [
     "communications",
     "lead_control",
     "client_withdrawals",
+    "call_queue",
 ]
 
 # ------------------------------------------------------------------
@@ -257,6 +259,20 @@ BITRIX_REDIRECT_URI = os.getenv("BITRIX_REDIRECT_URI", "http://localhost:8000/au
 BITRIX_OAUTH_BASE_URL = os.getenv("BITRIX_OAUTH_BASE_URL", "https://oauth.bitrix.info/oauth")
 BITRIX_WEBHOOK = os.getenv("BITRIX_WEBHOOK", os.getenv("BITRIX_WEBHOOK_URL", ""))
 BITRIX_WEBHOOK_URL = os.getenv("BITRIX_WEBHOOK_URL", BITRIX_WEBHOOK)
+BITRIX_BASE_URL = os.getenv("BITRIX_BASE_URL", "")
+BITRIX_DEAL_REPEAT_UNANSWERED_FIELD = os.getenv("BITRIX_DEAL_REPEAT_UNANSWERED_FIELD", "")
+BITRIX_DEAL_LAST_CALL_RESULT_FIELD = os.getenv("BITRIX_DEAL_LAST_CALL_RESULT_FIELD", "")
+MEGAFON_VATS_API_URL = os.getenv("MEGAFON_VATS_API_URL", "")
+MEGAFON_VATS_API_KEY = os.getenv("MEGAFON_VATS_API_KEY", "")
+MEGAFON_VATS_CRM_AUTH_KEY = os.getenv("MEGAFON_VATS_CRM_AUTH_KEY", "")
+MEGAFON_VATS_AUTH_MODE = os.getenv("MEGAFON_VATS_AUTH_MODE", "header")
+MEGAFON_VATS_AUTH_HEADER = os.getenv("MEGAFON_VATS_AUTH_HEADER", "X-CRM-AUTH")
+MEGAFON_WEBHOOK_LOG_FILE = os.getenv(
+    "MEGAFON_WEBHOOK_LOG_FILE",
+    str(BASE_DIR / "logs" / "megafon_webhooks.log"),
+)
+CALL_QUEUE_BITRIX_DEAL_UNANSWERED_STAGE_ID = os.getenv("CALL_QUEUE_BITRIX_DEAL_UNANSWERED_STAGE_ID", "PREPARATION")
+CALL_QUEUE_BITRIX_LEAD_UNANSWERED_STATUS_ID = os.getenv("CALL_QUEUE_BITRIX_LEAD_UNANSWERED_STATUS_ID", "IN_PROCESS")
 
 
 # ------------------------------------------------------------------

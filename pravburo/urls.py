@@ -39,6 +39,7 @@ from yclients.views import yclients_webhook
 from client_withdrawals.views import client_withdrawals_page, create_withdrawal_record, update_withdrawal_record, delete_withdrawal_record
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path("call-queue/", include("call_queue.urls")),
     path("march/", include("telki.urls")),
     path("api/calc-km/", calc_km_for_deal, name="calc_km_for_deal"),
     path("api/sync-regions/", sync_regions_from_bitrix, name="sync_regions_from_bitrix"),
