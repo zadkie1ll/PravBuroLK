@@ -167,9 +167,9 @@
             background: #1377e6;
             border-radius: 22px;
             padding: 14px 28px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            align-items: stretch;
             gap: 28px;
             margin-bottom: 26px;
         }
@@ -177,10 +177,11 @@
         .finance-item {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 12px;
             color: #fff;
             font-size: 20px;
-            white-space: nowrap;
+            min-width: 0;
         }
 
         .finance-item .chip {
@@ -189,8 +190,12 @@
             border-radius: 12px;
             padding: 6px 14px;
             font-weight: 700;
-            line-height: 1;
+            line-height: 1.15;
             display: inline-block;
+            max-width: 100%;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            text-align: right;
         }
 
         .viz-title {
@@ -228,7 +233,7 @@
             border-collapse: separate;
             border-spacing: 14px 14px;
             margin-left: -10px;
-            table-layout: auto;
+            table-layout: fixed;
             margin-top: 8px;
         }
 
@@ -238,10 +243,10 @@
         }
 
         .pair-table {
-            width: 50%;
+            width: 100%;
             border-collapse: separate;
             border-spacing: 5px 0;
-            table-layout: auto;
+            table-layout: fixed;
         }
 
         .pair-table td {
@@ -270,10 +275,11 @@
             line-height: 1.15;
             overflow-wrap: anywhere;
             word-break: break-word;
-            text-align: start;
-            min-width: 180px;
             text-align: left;
-            align-self: left;
+            min-width: 0;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
         }
 
         .property-card {
@@ -282,6 +288,10 @@
             padding: 14px 18px;
             width: 100%;
             max-width: 100%;
+            min-height: 44px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .property-card--highlight {
@@ -301,6 +311,10 @@
             padding: 12px 16px;
             width: 100%;
             max-width: 100%;
+            min-height: 44px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
 
         .income-card--highlight {
