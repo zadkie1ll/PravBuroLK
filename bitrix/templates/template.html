@@ -166,21 +166,22 @@
         .finance-pill {
             background: #1377e6;
             border-radius: 22px;
-            padding: 14px 28px;
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            align-items: stretch;
-            gap: 28px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
             margin-bottom: 26px;
         }
 
         .finance-item {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 12px;
+            gap: 8px;
             color: #fff;
-            font-size: 20px;
+            font-size: 18px;
+            white-space: nowrap;
+            flex: 1 1 0;
             min-width: 0;
         }
 
@@ -188,13 +189,13 @@
             color: #22252a;
             background: #e9ecef;
             border-radius: 12px;
-            padding: 6px 14px;
+            padding: 5px 10px;
             font-weight: 700;
-            line-height: 1.15;
+            font-size: 16px;
+            line-height: 1;
             display: inline-block;
-            max-width: 100%;
-            white-space: normal;
-            overflow-wrap: anywhere;
+            margin-left: auto;
+            white-space: nowrap;
             text-align: right;
         }
 
@@ -250,24 +251,27 @@
         }
 
         .pair-table td {
-            vertical-align: top;
+            vertical-align: middle;
             min-width: 0;
         }
 
         .label-cell {
             width: 126px;
+            vertical-align: middle;
         }
 
         .block-label {
             background: #1377e6;
             color: #fff;
             border-radius: 12px;
-            padding: 8px 14px;
+            padding: 0 14px;
             font-size: 18px;
             font-weight: 700;
             line-height: 1;
             white-space: nowrap;
-            display: inline-block;
+            display: flex;
+            align-items: center;
+            height: 40px;
         }
 
         .block-value {
@@ -277,7 +281,7 @@
             word-break: break-word;
             text-align: left;
             min-width: 0;
-            min-height: 44px;
+            min-height: 40px;
             display: flex;
             align-items: center;
         }
@@ -285,13 +289,12 @@
         .property-card {
             background: #eef1f4;
             border-radius: 20px;
-            padding: 14px 18px;
+            padding: 0 18px 12px;
             width: 100%;
             max-width: 100%;
-            min-height: 44px;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
         }
 
         .property-card--highlight {
@@ -301,20 +304,19 @@
         .property-save {
             color: #159b5a;
             font-size: 14px;
-            margin-top: 12px;
+            margin-top: 4px;
             font-weight: 600;
         }
 
         .income-card {
             background: #eef1f4;
             border-radius: 20px;
-            padding: 12px 16px;
+            padding: 0 16px 10px;
             width: 100%;
             max-width: 100%;
-            min-height: 44px;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
         }
 
         .income-card--highlight {
@@ -324,7 +326,7 @@
         .income-save {
             color: #1766b1;
             font-size: 14px;
-            margin-top: 8px;
+            margin-top: 2px;
             line-height: 1.1;
         }
 
