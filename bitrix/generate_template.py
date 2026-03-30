@@ -40,9 +40,12 @@ def format_consultation_datetime(raw_value: str) -> tuple[str, str]:
         return "", ""
     try:
         dt = datetime.strptime(str(raw_value), "%Y-%m-%d %H:%M")
-        return dt.strftime("%d.%m.%Y"), dt.strftime("%H:%M")
     except ValueError:
-        return str(raw_value), ""
+        try:
+            dt = datetime.fromisoformat(str(raw_value))
+        except ValueError:
+            return str(raw_value), ""
+    return dt.strftime("%d.%m.%Y"), dt.strftime("%H:%M")
 
 
 def download_photo(url: str, filepath: str):
@@ -106,9 +109,17 @@ def generate_pdf(data) -> bytes:
 
     data = json.loads(json.dumps(data, ensure_ascii=False))
 
+    document_data = data.get("document", {})
+    consultation_date = (
+        document_data.get("generated_at")
+        or document_data.get("DATE_CREATE")
+        or document_data.get("created_at")
+        or ""
+    )
+
     data["consultation"] = {
-        "date": data["document"]["generated_at"],
-        "isContract": data['summary']['contract'] != None
+        "date": consultation_date,
+        "isContract": data["summary"]["contract"] is not None,
     }
 
     # Parse finance amounts

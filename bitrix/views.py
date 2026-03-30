@@ -344,7 +344,7 @@ def build_consultation(request):
         payload = {
             "document": {
                 "document_id": f"CONS-{deal_id}",
-                "generated_at": timezone.localtime().strftime("%Y-%m-%d %H:%M"),
+                "generated_at": pick(deal_data, "DATE_CREATE"),
             },
             "manager": {
                 "bitrix_user_id": assigned_id,
@@ -359,7 +359,7 @@ def build_consultation(request):
                 "installment_plan": pick(deal_data, "UF_CRM_1754380522464"),
             },
             "summary": {
-                "client_name": pick(deal_data, UF_CLIENT_NAME) or "Клиент",
+                "client_name": pick(deal_data, UF_CLIENT_NAME) or "Итог",
                 "contract" : pick(deal_data, "UF_CRM_1745888352245"),
                 "property": pick(deal_data, "UF_CRM_1754647601622"),
                 "deals": pick(deal_data, "UF_CRM_1754647663541"),

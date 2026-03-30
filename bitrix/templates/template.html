@@ -238,9 +238,9 @@
         }
 
         .pair-table {
-            width: 100%;
+            width: 50%;
             border-collapse: separate;
-            border-spacing: 10px 0;
+            border-spacing: 5px 0;
             table-layout: auto;
         }
 
@@ -362,7 +362,7 @@
 
     <section>
         <h2 class="section-title">Финансовый обзор</h2>
-        <div class="finance-pill">
+        <div class="finance-pill"> <!--Вот тут оно плохо растягивается, числа вылезают за границы своих полей и даже налезают на соседние колонки-->
             <div class="finance-item">Долг: <span class="chip">{{ data.finance.debt_amount_rub }}</span></div>
             <div class="finance-item">Стоимость: <span class="chip">{{ data.finance.work_cost_rub }}</span></div>
             <div class="finance-item">Рассрочка: <span class="chip">{{ data.finance.installment_plan }}</span></div>
