@@ -381,6 +381,63 @@ class MegafonTelephonyTests(TestCase):
         with self.assertRaises(MegafonAPIError):
             service.make_call(phone="74952005060")
 
+    @override_settings(
+        MEGAFON_VATS_API_URL="https://configured.megafon.ru/crmapi/v1",
+        MEGAFON_VATS_API_KEY="configured-secret",
+        MEGAFON_VATS_AUTH_MODE="header",
+        MEGAFON_VATS_AUTH_HEADER="X-CRM-AUTH",
+    )
+    @patch("call_queue.services.telephony.megafon.requests.post")
+    def test_make_call_uses_settings_when_constructor_args_omitted(self, post_mock):
+        response = Mock()
+        response.json.return_value = {"callid": "12345"}
+        response.raise_for_status.return_value = None
+        post_mock.return_value = response
+
+        service = MegafonTelephonyService()
+        service.make_call(phone="74952005060", user="manager-login")
+
+        _, kwargs = post_mock.call_args
+        self.assertEqual(kwargs["headers"]["X-CRM-AUTH"], "configured-secret")
+        self.assertEqual(post_mock.call_args.args[0], "https://configured.megafon.ru/crmapi/v1/makecall")
+
+    @patch("call_queue.services.telephony.megafon.requests.post")
+    def test_make_call_prefers_user_over_group(self, post_mock):
+        response = Mock()
+        response.json.return_value = {"callid": "12345"}
+        response.raise_for_status.return_value = None
+        post_mock.return_value = response
+
+        service = MegafonTelephonyService(
+            base_url="https://example.megafon.ru/crmapi/v1",
+            api_key="secret",
+        )
+        service.make_call(phone="74952005060", user="manager-login", group="sales-group")
+
+        _, kwargs = post_mock.call_args
+        self.assertEqual(kwargs["json"]["user"], "manager-login")
+        self.assertNotIn("group", kwargs["json"])
+
+    @patch("call_queue.services.telephony.megafon.requests.post")
+    def test_make_call_raises_api_error_with_response_details(self, post_mock):
+        response = Mock()
+        response.status_code = 400
+        response.json.return_value = {"error": "invalid user"}
+        response.text = '{"error":"invalid user"}'
+        response.raise_for_status.side_effect = requests.HTTPError("400 Client Error", response=response)
+        post_mock.return_value = response
+
+        service = MegafonTelephonyService(
+            base_url="https://example.megafon.ru/crmapi/v1",
+            api_key="secret",
+        )
+
+        with self.assertRaises(MegafonAPIError) as exc:
+            service.make_call(phone="74952005060", user="manager-login")
+
+        self.assertIn("HTTP 400", str(exc.exception))
+        self.assertIn("invalid user", str(exc.exception))
+
 
 class CallQueueMegafonViewTests(TestCase):
     def setUp(self):

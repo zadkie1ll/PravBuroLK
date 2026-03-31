@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
-
+from leadreport.models import SalesManager
 import requests
 from django.conf import settings
 
@@ -13,8 +13,8 @@ class MegafonAPIError(Exception):
 class MegafonTelephonyService:
     def __init__(
         self,
-        base_url: str | None = None,
-        api_key: str | None = None,
+        base_url: str | None = "https://vats671653.megapbx.ru/crmapi/v1",
+        api_key: str | None = "9fa7e15c-1997-4192-8406-3245d251dce5",
         auth_header: str | None = None,
         auth_mode: str | None = None,
     ):
@@ -42,15 +42,11 @@ class MegafonTelephonyService:
         payload: dict[str, Any] = {
             "phone": phone,
             "show_phone": bool(show_phone),
+            "user": user,
+    
         }
-        if user:
-            payload["user"] = user
-        if group:
-            payload["group"] = group
-        if clid:
-            payload["clid"] = clid
-
-        headers = {"Content-Type": "application/json"}
+        
+        headers = {"X-API-KEY": self.api_key}
         params: dict[str, Any] = {}
 
         if self.auth_mode == "header":
@@ -62,14 +58,29 @@ class MegafonTelephonyService:
         else:
             raise MegafonAPIError(f"Неизвестный режим авторизации МегаФона: {self.auth_mode}")
 
-        response = requests.post(
-            f"{self.base_url}/makecall",
-            json=payload,
-            headers=headers,
-            params=params,
-            timeout=30,
-        )
-        response.raise_for_status()
+        try:
+            response = requests.post(
+                f"{self.base_url}/makecall",
+                json=payload,
+                headers=headers,
+                #params=params,
+                timeout=30,
+            )
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            response = exc.response
+            details = ""
+            if response is not None:
+                try:
+                    error_payload = response.json()
+                except ValueError:
+                    error_payload = response.text.strip()
+                if error_payload:
+                    details = f" Детали ответа: {error_payload}"
+            raise MegafonAPIError(f"МегаФон вернул HTTP {response.status_code if response else 'error'}.{details}") from exc
+        except requests.RequestException as exc:
+            raise MegafonAPIError(f"Ошибка запроса к МегаФону: {exc}") from exc
+
         data = response.json()
         if not isinstance(data, dict):
             raise MegafonAPIError("МегаФон вернул неожиданный ответ.")
