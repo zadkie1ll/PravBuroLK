@@ -550,6 +550,49 @@ class CallQueueMegafonViewTests(TestCase):
         payload = response.json()
         self.assertEqual(payload["snapshot"]["marker"]["state"], "unreachable")
 
+    def test_call_status_endpoint_marks_answered_on_accepted_outgoing_event(self):
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALL77",
+            action="event:ACCEPTED",
+            request_payload={"payload": {"cmd": "event", "type": "ACCEPTED", "direction": "out", "callid": "CALL77"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("call_queue:megafon_call_status"), {"callid": "CALL77"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["snapshot"]["phone_result"]["label"], "Взял трубку")
+
+    def test_call_status_endpoint_marks_invalid_number_on_not_available(self):
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALL66",
+            action="event:CANCELLED",
+            request_payload={"payload": {"cmd": "event", "type": "CANCELLED", "direction": "out", "callid": "CALL66"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALL66",
+            action="history:NotAvailable",
+            request_payload={"payload": {"cmd": "history", "status": "NotAvailable", "callid": "CALL66"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("call_queue:megafon_call_status"), {"callid": "CALL66"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["snapshot"]["marker"]["label"], "Номер недоступен или набран неверно")
+        self.assertEqual(payload["snapshot"]["phone_result"]["state"], "invalid")
+
     @patch("call_queue.views.MegafonTelephonyService.make_call")
     def test_manual_test_call_page_starts_call(self, make_call_mock):
         session = self.client.session

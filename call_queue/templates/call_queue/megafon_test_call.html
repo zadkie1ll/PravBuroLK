@@ -94,16 +94,9 @@
                         <span class="text-sm text-slate-500">#{{ entry.index|add:1 }}</span>
                         <span class="ml-2 font-medium">{{ entry.phone }}</span>
                       </div>
-                      {% if entry.result.label %}
-                        <span class="rounded-full px-3 py-1 text-xs font-medium
-                          {% if entry.result.state == 'answered' %}bg-emerald-100 text-emerald-800
-                          {% elif entry.result.state == 'in_progress' %}bg-amber-100 text-amber-800
-                          {% elif entry.result.state == 'cancelled' %}bg-violet-100 text-violet-800
-                          {% elif entry.result.state == 'unanswered' %}bg-rose-100 text-rose-800
-                          {% else %}bg-slate-100 text-slate-700{% endif %}">
-                          {{ entry.result.label }}
-                        </span>
-                      {% endif %}
+                      <span data-phone-badge data-phone="{{ entry.phone }}" class="rounded-full px-3 py-1 text-xs font-medium {% if entry.result.state == 'answered' %}bg-emerald-100 text-emerald-800{% elif entry.result.state == 'in_progress' %}bg-amber-100 text-amber-800{% elif entry.result.state == 'cancelled' %}bg-violet-100 text-violet-800{% elif entry.result.state == 'unanswered' %}bg-rose-100 text-rose-800{% elif entry.result.state == 'invalid' %}bg-orange-100 text-orange-800{% else %}bg-slate-100 text-slate-700{% endif %} {% if not entry.result.label %}hidden{% endif %}">
+                        {{ entry.result.label }}
+                      </span>
                     </div>
                   </button>
                 </form>
@@ -197,6 +190,7 @@
         const autoDialEnabled = panel.dataset.autodial === "1";
         const autoNextUrl = panel.dataset.autoNextUrl;
         const csrfToken = panel.dataset.csrfToken;
+        const currentPhone = "{{ current_phone|escapejs }}";
         let autoAdvanceTriggered = false;
 
         function markerClass(state) {
@@ -204,6 +198,28 @@
           if (state === "unreachable") return "rounded-full px-4 py-2 text-sm font-medium bg-rose-100 text-rose-800";
           if (state === "in_progress") return "rounded-full px-4 py-2 text-sm font-medium bg-amber-100 text-amber-800";
           return "rounded-full px-4 py-2 text-sm font-medium bg-slate-100 text-slate-700";
+        }
+
+        function phoneBadgeClass(state) {
+          if (state === "answered") return "rounded-full px-3 py-1 text-xs font-medium bg-emerald-100 text-emerald-800";
+          if (state === "in_progress") return "rounded-full px-3 py-1 text-xs font-medium bg-amber-100 text-amber-800";
+          if (state === "cancelled") return "rounded-full px-3 py-1 text-xs font-medium bg-violet-100 text-violet-800";
+          if (state === "unanswered") return "rounded-full px-3 py-1 text-xs font-medium bg-rose-100 text-rose-800";
+          if (state === "invalid") return "rounded-full px-3 py-1 text-xs font-medium bg-orange-100 text-orange-800";
+          return "rounded-full px-3 py-1 text-xs font-medium bg-slate-100 text-slate-700";
+        }
+
+        function renderCurrentPhoneBadge(result) {
+          if (!currentPhone) return;
+          const badge = document.querySelector(`[data-phone-badge][data-phone="${CSS.escape(currentPhone)}"]`);
+          if (!badge) return;
+          if (!result || !result.label) {
+            badge.className = `${phoneBadgeClass("pending")} hidden`;
+            badge.textContent = "";
+            return;
+          }
+          badge.className = phoneBadgeClass(result.state || "pending");
+          badge.textContent = result.label;
         }
 
         function renderTimeline(items) {
@@ -275,6 +291,7 @@
             finalNode.textContent = snapshot.latest_history_status || "—";
             acceptedNode.textContent = snapshot.manager_answered ? "Да" : "Нет";
             stateNode.textContent = snapshot.marker.label;
+            renderCurrentPhoneBadge(snapshot.phone_result || null);
             renderTimeline(snapshot.timeline || []);
             if (snapshot.latest_history_status) {
               triggerNextCall();

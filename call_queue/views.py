@@ -23,9 +23,9 @@ from .services.queue_service import QueueService
 
 
 MEGAFON_FINAL_STATUS_LABELS = {
-    "Success": ("success", "Успешный звонок"),
+    "Success": ("success", "Клиент взял трубку"),
     "Busy": ("unreachable", "Не дозвонились: занято"),
-    "NotAvailable": ("unreachable", "Не дозвонились: недоступен"),
+    "NotAvailable": ("unreachable", "Номер недоступен или набран неверно"),
     "missed": ("unreachable", "Не дозвонились: не взял трубку"),
 }
 MEGAFON_TEST_PHONE_LIST_SESSION_KEY = "megafon_test_phone_list"
@@ -137,6 +137,13 @@ def build_megafon_call_snapshot(call_id: str) -> dict:
         "latest_history_status": latest_history_status,
         "last_event_type": last_event_type,
         "last_event_direction": last_event_direction,
+        "phone_result": build_megafon_phone_result(
+            {
+                "latest_history_status": latest_history_status,
+                "last_event_type": last_event_type,
+                "last_event_direction": last_event_direction,
+            }
+        ),
         "timeline": timeline[-20:],
     }
 
@@ -174,10 +181,15 @@ def build_megafon_phone_result(snapshot: dict) -> dict:
     if history_status == "Busy":
         return {"state": "unanswered", "label": "Клиент сбросил или занято"}
     if history_status == "NotAvailable":
-        return {"state": "unanswered", "label": "Недоступен"}
+        return {"state": "invalid", "label": "Номер недоступен или набран неверно"}
 
     last_event_type = snapshot.get("last_event_type")
     last_event_direction = snapshot.get("last_event_direction")
+    if last_event_type == "ACCEPTED":
+        if last_event_direction == "out":
+            return {"state": "answered", "label": "Взял трубку"}
+        if last_event_direction == "in":
+            return {"state": "in_progress", "label": "Менеджер взял трубку"}
     if last_event_type == "CANCELLED":
         if last_event_direction == "in":
             return {"state": "cancelled", "label": "Сброс или отмена у менеджера"}
