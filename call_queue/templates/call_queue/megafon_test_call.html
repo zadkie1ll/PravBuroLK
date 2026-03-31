@@ -27,6 +27,10 @@
     <div class="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
       <section class="rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
         <h2 class="text-xl font-semibold">Запуск звонка</h2>
+        <div class="mt-5 rounded-2xl bg-slate-50 p-4">
+          <div class="text-sm text-slate-500">Текущий номер из списка</div>
+          <div class="mt-1 break-all text-lg font-medium text-slate-900">{{ current_phone|default:"Список пока пуст" }}</div>
+        </div>
         <form method="post" class="mt-6 space-y-5">
           {% csrf_token %}
           <input type="hidden" name="action" value="start_call">
@@ -102,10 +106,10 @@
           </div>
           <div class="rounded-2xl bg-slate-50 p-4">
             <div class="font-medium text-slate-900">Как тестировать</div>
-            <div class="mt-2">1. Сохраните список номеров или введите один номер вручную.</div>
-            <div class="mt-1">2. Включите автопрозвон, если следующий номер должен стартовать сам.</div>
-            <div class="mt-1">3. Ответьте на звонок менеджеру.</div>
-            <div class="mt-1">4. Следите за маркерами и этапами звонка ниже.</div>
+            <div class="mt-2">1. Вставьте список номеров и сохраните его.</div>
+            <div class="mt-1">2. При необходимости выберите нужный номер в списке как текущий.</div>
+            <div class="mt-1">3. Включите автопрозвон, если следующий номер должен стартовать сам.</div>
+            <div class="mt-1">4. Ответьте на звонок менеджеру и следите за маркерами ниже.</div>
           </div>
         </div>
       </aside>

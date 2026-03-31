@@ -75,16 +75,6 @@ class CallResultForm(forms.Form):
 
 
 class MegafonTestCallForm(forms.Form):
-    phone = forms.CharField(
-        label="Номер клиента",
-        max_length=32,
-        widget=forms.TextInput(
-            attrs={
-                "placeholder": "74952005060",
-                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
-            }
-        ),
-    )
     sales_manager = forms.ModelChoiceField(
         label="Менеджер",
         queryset=SalesManager.objects.filter(is_active=True).order_by("name"),

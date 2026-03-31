@@ -551,13 +551,16 @@ class CallQueueMegafonViewTests(TestCase):
 
     @patch("call_queue.views.MegafonTelephonyService.make_call")
     def test_manual_test_call_page_starts_call(self, make_call_mock):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["74952005060"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session.save()
         make_call_mock.return_value = {"callid": "9001", "clid": "79990000000"}
         self.client.force_login(self.user)
 
         response = self.client.post(
             reverse("call_queue:megafon_test_call"),
             {
-                "phone": "74952005060",
                 "sales_manager": self.sales_manager.pk,
                 "clid": "",
                 "show_phone": "on",
@@ -601,7 +604,6 @@ class CallQueueMegafonViewTests(TestCase):
             reverse("call_queue:megafon_test_call"),
             {
                 "action": "start_call",
-                "phone": "79990000001",
                 "sales_manager": self.sales_manager.pk,
                 "clid": "",
                 "show_phone": "on",

@@ -259,6 +259,7 @@ def call_queue_dashboard(request):
 def megafon_test_call(request):
     phone_list = get_megafon_test_phone_list(request)
     phone_index = get_megafon_test_phone_index(request, phone_list)
+    current_phone = phone_list[phone_index] if phone_list else ""
     initial_manager = getattr(request, "sales_manager_profile", None)
     call_config = get_megafon_test_call_config(request)
     initial_sales_manager_id = call_config.get("sales_manager_id") or (initial_manager.pk if initial_manager else None)
@@ -273,7 +274,6 @@ def megafon_test_call(request):
             form = MegafonTestCallForm(
                 initial={
                     "sales_manager": initial_sales_manager_id,
-                    "phone": phone_list[phone_index] if phone_list else "",
                     "clid": initial_clid,
                     "show_phone": initial_show_phone,
                 }
@@ -295,31 +295,34 @@ def megafon_test_call(request):
             form = MegafonTestCallForm(request.POST)
             list_form = MegafonPhoneListForm(initial={"phone_list": "\n".join(phone_list)})
             if form.is_valid():
-                sales_manager = form.cleaned_data["sales_manager"]
-                try:
-                    call_id, _response = start_megafon_test_call(
-                        request,
-                        phone=form.cleaned_data["phone"],
-                        sales_manager=sales_manager,
-                        clid=form.cleaned_data["clid"] or sales_manager.megafon_clid or None,
-                        show_phone=bool(form.cleaned_data.get("show_phone")),
-                    )
-                except MegafonAPIError as exc:
-                    messages.error(request, f"Не удалось запустить тестовый звонок: {exc}")
-                except Exception as exc:
-                    messages.error(request, f"Ошибка при запросе в МегаФон АТС: {exc}")
+                if not current_phone:
+                    messages.error(request, "Сначала сохраните список номеров и выберите текущий номер.")
+                    current_phone = phone_list[phone_index] if phone_list else ""
                 else:
-                    auto_dial = request.POST.get("auto_dial") == "on"
-                    messages.success(
-                        request,
-                        f"Тестовый звонок запущен. Call ID: {call_id}.",
-                    )
-                    return redirect(build_megafon_test_call_url(call_id, auto_dial=auto_dial))
+                    sales_manager = form.cleaned_data["sales_manager"]
+                    try:
+                        call_id, _response = start_megafon_test_call(
+                            request,
+                            phone=current_phone,
+                            sales_manager=sales_manager,
+                            clid=form.cleaned_data["clid"] or sales_manager.megafon_clid or None,
+                            show_phone=bool(form.cleaned_data.get("show_phone")),
+                        )
+                    except MegafonAPIError as exc:
+                        messages.error(request, f"Не удалось запустить тестовый звонок: {exc}")
+                    except Exception as exc:
+                        messages.error(request, f"Ошибка при запросе в МегаФон АТС: {exc}")
+                    else:
+                        auto_dial = request.POST.get("auto_dial") == "on"
+                        messages.success(
+                            request,
+                            f"Тестовый звонок запущен для номера {current_phone}. Call ID: {call_id}.",
+                        )
+                        return redirect(build_megafon_test_call_url(call_id, auto_dial=auto_dial))
     else:
         form = MegafonTestCallForm(
             initial={
                 "sales_manager": initial_sales_manager_id,
-                "phone": phone_list[phone_index] if phone_list else "",
                 "clid": initial_clid,
                 "show_phone": initial_show_phone,
             }
@@ -330,7 +333,6 @@ def megafon_test_call(request):
         form = MegafonTestCallForm(
             initial={
                 "sales_manager": initial_sales_manager_id,
-                "phone": phone_list[phone_index] if phone_list else "",
                 "clid": initial_clid,
                 "show_phone": initial_show_phone,
             }
@@ -358,7 +360,7 @@ def megafon_test_call(request):
             "current_call_id": current_call_id,
             "current_snapshot": current_snapshot,
             "phone_entries": phone_entries,
-            "current_phone": phone_list[phone_index] if phone_list else "",
+            "current_phone": current_phone,
             "auto_dial_enabled": auto_dial_enabled,
         },
     )
