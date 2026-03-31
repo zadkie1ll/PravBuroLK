@@ -29,6 +29,7 @@
         <h2 class="text-xl font-semibold">Запуск звонка</h2>
         <form method="post" class="mt-6 space-y-5">
           {% csrf_token %}
+          <input type="hidden" name="action" value="start_call">
           {% for field in form %}
             <div>
               {% if field.field.widget.input_type == 'checkbox' %}
@@ -48,6 +49,10 @@
               {% endif %}
             </div>
           {% endfor %}
+          <label class="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+            <input type="checkbox" name="auto_dial" class="h-4 w-4 rounded border-slate-300" {% if auto_dial_enabled or phone_entries|length > 1 %}checked{% endif %}>
+            <span>Автопрозвон списка без лишних нажатий</span>
+          </label>
           <button type="submit" class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-slate-700">
             Запустить тестовый звонок
           </button>
@@ -55,8 +60,38 @@
       </section>
 
       <aside class="rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
-        <h2 class="text-xl font-semibold">Что проверить на проде</h2>
+        <h2 class="text-xl font-semibold">Список номеров</h2>
         <div class="mt-5 space-y-4 text-sm text-slate-700">
+          <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save_phone_list">
+            <div>
+              <label for="{{ list_form.phone_list.id_for_label }}" class="mb-2 block text-sm font-medium text-slate-700">{{ list_form.phone_list.label }}</label>
+              {{ list_form.phone_list }}
+            </div>
+            <button type="submit" class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-slate-700">
+              Сохранить список
+            </button>
+          </form>
+          {% if phone_entries %}
+            <div class="rounded-2xl bg-slate-50 p-4">
+              <div class="font-medium text-slate-900">Текущий номер</div>
+              <div class="mt-1 break-all">{{ current_phone }}</div>
+            </div>
+            <div class="space-y-2">
+              {% for entry in phone_entries %}
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="pick_phone">
+                  <input type="hidden" name="phone_index" value="{{ entry.index }}">
+                  <button type="submit" class="w-full rounded-2xl border px-4 py-3 text-left transition {% if entry.is_current %}border-amber-400 bg-amber-50{% else %}border-slate-200 bg-white hover:border-slate-300{% endif %}">
+                    <span class="text-sm text-slate-500">#{{ entry.index|add:1 }}</span>
+                    <span class="ml-2 font-medium">{{ entry.phone }}</span>
+                  </button>
+                </form>
+              {% endfor %}
+            </div>
+          {% endif %}
           <div class="rounded-2xl bg-slate-50 p-4">
             <div class="font-medium text-slate-900">Webhook URL</div>
             <div class="mt-1 break-all">{{ megafon_webhook_url }}</div>
@@ -67,17 +102,17 @@
           </div>
           <div class="rounded-2xl bg-slate-50 p-4">
             <div class="font-medium text-slate-900">Как тестировать</div>
-            <div class="mt-2">1. Откройте эту страницу и запустите звонок.</div>
-            <div class="mt-1">2. Ответьте на звонок менеджеру.</div>
-            <div class="mt-1">3. Дождитесь дозвона клиенту или ошибки.</div>
-            <div class="mt-1">4. Посмотрите, что прилетело в лог callback'ов.</div>
+            <div class="mt-2">1. Сохраните список номеров или введите один номер вручную.</div>
+            <div class="mt-1">2. Включите автопрозвон, если следующий номер должен стартовать сам.</div>
+            <div class="mt-1">3. Ответьте на звонок менеджеру.</div>
+            <div class="mt-1">4. Следите за маркерами и этапами звонка ниже.</div>
           </div>
         </div>
       </aside>
     </div>
 
     {% if current_call_id %}
-      <section class="mt-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200" data-call-panel data-callid="{{ current_call_id }}">
+      <section class="mt-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200" data-call-panel data-callid="{{ current_call_id }}" data-autodial="{% if auto_dial_enabled %}1{% else %}0{% endif %}" data-auto-next-url="{% url 'call_queue:megafon_auto_next_call' %}" data-csrf-token="{{ csrf_token }}">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 class="text-xl font-semibold">Статус текущего тестового звонка</h2>
@@ -141,6 +176,10 @@
         const acceptedNode = panel.querySelector("[data-call-accepted]");
         const stateNode = panel.querySelector("[data-call-state]");
         const timelineNode = panel.querySelector("[data-call-timeline]");
+        const autoDialEnabled = panel.dataset.autodial === "1";
+        const autoNextUrl = panel.dataset.autoNextUrl;
+        const csrfToken = panel.dataset.csrfToken;
+        let autoAdvanceTriggered = false;
 
         function markerClass(state) {
           if (state === "success") return "rounded-full px-4 py-2 text-sm font-medium bg-emerald-100 text-emerald-800";
@@ -165,6 +204,41 @@
           `).join("");
         }
 
+        async function triggerNextCall() {
+          if (!autoDialEnabled || autoAdvanceTriggered) return;
+          autoAdvanceTriggered = true;
+          stateNode.textContent = "Запускаем следующий номер...";
+
+          try {
+            const response = await fetch(autoNextUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-CSRFToken": csrfToken,
+                "X-Requested-With": "XMLHttpRequest"
+              },
+              body: new URLSearchParams({completed_callid: callId}).toString()
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+              stateNode.textContent = data.error || "Не удалось запустить следующий номер";
+              return;
+            }
+            if (data.redirect_url) {
+              window.location.href = data.redirect_url;
+              return;
+            }
+            if (data.no_next) {
+              stateNode.textContent = "Список завершён";
+              return;
+            }
+            stateNode.textContent = "Ожидаем следующий номер";
+          } catch (error) {
+            console.error(error);
+            stateNode.textContent = "Не удалось запустить следующий номер";
+          }
+        }
+
         async function poll() {
           try {
             const response = await fetch(`/call-queue/megafon/call-status/?callid=${encodeURIComponent(callId)}`, {
@@ -180,6 +254,9 @@
             acceptedNode.textContent = snapshot.manager_answered ? "Да" : "Нет";
             stateNode.textContent = snapshot.marker.label;
             renderTimeline(snapshot.timeline || []);
+            if (snapshot.latest_history_status) {
+              triggerNextCall();
+            }
           } catch (error) {
             console.error(error);
           }

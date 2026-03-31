@@ -114,3 +114,30 @@ class MegafonTestCallForm(forms.Form):
             attrs={"class": "h-4 w-4 rounded border-slate-300"}
         ),
     )
+
+
+class MegafonPhoneListForm(forms.Form):
+    phone_list = forms.CharField(
+        label="Список номеров",
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "rows": 8,
+                "placeholder": "Один номер на строку, через запятую или точку с запятой",
+                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
+            }
+        ),
+    )
+
+    def clean_phone_list(self):
+        raw_value = self.cleaned_data.get("phone_list", "")
+        normalized = raw_value.replace(",", "\n").replace(";", "\n")
+        phones = []
+        seen = set()
+        for chunk in normalized.splitlines():
+            phone = "".join(ch for ch in chunk if ch.isdigit() or ch == "+").strip()
+            if not phone or phone in seen:
+                continue
+            seen.add(phone)
+            phones.append(phone)
+        return phones

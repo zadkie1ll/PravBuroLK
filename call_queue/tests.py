@@ -21,6 +21,13 @@ from call_queue.models import (
 from call_queue.services.bitrix.deal_service import BitrixDealService
 from call_queue.services.queue_service import QueueService
 from call_queue.services.telephony.megafon import MegafonAPIError, MegafonTelephonyService
+from call_queue.views import (
+    MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY,
+    MEGAFON_TEST_CALL_CONFIG_SESSION_KEY,
+    MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY,
+    MEGAFON_TEST_PHONE_INDEX_SESSION_KEY,
+    MEGAFON_TEST_PHONE_LIST_SESSION_KEY,
+)
 from leadreport.models import SalesManager
 
 User = get_user_model()
@@ -559,3 +566,86 @@ class CallQueueMegafonViewTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         make_call_mock.assert_called_once()
+        self.assertEqual(self.client.session[MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY], "9001")
+        self.assertEqual(
+            self.client.session[MEGAFON_TEST_CALL_CONFIG_SESSION_KEY]["sales_manager_id"],
+            self.sales_manager.pk,
+        )
+
+    def test_manual_test_call_page_saves_phone_list_in_session(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_test_call"),
+            {
+                "action": "save_phone_list",
+                "phone_list": "79990000001\n79990000002\n79990000001",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        session = self.client.session
+        self.assertEqual(session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY], ["79990000001", "79990000002"])
+        self.assertEqual(session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY], 0)
+
+    @patch("call_queue.views.MegafonTelephonyService.make_call")
+    def test_manual_test_call_keeps_current_phone_until_call_completes(self, make_call_mock):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001", "79990000002"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session.save()
+        make_call_mock.return_value = {"callid": "9002", "clid": "79990000000"}
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_test_call"),
+            {
+                "action": "start_call",
+                "phone": "79990000001",
+                "sales_manager": self.sales_manager.pk,
+                "clid": "",
+                "show_phone": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.client.session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY], 0)
+
+    @patch("call_queue.views.MegafonTelephonyService.make_call")
+    def test_auto_next_call_starts_next_phone_after_final_status(self, make_call_mock):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001", "79990000002"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session[MEGAFON_TEST_CALL_CONFIG_SESSION_KEY] = {
+            "sales_manager_id": self.sales_manager.pk,
+            "clid": "",
+            "show_phone": True,
+        }
+        session[MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY] = "9002"
+        session.save()
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="9002",
+            action="history:Success",
+            request_payload={"payload": {"cmd": "history", "status": "Success", "callid": "9002"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        make_call_mock.return_value = {"callid": "9003", "clid": "79990000000"}
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_auto_next_call"),
+            {"completed_callid": "9002"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["started"])
+        self.assertEqual(payload["call_id"], "9003")
+        make_call_mock.assert_called_once()
+        session = self.client.session
+        self.assertEqual(session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY], 1)
+        self.assertEqual(session[MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY], "9003")
+        self.assertEqual(session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY], "9002")
