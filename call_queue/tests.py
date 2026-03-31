@@ -2,6 +2,7 @@ from unittest.mock import Mock, patch
 from pathlib import Path
 import tempfile
 
+import requests
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -279,6 +280,21 @@ class MegafonWebhookTests(TestCase):
         self.assertJSONEqual(response.content.decode("utf-8"), {"ok": True})
         self.assertEqual(BitrixSyncLog.objects.filter(entity_type="megafon_webhook", success=True).count(), 1)
 
+    def test_webhook_accepts_valid_crm_token(self):
+        response = self.client.post(
+            reverse("call_queue:megafon_webhook"),
+            data={
+                "crm_token": "test_megafon_secret",
+                "callid": "ABC123",
+                "cmd": "history",
+                "status": "Success",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        log = BitrixSyncLog.objects.get(entity_type="megafon_webhook", entity_id="ABC123", success=True)
+        self.assertEqual(log.action, "history:Success")
+
     @override_settings(MEGAFON_VATS_CRM_AUTH_KEY="test_megafon_secret")
     def test_webhook_writes_to_log_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -347,7 +363,7 @@ class MegafonTelephonyTests(TestCase):
         MEGAFON_VATS_API_URL="https://example.megafon.ru/crmapi/v1",
         MEGAFON_VATS_API_KEY="secret",
         MEGAFON_VATS_AUTH_MODE="header",
-        MEGAFON_VATS_AUTH_HEADER="X-CRM-AUTH",
+        MEGAFON_VATS_AUTH_HEADER="X-API-KEY",
     )
     @patch("call_queue.services.telephony.megafon.requests.post")
     def test_make_call_sends_expected_payload(self, post_mock):
@@ -370,7 +386,7 @@ class MegafonTelephonyTests(TestCase):
         self.assertEqual(kwargs["json"]["phone"], "74952005060")
         self.assertEqual(kwargs["json"]["user"], "manager-login")
         self.assertEqual(kwargs["json"]["clid"], "79990000000")
-        self.assertEqual(kwargs["headers"]["X-CRM-AUTH"], "secret")
+        self.assertEqual(kwargs["headers"]["X-API-KEY"], "secret")
 
     def test_make_call_requires_user_or_group(self):
         service = MegafonTelephonyService(
@@ -385,7 +401,7 @@ class MegafonTelephonyTests(TestCase):
         MEGAFON_VATS_API_URL="https://configured.megafon.ru/crmapi/v1",
         MEGAFON_VATS_API_KEY="configured-secret",
         MEGAFON_VATS_AUTH_MODE="header",
-        MEGAFON_VATS_AUTH_HEADER="X-CRM-AUTH",
+        MEGAFON_VATS_AUTH_HEADER="X-API-KEY",
     )
     @patch("call_queue.services.telephony.megafon.requests.post")
     def test_make_call_uses_settings_when_constructor_args_omitted(self, post_mock):
@@ -398,7 +414,7 @@ class MegafonTelephonyTests(TestCase):
         service.make_call(phone="74952005060", user="manager-login")
 
         _, kwargs = post_mock.call_args
-        self.assertEqual(kwargs["headers"]["X-CRM-AUTH"], "configured-secret")
+        self.assertEqual(kwargs["headers"]["X-API-KEY"], "configured-secret")
         self.assertEqual(post_mock.call_args.args[0], "https://configured.megafon.ru/crmapi/v1/makecall")
 
     @patch("call_queue.services.telephony.megafon.requests.post")
@@ -482,6 +498,49 @@ class CallQueueMegafonViewTests(TestCase):
         self.item.refresh_from_db()
         self.assertEqual(self.item.last_provider_call_id, "2015948553")
         self.assertEqual(BitrixSyncLog.objects.filter(entity_type="megafon_call", success=True).count(), 1)
+
+    def test_call_status_endpoint_returns_success_marker(self):
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALL42",
+            action="event:ACCEPTED",
+            request_payload={"payload": {"cmd": "event", "type": "ACCEPTED", "direction": "out", "callid": "CALL42"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALL42",
+            action="history:Success",
+            request_payload={"payload": {"cmd": "history", "status": "Success", "callid": "CALL42"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("call_queue:megafon_call_status"), {"callid": "CALL42"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["snapshot"]["marker"]["state"], "success")
+
+    def test_call_status_endpoint_returns_unreachable_marker(self):
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALL99",
+            action="history:missed",
+            request_payload={"payload": {"cmd": "history", "status": "missed", "callid": "CALL99"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("call_queue:megafon_call_status"), {"callid": "CALL99"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["snapshot"]["marker"]["state"], "unreachable")
 
     @patch("call_queue.views.MegafonTelephonyService.make_call")
     def test_manual_test_call_page_starts_call(self, make_call_mock):

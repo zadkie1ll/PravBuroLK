@@ -7,6 +7,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
@@ -18,6 +20,14 @@ from .models import BitrixSyncLog, CallQueueItem, CallSession, CallSessionStatus
 from .selectors import get_active_item_for_manager, get_recent_sessions, get_session_with_stats
 from .services.telephony.megafon import MegafonAPIError, MegafonTelephonyService
 from .services.queue_service import QueueService
+
+
+MEGAFON_FINAL_STATUS_LABELS = {
+    "Success": ("success", "Успешный звонок"),
+    "Busy": ("unreachable", "Не дозвонились: занято"),
+    "NotAvailable": ("unreachable", "Не дозвонились: недоступен"),
+    "missed": ("unreachable", "Не дозвонились: не взял трубку"),
+}
 
 
 def append_megafon_log(event_type: str, payload: dict):
@@ -32,6 +42,90 @@ def append_megafon_log(event_type: str, payload: dict):
     }
     with log_path.open("a", encoding="utf-8") as log_file:
         log_file.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def extract_megafon_call_id(payload: dict) -> str:
+    return str(
+        payload.get("callid")
+        or payload.get("call_id")
+        or payload.get("callId")
+        or payload.get("id")
+        or ""
+    )
+
+
+def normalize_megafon_payload(request) -> dict:
+    if request.POST:
+        return request.POST.dict()
+    try:
+        parsed = json.loads(request.body.decode("utf-8") or "{}") if request.body else {}
+    except json.JSONDecodeError:
+        parsed = {"raw_body": request.body.decode("utf-8", errors="ignore")}
+    if isinstance(parsed, dict):
+        return parsed
+    return {"payload": parsed}
+
+
+def serialize_megafon_log(log: BitrixSyncLog) -> dict:
+    payload = log.request_payload.get("payload", {}) if isinstance(log.request_payload, dict) else {}
+    cmd = payload.get("cmd", "")
+    event_type = payload.get("type", "")
+    status = payload.get("status", "")
+    direction = payload.get("direction", "")
+    if cmd == "history":
+        title = f"history: {status or 'unknown'}"
+    elif cmd == "event":
+        title = f"event: {event_type or 'unknown'}"
+    elif cmd:
+        title = f"{cmd}: {event_type or status or 'received'}"
+    else:
+        title = "callback"
+    return {
+        "created_at": timezone.localtime(log.created_at).isoformat(),
+        "title": title,
+        "cmd": cmd,
+        "type": event_type,
+        "status": status,
+        "direction": direction,
+        "payload": payload,
+    }
+
+
+def build_megafon_call_snapshot(call_id: str) -> dict:
+    logs = list(
+        BitrixSyncLog.objects.filter(entity_type="megafon_webhook", entity_id=call_id, success=True)
+        .order_by("created_at", "id")
+    )
+    timeline = [serialize_megafon_log(log) for log in logs]
+
+    marker = {"state": "pending", "label": "Ожидаем события от МегаФона"}
+    manager_answered = False
+    latest_history_status = ""
+
+    for entry in timeline:
+        if entry["cmd"] == "event" and entry["type"] == "ACCEPTED":
+            manager_answered = True
+        if entry["cmd"] == "history" and entry["status"]:
+            latest_history_status = entry["status"]
+
+    if latest_history_status:
+        state, label = MEGAFON_FINAL_STATUS_LABELS.get(
+            latest_history_status,
+            ("completed", f"Звонок завершен: {latest_history_status}"),
+        )
+        marker = {"state": state, "label": label}
+    elif manager_answered:
+        marker = {"state": "in_progress", "label": "Есть ответ по одной из ног звонка"}
+    elif timeline:
+        marker = {"state": "in_progress", "label": "Звонок в процессе"}
+
+    return {
+        "call_id": call_id,
+        "marker": marker,
+        "manager_answered": manager_answered,
+        "latest_history_status": latest_history_status,
+        "timeline": timeline[-20:],
+    }
 
 
 def sales_manager_required(view_func):
@@ -111,6 +205,7 @@ def megafon_test_call(request):
             except Exception as exc:
                 messages.error(request, f"Ошибка при запросе в МегаФон АТС: {exc}")
             else:
+                call_id = str(response.get("callid") or "")
                 append_megafon_log(
                     "manual_test_call",
                     {
@@ -125,12 +220,15 @@ def megafon_test_call(request):
                 )
                 messages.success(
                     request,
-                    f"Тестовый звонок запущен. Call ID: {response.get('callid')}.",
+                    f"Тестовый звонок запущен. Call ID: {call_id}.",
                 )
-                return redirect("call_queue:megafon_test_call")
+                return redirect(f"{reverse('call_queue:megafon_test_call')}?callid={call_id}")
     else:
         initial_manager = getattr(request, "sales_manager_profile", None)
         form = MegafonTestCallForm(initial={"sales_manager": initial_manager.pk if initial_manager else None})
+
+    current_call_id = request.GET.get("callid", "").strip()
+    current_snapshot = build_megafon_call_snapshot(current_call_id) if current_call_id else None
 
     return render(
         request,
@@ -140,8 +238,20 @@ def megafon_test_call(request):
             "sales_manager_profile": request.sales_manager_profile,
             "megafon_webhook_url": getattr(settings, "SITE_BASE_URL", "").rstrip("/") + "/call-queue/megafon/webhook/",
             "megafon_log_file": getattr(settings, "MEGAFON_WEBHOOK_LOG_FILE", ""),
+            "current_call_id": current_call_id,
+            "current_snapshot": current_snapshot,
         },
     )
+
+
+@login_required
+@sales_manager_required
+@require_http_methods(["GET"])
+def megafon_call_status(request):
+    call_id = request.GET.get("callid", "").strip()
+    if not call_id:
+        return JsonResponse({"ok": False, "error": "callid is required"}, status=400)
+    return JsonResponse({"ok": True, "snapshot": build_megafon_call_snapshot(call_id)})
 
 
 @login_required
@@ -266,17 +376,12 @@ def megafon_webhook(request):
     received_key = (
         request.headers.get("X-CRM-AUTH")
         or request.headers.get("X-Megafon-Auth")
+        or request.POST.get("crm_token")
         or request.POST.get("auth")
         or request.GET.get("auth")
     )
-
-    try:
-        payload = json.loads(request.body.decode("utf-8") or "{}") if request.body else {}
-    except json.JSONDecodeError:
-        payload = {"raw_body": request.body.decode("utf-8", errors="ignore")}
-
-    if not isinstance(payload, dict):
-        payload = {"payload": payload}
+    payload = normalize_megafon_payload(request)
+    call_id = extract_megafon_call_id(payload)
 
     append_megafon_log(
         "incoming_callback_raw",
@@ -294,7 +399,7 @@ def megafon_webhook(request):
     if not expected_key or received_key != expected_key:
         BitrixSyncLog.objects.create(
             entity_type="megafon_webhook",
-            entity_id=str(payload.get("call_id") or payload.get("id") or ""),
+            entity_id=call_id,
             action="incoming_callback_rejected",
             request_payload={
                 "headers": {
@@ -321,8 +426,8 @@ def megafon_webhook(request):
 
     BitrixSyncLog.objects.create(
         entity_type="megafon_webhook",
-        entity_id=str(payload.get("call_id") or payload.get("id") or ""),
-        action="incoming_callback",
+        entity_id=call_id,
+        action=f"{payload.get('cmd', 'callback')}:{payload.get('type', payload.get('status', 'received'))}",
         request_payload={
             "headers": {
                 "X-CRM-AUTH": request.headers.get("X-CRM-AUTH", ""),
@@ -338,7 +443,7 @@ def megafon_webhook(request):
     append_megafon_log(
         "incoming_callback_accepted",
         {
-            "call_id": payload.get("callid") or payload.get("call_id") or payload.get("callId") or payload.get("call_id"),
+            "call_id": call_id,
             "payload": payload,
         },
     )

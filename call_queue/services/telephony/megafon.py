@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
-from leadreport.models import SalesManager
+
 import requests
 from django.conf import settings
 
@@ -13,14 +13,14 @@ class MegafonAPIError(Exception):
 class MegafonTelephonyService:
     def __init__(
         self,
-        base_url: str | None = "https://vats671653.megapbx.ru/crmapi/v1",
-        api_key: str | None = "9fa7e15c-1997-4192-8406-3245d251dce5",
+        base_url: str | None = None,
+        api_key: str | None = None,
         auth_header: str | None = None,
         auth_mode: str | None = None,
     ):
         self.base_url = (base_url or settings.MEGAFON_VATS_API_URL).rstrip("/")
         self.api_key = api_key or settings.MEGAFON_VATS_API_KEY
-        self.auth_header = auth_header or getattr(settings, "MEGAFON_VATS_AUTH_HEADER", "X-CRM-AUTH")
+        self.auth_header = auth_header or getattr(settings, "MEGAFON_VATS_AUTH_HEADER", "X-API-KEY")
         self.auth_mode = auth_mode or getattr(settings, "MEGAFON_VATS_AUTH_MODE", "header")
 
     def make_call(
@@ -42,11 +42,17 @@ class MegafonTelephonyService:
         payload: dict[str, Any] = {
             "phone": phone,
             "show_phone": bool(show_phone),
-            "user": user,
-    
         }
-        
-        headers = {"X-API-KEY": self.api_key}
+
+        if user:
+            payload["user"] = user
+        elif group:
+            payload["group"] = group
+
+        if clid:
+            payload["clid"] = clid
+
+        headers = {"Content-Type": "application/json"}
         params: dict[str, Any] = {}
 
         if self.auth_mode == "header":
@@ -63,7 +69,7 @@ class MegafonTelephonyService:
                 f"{self.base_url}/makecall",
                 json=payload,
                 headers=headers,
-                #params=params,
+                params=params,
                 timeout=30,
             )
             response.raise_for_status()

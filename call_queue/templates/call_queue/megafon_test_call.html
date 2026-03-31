@@ -75,6 +75,120 @@
         </div>
       </aside>
     </div>
+
+    {% if current_call_id %}
+      <section class="mt-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200" data-call-panel data-callid="{{ current_call_id }}">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-semibold">Статус текущего тестового звонка</h2>
+            <p class="mt-1 text-sm text-slate-500">Call ID: <span class="font-mono">{{ current_call_id }}</span></p>
+          </div>
+          <div class="rounded-full px-4 py-2 text-sm font-medium
+            {% if current_snapshot.marker.state == 'success' %}bg-emerald-100 text-emerald-800
+            {% elif current_snapshot.marker.state == 'unreachable' %}bg-rose-100 text-rose-800
+            {% elif current_snapshot.marker.state == 'in_progress' %}bg-amber-100 text-amber-800
+            {% else %}bg-slate-100 text-slate-700{% endif %}"
+            data-call-marker>
+            {{ current_snapshot.marker.label }}
+          </div>
+        </div>
+
+        <div class="mt-4 grid gap-4 md:grid-cols-3">
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Финальный статус</div>
+            <div class="mt-1 font-medium" data-call-final>{{ current_snapshot.latest_history_status|default:"—" }}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Есть ACCEPTED</div>
+            <div class="mt-1 font-medium" data-call-accepted>{% if current_snapshot.manager_answered %}Да{% else %}Нет{% endif %}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Итоговый маркер</div>
+            <div class="mt-1 font-medium" data-call-state>{{ current_snapshot.marker.label }}</div>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <h3 class="text-lg font-semibold">Этапы звонка</h3>
+          <div class="mt-4 space-y-3" data-call-timeline>
+            {% for entry in current_snapshot.timeline %}
+              <div class="rounded-2xl border border-slate-200 p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="font-medium text-slate-900">{{ entry.title }}</div>
+                  <div class="text-xs text-slate-500">{{ entry.created_at }}</div>
+                </div>
+                <div class="mt-2 text-sm text-slate-600">direction: {{ entry.direction|default:"—" }} | cmd: {{ entry.cmd|default:"—" }} | type: {{ entry.type|default:"—" }} | status: {{ entry.status|default:"—" }}</div>
+              </div>
+            {% empty %}
+              <div class="rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
+                Событий по этому звонку пока нет.
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    {% endif %}
   </div>
+
+  {% if current_call_id %}
+    <script>
+      (function () {
+        const panel = document.querySelector("[data-call-panel]");
+        if (!panel) return;
+        const callId = panel.dataset.callid;
+        const markerNode = panel.querySelector("[data-call-marker]");
+        const finalNode = panel.querySelector("[data-call-final]");
+        const acceptedNode = panel.querySelector("[data-call-accepted]");
+        const stateNode = panel.querySelector("[data-call-state]");
+        const timelineNode = panel.querySelector("[data-call-timeline]");
+
+        function markerClass(state) {
+          if (state === "success") return "rounded-full px-4 py-2 text-sm font-medium bg-emerald-100 text-emerald-800";
+          if (state === "unreachable") return "rounded-full px-4 py-2 text-sm font-medium bg-rose-100 text-rose-800";
+          if (state === "in_progress") return "rounded-full px-4 py-2 text-sm font-medium bg-amber-100 text-amber-800";
+          return "rounded-full px-4 py-2 text-sm font-medium bg-slate-100 text-slate-700";
+        }
+
+        function renderTimeline(items) {
+          if (!items.length) {
+            timelineNode.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">Событий по этому звонку пока нет.</div>';
+            return;
+          }
+          timelineNode.innerHTML = items.map((entry) => `
+            <div class="rounded-2xl border border-slate-200 p-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="font-medium text-slate-900">${entry.title}</div>
+                <div class="text-xs text-slate-500">${entry.created_at}</div>
+              </div>
+              <div class="mt-2 text-sm text-slate-600">direction: ${entry.direction || "—"} | cmd: ${entry.cmd || "—"} | type: ${entry.type || "—"} | status: ${entry.status || "—"}</div>
+            </div>
+          `).join("");
+        }
+
+        async function poll() {
+          try {
+            const response = await fetch(`/call-queue/megafon/call-status/?callid=${encodeURIComponent(callId)}`, {
+              headers: {"X-Requested-With": "XMLHttpRequest"}
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (!data.ok) return;
+            const snapshot = data.snapshot;
+            markerNode.className = markerClass(snapshot.marker.state);
+            markerNode.textContent = snapshot.marker.label;
+            finalNode.textContent = snapshot.latest_history_status || "—";
+            acceptedNode.textContent = snapshot.manager_answered ? "Да" : "Нет";
+            stateNode.textContent = snapshot.marker.label;
+            renderTimeline(snapshot.timeline || []);
+          } catch (error) {
+            console.error(error);
+          }
+        }
+
+        poll();
+        setInterval(poll, 3000);
+      })();
+    </script>
+  {% endif %}
 </body>
 </html>
