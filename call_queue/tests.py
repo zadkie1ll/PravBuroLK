@@ -27,6 +27,7 @@ from call_queue.views import (
     MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY,
     MEGAFON_TEST_PHONE_INDEX_SESSION_KEY,
     MEGAFON_TEST_PHONE_LIST_SESSION_KEY,
+    MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY,
 )
 from leadreport.models import SalesManager
 
@@ -651,3 +652,48 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY], 1)
         self.assertEqual(session[MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY], "9003")
         self.assertEqual(session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY], "9002")
+        self.assertEqual(
+            session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY]["79990000001"]["label"],
+            "Взял трубку",
+        )
+
+    def test_auto_next_call_marks_manager_side_cancel(self):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session[MEGAFON_TEST_CALL_CONFIG_SESSION_KEY] = {
+            "sales_manager_id": self.sales_manager.pk,
+            "clid": "",
+            "show_phone": True,
+        }
+        session.save()
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="9005",
+            action="event:CANCELLED",
+            request_payload={"payload": {"cmd": "event", "type": "CANCELLED", "direction": "in", "callid": "9005"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="9005",
+            action="history:missed",
+            request_payload={"payload": {"cmd": "history", "status": "missed", "callid": "9005"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_auto_next_call"),
+            {"completed_callid": "9005"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        session = self.client.session
+        self.assertEqual(
+            session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY]["79990000001"]["label"],
+            "Не взял трубку",
+        )

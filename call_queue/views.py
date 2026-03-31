@@ -33,6 +33,7 @@ MEGAFON_TEST_PHONE_INDEX_SESSION_KEY = "megafon_test_phone_index"
 MEGAFON_TEST_CALL_CONFIG_SESSION_KEY = "megafon_test_call_config"
 MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY = "megafon_test_active_call_id"
 MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY = "megafon_test_last_completed_call_id"
+MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY = "megafon_test_phone_results"
 
 
 def append_megafon_log(event_type: str, payload: dict):
@@ -106,10 +107,15 @@ def build_megafon_call_snapshot(call_id: str) -> dict:
     marker = {"state": "pending", "label": "Ожидаем события от МегаФона"}
     manager_answered = False
     latest_history_status = ""
+    last_event_type = ""
+    last_event_direction = ""
 
     for entry in timeline:
         if entry["cmd"] == "event" and entry["type"] == "ACCEPTED":
             manager_answered = True
+        if entry["cmd"] == "event" and entry["type"]:
+            last_event_type = entry["type"]
+            last_event_direction = entry["direction"]
         if entry["cmd"] == "history" and entry["status"]:
             latest_history_status = entry["status"]
 
@@ -129,6 +135,8 @@ def build_megafon_call_snapshot(call_id: str) -> dict:
         "marker": marker,
         "manager_answered": manager_answered,
         "latest_history_status": latest_history_status,
+        "last_event_type": last_event_type,
+        "last_event_direction": last_event_direction,
         "timeline": timeline[-20:],
     }
 
@@ -150,6 +158,48 @@ def get_megafon_test_phone_index(request, phone_list: list[str]) -> int:
 def get_megafon_test_call_config(request) -> dict:
     value = request.session.get(MEGAFON_TEST_CALL_CONFIG_SESSION_KEY, {})
     return value if isinstance(value, dict) else {}
+
+
+def get_megafon_test_phone_results(request) -> dict:
+    value = request.session.get(MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY, {})
+    return value if isinstance(value, dict) else {}
+
+
+def build_megafon_phone_result(snapshot: dict) -> dict:
+    history_status = snapshot.get("latest_history_status")
+    if history_status == "Success":
+        return {"state": "answered", "label": "Взял трубку"}
+    if history_status == "missed":
+        return {"state": "unanswered", "label": "Не взял трубку"}
+    if history_status == "Busy":
+        return {"state": "unanswered", "label": "Клиент сбросил или занято"}
+    if history_status == "NotAvailable":
+        return {"state": "unanswered", "label": "Недоступен"}
+
+    last_event_type = snapshot.get("last_event_type")
+    last_event_direction = snapshot.get("last_event_direction")
+    if last_event_type == "CANCELLED":
+        if last_event_direction == "in":
+            return {"state": "cancelled", "label": "Сброс или отмена у менеджера"}
+        if last_event_direction == "out":
+            return {"state": "cancelled", "label": "Сброс или отмена у клиента"}
+        return {"state": "cancelled", "label": "Сброс или отмена"}
+
+    return {"state": "pending", "label": "Ожидаем результат"}
+
+
+def update_megafon_phone_result(request, *, phone: str, snapshot: dict, call_id: str):
+    if not phone:
+        return
+    results = get_megafon_test_phone_results(request)
+    result = build_megafon_phone_result(snapshot)
+    results[phone] = {
+        "call_id": call_id,
+        "state": result["state"],
+        "label": result["label"],
+    }
+    request.session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = results
+    request.session.modified = True
 
 
 def build_megafon_test_call_url(call_id: str, auto_dial: bool = False) -> str:
@@ -182,6 +232,13 @@ def start_megafon_test_call(
         "show_phone": bool(show_phone),
     }
     request.session[MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY] = call_id
+    results = get_megafon_test_phone_results(request)
+    results[phone] = {
+        "call_id": call_id,
+        "state": "in_progress",
+        "label": "Звонок в процессе",
+    }
+    request.session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = results
     request.session.modified = True
     append_megafon_log(
         "manual_test_call",
@@ -282,6 +339,7 @@ def megafon_test_call(request):
                 phone_list = list_form.cleaned_data["phone_list"]
                 request.session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = phone_list
                 request.session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+                request.session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = {}
                 phone_index = 0
                 messages.success(request, f"Список сохранён: {len(phone_list)} номеров." if phone_list else "Список очищен.")
         elif action == "pick_phone":
@@ -343,8 +401,14 @@ def megafon_test_call(request):
     current_call_id = request.GET.get("callid", "").strip()
     auto_dial_enabled = request.GET.get("autodial") == "1"
     current_snapshot = build_megafon_call_snapshot(current_call_id) if current_call_id else None
+    phone_results = get_megafon_test_phone_results(request)
     phone_entries = [
-        {"index": idx, "phone": phone, "is_current": idx == phone_index}
+        {
+            "index": idx,
+            "phone": phone,
+            "is_current": idx == phone_index,
+            "result": phone_results.get(phone, {}),
+        }
         for idx, phone in enumerate(phone_list)
     ]
 
@@ -396,15 +460,16 @@ def megafon_auto_next_call(request):
                 "started": False,
                 "already_processed": True,
                 "active_call_id": active_call_id,
-                "redirect_url": build_megafon_test_call_url(active_call_id, auto_dial=True) if active_call_id else "",
             }
         )
 
     phone_list = get_megafon_test_phone_list(request)
+    current_index = get_megafon_test_phone_index(request, phone_list)
+    current_phone = phone_list[current_index] if phone_list else ""
+    update_megafon_phone_result(request, phone=current_phone, snapshot=snapshot, call_id=completed_call_id)
+
     if not phone_list:
         return JsonResponse({"ok": True, "started": False, "no_next": True})
-
-    current_index = get_megafon_test_phone_index(request, phone_list)
     if current_index >= len(phone_list) - 1:
         request.session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY] = completed_call_id
         request.session.modified = True

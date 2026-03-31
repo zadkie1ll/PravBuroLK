@@ -89,8 +89,22 @@
                   <input type="hidden" name="action" value="pick_phone">
                   <input type="hidden" name="phone_index" value="{{ entry.index }}">
                   <button type="submit" class="w-full rounded-2xl border px-4 py-3 text-left transition {% if entry.is_current %}border-amber-400 bg-amber-50{% else %}border-slate-200 bg-white hover:border-slate-300{% endif %}">
-                    <span class="text-sm text-slate-500">#{{ entry.index|add:1 }}</span>
-                    <span class="ml-2 font-medium">{{ entry.phone }}</span>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <span class="text-sm text-slate-500">#{{ entry.index|add:1 }}</span>
+                        <span class="ml-2 font-medium">{{ entry.phone }}</span>
+                      </div>
+                      {% if entry.result.label %}
+                        <span class="rounded-full px-3 py-1 text-xs font-medium
+                          {% if entry.result.state == 'answered' %}bg-emerald-100 text-emerald-800
+                          {% elif entry.result.state == 'in_progress' %}bg-amber-100 text-amber-800
+                          {% elif entry.result.state == 'cancelled' %}bg-violet-100 text-violet-800
+                          {% elif entry.result.state == 'unanswered' %}bg-rose-100 text-rose-800
+                          {% else %}bg-slate-100 text-slate-700{% endif %}">
+                          {{ entry.result.label }}
+                        </span>
+                      {% endif %}
+                    </div>
                   </button>
                 </form>
               {% endfor %}
@@ -228,8 +242,12 @@
               stateNode.textContent = data.error || "Не удалось запустить следующий номер";
               return;
             }
-            if (data.redirect_url) {
+            if (data.started && data.redirect_url) {
               window.location.href = data.redirect_url;
+              return;
+            }
+            if (data.already_processed) {
+              stateNode.textContent = "Ожидаем следующий номер";
               return;
             }
             if (data.no_next) {
