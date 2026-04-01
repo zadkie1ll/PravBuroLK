@@ -193,6 +193,30 @@
         </div>
       </section>
 
+      <div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/40 px-4" data-decision-modal>
+        <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+          <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Подтверждение исхода</div>
+          <h3 class="mt-2 text-2xl font-semibold text-slate-900">Кто ответил на стороне клиента?</h3>
+          <p class="mt-3 text-sm text-slate-600">
+            МегаФон сообщил, что на стороне клиента есть ответ. Подтвердите исход звонка вручную.
+          </p>
+          <div class="mt-6 grid gap-3 sm:grid-cols-3">
+            <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
+              Клиент ответил
+            </button>
+            <button type="button" data-decision="voicemail" class="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-amber-400">
+              Автоответчик
+            </button>
+            <button type="button" data-decision="failed" class="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-500">
+              Не дозвонились
+            </button>
+          </div>
+          <p class="mt-4 text-xs text-slate-500">
+            Следующий звонок стартует только после реального завершения текущего.
+          </p>
+        </div>
+      </div>
+
     {% endif %}
   </div>
 
@@ -214,6 +238,7 @@
         const currentPhone = "{{ current_phone|escapejs }}";
         const decisionPanel = panel.querySelector("[data-decision-panel]");
         const decisionHelpNode = panel.querySelector("[data-decision-help]");
+        const decisionModal = document.querySelector("[data-decision-modal]");
         let autoAdvanceTriggered = false;
         let decisionInFlight = false;
         let confirmationResolved = {% if current_phone_result.decision %}true{% else %}false{% endif %};
@@ -282,6 +307,18 @@
           decisionHelpNode.textContent = "Можно нажать исход заранее. Следующий звонок стартует только после фактического завершения текущего.";
         }
 
+        function showDecisionModal() {
+          if (!decisionModal || confirmationResolved || decisionInFlight) return;
+          decisionModal.classList.remove("hidden");
+          decisionModal.classList.add("flex");
+        }
+
+        function hideDecisionModal() {
+          if (!decisionModal) return;
+          decisionModal.classList.add("hidden");
+          decisionModal.classList.remove("flex");
+        }
+
         async function submitDecision(decision) {
           if (decisionInFlight) return;
           decisionInFlight = true;
@@ -304,6 +341,7 @@
             confirmationResolved = true;
             confirmationDecision = decision;
             renderDecisionPanel();
+            hideDecisionModal();
             renderCurrentPhoneBadge(data.result || null);
             stateNode.textContent = data.result?.label || "Решение сохранено";
             if (decision === "voicemail") {
@@ -385,6 +423,11 @@
             renderCurrentPhoneBadge(snapshot.phone_result || null);
             renderTimeline(snapshot.timeline || []);
             renderDecisionPanel();
+            if (snapshot.requires_manager_confirmation && !confirmationResolved) {
+              showDecisionModal();
+            } else {
+              hideDecisionModal();
+            }
             if (snapshot.latest_history_status && confirmationResolved && (confirmationDecision === "voicemail" || confirmationDecision === "failed")) {
               triggerNextCall();
               return;
@@ -401,7 +444,7 @@
           }
         }
 
-        panel.querySelectorAll("[data-decision]").forEach((button) => {
+        document.querySelectorAll("[data-decision]").forEach((button) => {
           button.addEventListener("click", () => submitDecision(button.dataset.decision));
         });
 
