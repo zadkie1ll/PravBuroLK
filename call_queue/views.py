@@ -490,7 +490,10 @@ def call_queue_dashboard(request):
                 return redirect(f"{session.get_absolute_url()}?auto_next=1")
             return redirect("call_queue:session_detail", session_id=session.pk)
     else:
-        form = CallSessionCreateForm(bitrix_service=service.deal_service)
+        form = CallSessionCreateForm(
+            request.GET or None,
+            bitrix_service=service.deal_service,
+        )
 
     return render(
         request,

@@ -27,7 +27,7 @@
     <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
       <section class="rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
         <h2 class="text-xl font-semibold">Формирование очереди</h2>
-        <form method="post" class="mt-6 space-y-5">
+        <form method="post" class="mt-6 space-y-5" id="call-queue-form">
           {% csrf_token %}
           <div class="grid gap-4 md:grid-cols-2">
             {% for field in form %}
@@ -89,5 +89,31 @@
       </section>
     </div>
   </div>
+  <script>
+    (function () {
+      const form = document.getElementById("call-queue-form");
+      if (!form) return;
+      const entityTypeField = form.querySelector('[name="entity_type"]');
+      if (!entityTypeField) return;
+
+      entityTypeField.addEventListener("change", () => {
+        const params = new URLSearchParams();
+        const fields = form.querySelectorAll("input, select, textarea");
+        fields.forEach((field) => {
+          if (!field.name || field.name === "csrfmiddlewaretoken") return;
+          if (field.type === "checkbox") {
+            if (field.checked) {
+              params.set(field.name, "on");
+            }
+            return;
+          }
+          if (field.value) {
+            params.set(field.name, field.value);
+          }
+        });
+        window.location.href = `${window.location.pathname}?${params.toString()}`;
+      });
+    })();
+  </script>
 </body>
 </html>

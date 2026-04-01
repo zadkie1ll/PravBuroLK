@@ -41,6 +41,7 @@ class CallSessionCreateForm(forms.Form):
         self.fields["stage_id"].choices = blank + service.get_stage_choices(entity_type)
         self.fields["source_id"].choices = blank + service.get_source_choices(entity_type)
         self.fields["responsible_id"].choices = blank + service.get_responsible_choices()
+        self.fields["stage_id"].label = "Стадия сделки" if entity_type == CallEntityType.DEAL else "Статус лида"
 
         for name in ("entity_type", "date_from", "date_to", "stage_id", "source_id", "responsible_id"):
             self.fields[name].widget.attrs.setdefault(
