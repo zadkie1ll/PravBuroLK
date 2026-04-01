@@ -45,6 +45,15 @@ class BitrixDealService:
         "NAME",
         "UF_*",
     ]
+    production_deal_select_fields = [
+        "ID",
+        "TITLE",
+        "CONTACT_ID",
+        "STAGE_ID",
+        "DATE_CREATE",
+        "COMMENTS",
+        "ASSIGNED_BY_ID",
+    ]
 
     def __init__(self, client: BitrixClient | None = None):
         self.client = client or BitrixClient()
@@ -122,6 +131,93 @@ class BitrixDealService:
         if filters.get("only_without_repeat"):
             normalized = [deal for deal in normalized if not deal.get("repeat_unanswered")]
         return normalized
+
+    def fetch_production_recall_deals(
+        self,
+        *,
+        date_from,
+        date_to,
+        stage_id: str = "PREPARATION",
+    ) -> list[dict[str, Any]]:
+        from_dt = timezone.make_aware(datetime.combine(date_from, time.min))
+        to_dt = timezone.make_aware(datetime.combine(date_to, time.max))
+        deals = self.client.paginated_call(
+            "crm.deal.list",
+            {
+                "filter": {
+                    ">=DATE_CREATE": from_dt.isoformat(),
+                    "<=DATE_CREATE": to_dt.isoformat(),
+                    "STAGE_ID": stage_id,
+                    "!CONTACT_ID": None,
+                },
+                "select": self.production_deal_select_fields,
+                "order": {"DATE_CREATE": "ASC", "ID": "ASC"},
+            },
+        )
+        items: list[dict[str, Any]] = []
+        for deal in deals:
+            contact_id = _safe_int(deal.get("CONTACT_ID"))
+            if not contact_id:
+                continue
+            contact = self.get_contact(contact_id)
+            phones = self.extract_contact_phones(contact)
+            if not phones:
+                continue
+            deal_id = _safe_int(deal.get("ID"))
+            items.append(
+                {
+                    "deal_id": deal_id,
+                    "contact_id": contact_id,
+                    "client_name": self.extract_contact_name(contact) or (deal.get("TITLE") or "").strip(),
+                    "phone": phones[0],
+                    "phones": phones,
+                    "bitrix_url": self.build_entity_url(CallEntityType.DEAL, deal_id),
+                    "comments": (deal.get("COMMENTS") or "").strip(),
+                    "stage_id": str(deal.get("STAGE_ID") or ""),
+                    "created_at": deal.get("DATE_CREATE") or "",
+                }
+            )
+        return items
+
+    def get_contact(self, contact_id: int) -> dict[str, Any]:
+        return self.client.call("crm.contact.get", {"id": int(contact_id)})
+
+    def get_deal(self, deal_id: int) -> dict[str, Any]:
+        return self.client.call("crm.deal.get", {"id": int(deal_id)})
+
+    def extract_contact_phones(self, contact: dict[str, Any]) -> list[str]:
+        raw_phone = contact.get("PHONE") or []
+        if not isinstance(raw_phone, list):
+            return []
+        phones = []
+        for entry in raw_phone:
+            value = str((entry or {}).get("VALUE") or "").strip()
+            if value:
+                phones.append(value)
+        return phones
+
+    def extract_contact_name(self, contact: dict[str, Any]) -> str:
+        name_parts = [
+            str(contact.get("NAME") or "").strip(),
+            str(contact.get("SECOND_NAME") or "").strip(),
+            str(contact.get("LAST_NAME") or "").strip(),
+        ]
+        return " ".join(part for part in name_parts if part).strip()
+
+    def append_deal_comment(self, deal_id: int, line: str) -> str:
+        deal = self.get_deal(deal_id)
+        current_comments = str(deal.get("COMMENTS") or "").strip()
+        new_comments = f"{current_comments}\n{line}".strip() if current_comments else line
+        self.client.call(
+            "crm.deal.update",
+            {
+                "id": int(deal_id),
+                "fields": {
+                    "COMMENTS": new_comments,
+                },
+            },
+        )
+        return new_comments
 
     def normalize_entity(self, entity: dict[str, Any], entity_type: str) -> dict[str, Any]:
         raw_phone = entity.get("PHONE")

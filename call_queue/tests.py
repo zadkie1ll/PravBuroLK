@@ -22,6 +22,9 @@ from call_queue.services.bitrix.deal_service import BitrixDealService
 from call_queue.services.queue_service import QueueService
 from call_queue.services.telephony.megafon import MegafonAPIError, MegafonTelephonyService
 from call_queue.views import (
+    MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY,
+    MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY,
+    MEGAFON_PROD_QUEUE_SESSION_KEY,
     MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY,
     MEGAFON_TEST_CALL_CONFIG_SESSION_KEY,
     MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY,
@@ -1012,3 +1015,121 @@ class CallQueueMegafonViewTests(TestCase):
         payload = response.json()
         self.assertTrue(payload["started"])
         self.assertEqual(payload["call_id"], "CALL110")
+
+    @patch("call_queue.views.BitrixDealService.fetch_production_recall_deals")
+    def test_production_handler_builds_queue_from_bitrix(self, fetch_mock):
+        fetch_mock.return_value = [
+            {
+                "deal_id": 701,
+                "contact_id": 801,
+                "client_name": "Ирина",
+                "phone": "79990000001",
+                "phones": ["79990000001"],
+                "bitrix_url": "https://example.bitrix24.ru/crm/deal/details/701/",
+                "comments": "",
+                "stage_id": "PREPARATION",
+                "created_at": "2026-04-01T10:00:00+03:00",
+            }
+        ]
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:production_handler"),
+            {
+                "action": "build_queue",
+                "date_from": "2026-03-01",
+                "date_to": "2026-03-31",
+                "stage_id": "PREPARATION",
+                "auto_dial": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        session = self.client.session
+        self.assertEqual(session[MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY], 0)
+        self.assertEqual(session[MEGAFON_PROD_QUEUE_SESSION_KEY][0]["deal_id"], 701)
+        self.assertEqual(session[MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY]["stage_id"], "PREPARATION")
+
+    def test_production_handler_resolve_answered_returns_bitrix_url(self):
+        session = self.client.session
+        session[MEGAFON_PROD_QUEUE_SESSION_KEY] = [
+            {
+                "deal_id": 701,
+                "contact_id": 801,
+                "client_name": "Ирина",
+                "phone": "79990000001",
+                "bitrix_url": "https://example.bitrix24.ru/crm/deal/details/701/",
+                "manual_decision": "",
+                "comment_logged": False,
+                "call_id": "PROD-CALL-1",
+                "status": "calling",
+            }
+        ]
+        session.save()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:production_handler_resolve"),
+            {"callid": "PROD-CALL-1", "decision": "answered"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["decision"], "answered")
+        self.assertEqual(payload["bitrix_url"], "https://example.bitrix24.ru/crm/deal/details/701/")
+
+    @patch("call_queue.views.start_megafon_production_call")
+    @patch("call_queue.views.BitrixDealService.append_deal_comment")
+    def test_production_handler_auto_next_logs_comment_for_not_available(self, append_mock, start_call_mock):
+        session = self.client.session
+        session[MEGAFON_PROD_QUEUE_SESSION_KEY] = [
+            {
+                "deal_id": 701,
+                "contact_id": 801,
+                "client_name": "Ирина",
+                "phone": "79990000001",
+                "bitrix_url": "https://example.bitrix24.ru/crm/deal/details/701/",
+                "manual_decision": "",
+                "comment_logged": False,
+                "comments": "",
+                "call_id": "PROD-CALL-2",
+                "status": "calling",
+            },
+            {
+                "deal_id": 702,
+                "contact_id": 802,
+                "client_name": "Ольга",
+                "phone": "79990000002",
+                "bitrix_url": "https://example.bitrix24.ru/crm/deal/details/702/",
+                "manual_decision": "",
+                "comment_logged": False,
+                "comments": "",
+                "call_id": "",
+                "status": "pending",
+            },
+        ]
+        session[MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY] = 0
+        session.save()
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="PROD-CALL-2",
+            action="history:NotAvailable",
+            request_payload={"payload": {"cmd": "history", "status": "NotAvailable", "callid": "PROD-CALL-2"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        append_mock.return_value = "31.03 (менеджер) недозвон"
+        start_call_mock.return_value = ("PROD-CALL-3", {"callid": "PROD-CALL-3"})
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:production_handler_auto_next"),
+            {"completed_callid": "PROD-CALL-2"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["started"])
+        append_mock.assert_called_once()

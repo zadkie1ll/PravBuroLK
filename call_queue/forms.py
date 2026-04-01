@@ -131,3 +131,50 @@ class MegafonPhoneListForm(forms.Form):
             seen.add(phone)
             phones.append(phone)
         return phones
+
+
+class ProductionRecallForm(forms.Form):
+    date_from = forms.DateField(
+        label="Дата от",
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
+            }
+        ),
+    )
+    date_to = forms.DateField(
+        label="Дата до",
+        widget=forms.DateInput(
+            attrs={
+                "type": "date",
+                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
+            }
+        ),
+    )
+    stage_id = forms.ChoiceField(
+        label="Колонка CRM",
+        choices=[("PREPARATION", "PREPARATION")],
+        initial="PREPARATION",
+        widget=forms.Select(
+            attrs={
+                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
+            }
+        ),
+    )
+    auto_dial = forms.BooleanField(
+        label="Автоматически переходить к следующему номеру после недозвона",
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(
+            attrs={"class": "h-4 w-4 rounded border-slate-300"}
+        ),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        date_from = cleaned_data.get("date_from")
+        date_to = cleaned_data.get("date_to")
+        if date_from and date_to and date_from > date_to:
+            raise forms.ValidationError("Дата начала не может быть позже даты окончания.")
+        return cleaned_data

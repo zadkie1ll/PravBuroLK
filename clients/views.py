@@ -75,7 +75,7 @@ def get_user_redirect_url(user):
         return resolve_url("admin_dashboard")
     
     if hasattr(user, "sales_manager_profile") and user.sales_manager_profile.is_active:
-        return resolve_url("my_stats")
+        return resolve_url("call_queue:production_handler")
     
     if hasattr(user, "trainee_profile") and user.trainee_profile.is_active:
         return "/static/lms-front"

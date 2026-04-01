@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Продовый обзвон сделок</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-900">
+  <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mb-8 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-700 p-8 text-white shadow-2xl">
+      <p class="mb-2 text-sm uppercase tracking-[0.3em] text-emerald-200">Call Queue</p>
+      <h1 class="text-3xl font-semibold sm:text-4xl">Продовый обработчик сделок</h1>
+      <p class="mt-3 max-w-3xl text-sm text-slate-200 sm:text-base">
+        Менеджер выбирает даты, получает сделки из Bitrix24 в колонке PREPARATION, а дальше идёт по очереди и фиксирует дозвон.
+      </p>
+    </div>
+
+    {% if messages %}
+      <div class="mb-6 space-y-3">
+        {% for message in messages %}
+          <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+      <section class="rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
+        <h2 class="text-xl font-semibold">Формирование очереди</h2>
+        <form method="post" class="mt-6 space-y-5">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="build_queue">
+          {% for field in form %}
+            <div>
+              {% if field.field.widget.input_type == 'checkbox' %}
+                <label class="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+                  {{ field }}
+                  <span>{{ field.label }}</span>
+                </label>
+              {% else %}
+                <label for="{{ field.id_for_label }}" class="mb-2 block text-sm font-medium text-slate-700">{{ field.label }}</label>
+                {{ field }}
+              {% endif %}
+              {% if field.errors %}
+                <p class="mt-1 text-sm text-rose-600">{{ field.errors|join:", " }}</p>
+              {% endif %}
+            </div>
+          {% endfor %}
+          <div class="flex flex-wrap gap-3">
+            <button type="submit" class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-slate-700">
+              Загрузить сделки
+            </button>
+          </div>
+        </form>
+        <form method="post" class="mt-3">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="reset_queue">
+          <button type="submit" class="rounded-full bg-white px-5 py-3 text-sm font-medium text-slate-900 shadow-sm ring-1 ring-slate-300 transition hover:bg-slate-100">
+            Очистить очередь
+          </button>
+        </form>
+      </section>
+
+      <aside class="rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
+        <h2 class="text-xl font-semibold">Статус очереди</h2>
+        <div class="mt-5 grid gap-4 sm:grid-cols-3">
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Всего сделок</div>
+            <div class="mt-1 text-2xl font-semibold">{{ queue_size }}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Текущая позиция</div>
+            <div class="mt-1 text-2xl font-semibold">
+              {% if queue_size %}{{ current_index|add:1 }}{% else %}0{% endif %}
+            </div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Менеджер</div>
+            <div class="mt-1 text-lg font-semibold">{{ sales_manager_profile.name }}</div>
+          </div>
+        </div>
+
+        {% if current_item %}
+          <div class="mt-5 rounded-2xl border border-slate-200 p-4">
+            <div class="text-sm text-slate-500">Текущая сделка</div>
+            <div class="mt-2 text-lg font-semibold">{{ current_item.client_name|default:"Без имени" }}</div>
+            <div class="mt-2 text-sm text-slate-600">Телефон: {{ current_item.phone }}</div>
+            <div class="mt-1 text-sm text-slate-600">Bitrix Deal ID: {{ current_item.deal_id }}</div>
+            {% if current_item.comments %}
+              <div class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                <div class="mb-2 font-medium text-slate-900">COMMENTS</div>
+                <pre class="whitespace-pre-wrap font-sans">{{ current_item.comments }}</pre>
+              </div>
+            {% endif %}
+            <div class="mt-4 flex flex-wrap gap-3">
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="start_call">
+                <button type="submit" class="rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-emerald-500">
+                  Позвонить
+                </button>
+              </form>
+              {% if current_item.bitrix_url %}
+                <a href="{{ current_item.bitrix_url }}" target="_blank" rel="noopener" class="rounded-full bg-white px-5 py-3 text-sm font-medium text-slate-900 shadow-sm ring-1 ring-slate-300 transition hover:bg-slate-100">
+                  Открыть сделку в Bitrix
+                </a>
+              {% endif %}
+            </div>
+          </div>
+        {% else %}
+          <div class="mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
+            Очередь пока не сформирована.
+          </div>
+        {% endif %}
+      </aside>
+    </div>
+
+    {% if current_item and current_call_id %}
+      <section class="mt-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200" data-prod-panel data-callid="{{ current_call_id }}" data-autodial="{% if auto_dial_enabled %}1{% else %}0{% endif %}" data-status-url="{% url 'call_queue:production_handler_status' %}" data-resolve-url="{% url 'call_queue:production_handler_resolve' %}" data-auto-next-url="{% url 'call_queue:production_handler_auto_next' %}" data-csrf-token="{{ csrf_token }}">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-semibold">Текущий звонок</h2>
+            <p class="mt-1 text-sm text-slate-500">Call ID: <span class="font-mono">{{ current_call_id }}</span></p>
+          </div>
+          <div class="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700" data-call-marker>
+            {% if current_snapshot %}{{ current_snapshot.marker.label }}{% else %}Ожидаем события{% endif %}
+          </div>
+        </div>
+
+        <div class="mt-4 grid gap-4 md:grid-cols-4">
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Клиент</div>
+            <div class="mt-1 font-medium">{{ current_item.client_name|default:"Без имени" }}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Телефон</div>
+            <div class="mt-1 font-medium">{{ current_item.phone }}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">История</div>
+            <div class="mt-1 font-medium" data-call-final>{% if current_snapshot %}{{ current_snapshot.latest_history_status|default:"—" }}{% else %}—{% endif %}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Пауза</div>
+            <div class="mt-1 font-medium" data-pause-status>{% if auto_dial_enabled %}Выключена{% else %}Включена{% endif %}</div>
+          </div>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-3">
+          <button type="button" class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-700" data-pause-toggle>
+            Пауза
+          </button>
+        </div>
+
+        <div class="mt-6">
+          <h3 class="text-lg font-semibold">Этапы звонка</h3>
+          <div class="mt-4 space-y-3" data-call-timeline>
+            {% if current_snapshot and current_snapshot.timeline %}
+              {% for entry in current_snapshot.timeline %}
+                <div class="rounded-2xl border border-slate-200 p-4">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="font-medium text-slate-900">{{ entry.title }}</div>
+                    <div class="text-xs text-slate-500">{{ entry.created_at }}</div>
+                  </div>
+                  <div class="mt-2 text-sm text-slate-600">direction: {{ entry.direction|default:"—" }} | cmd: {{ entry.cmd|default:"—" }} | type: {{ entry.type|default:"—" }} | status: {{ entry.status|default:"—" }}</div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
+                Событий по звонку пока нет.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+
+      <div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/40 px-4" data-decision-modal>
+        <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+          <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Подтверждение дозвона</div>
+          <h3 class="mt-2 text-2xl font-semibold text-slate-900">Клиент взял трубку?</h3>
+          <p class="mt-3 text-sm text-slate-600">
+            Подтвердите итог. Если клиент ответил, карточка сделки сразу откроется в новой вкладке.
+          </p>
+          <div class="mt-6 grid gap-3 sm:grid-cols-2">
+            <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
+              Клиент взял трубку
+            </button>
+            <button type="button" data-decision="failed" class="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-500">
+              Недозвон
+            </button>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if current_item and current_call_id %}
+    <script>
+      (function () {
+        const panel = document.querySelector("[data-prod-panel]");
+        if (!panel) return;
+
+        const callId = panel.dataset.callid;
+        const statusUrl = panel.dataset.statusUrl;
+        const resolveUrl = panel.dataset.resolveUrl;
+        const autoNextUrl = panel.dataset.autoNextUrl;
+        const csrfToken = panel.dataset.csrfToken;
+        const autoDialEnabled = panel.dataset.autodial === "1";
+        const markerNode = panel.querySelector("[data-call-marker]");
+        const finalNode = panel.querySelector("[data-call-final]");
+        const pauseStatusNode = panel.querySelector("[data-pause-status]");
+        const timelineNode = panel.querySelector("[data-call-timeline]");
+        const pauseToggle = panel.querySelector("[data-pause-toggle]");
+        const decisionModal = document.querySelector("[data-decision-modal]");
+
+        let paused = !autoDialEnabled;
+        let decision = "{{ current_item.manual_decision|default:''|escapejs }}";
+        let autoAdvanceTriggered = false;
+        let latestSnapshot = null;
+
+        function renderPause() {
+          pauseToggle.textContent = paused ? "Возобновить" : "Пауза";
+          pauseStatusNode.textContent = paused ? "Включена" : "Выключена";
+        }
+
+        function showModal() {
+          if (decisionModal && !decision) {
+            decisionModal.classList.remove("hidden");
+            decisionModal.classList.add("flex");
+          }
+        }
+
+        function hideModal() {
+          if (!decisionModal) return;
+          decisionModal.classList.add("hidden");
+          decisionModal.classList.remove("flex");
+        }
+
+        function renderTimeline(items) {
+          if (!items.length) {
+            timelineNode.innerHTML = '<div class="rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">Событий по звонку пока нет.</div>';
+            return;
+          }
+          timelineNode.innerHTML = items.map((entry) => `
+            <div class="rounded-2xl border border-slate-200 p-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="font-medium text-slate-900">${entry.title}</div>
+                <div class="text-xs text-slate-500">${entry.created_at}</div>
+              </div>
+              <div class="mt-2 text-sm text-slate-600">direction: ${entry.direction || "—"} | cmd: ${entry.cmd || "—"} | type: ${entry.type || "—"} | status: ${entry.status || "—"}</div>
+            </div>
+          `).join("");
+        }
+
+        async function submitDecision(value) {
+          const response = await fetch(resolveUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+              "X-CSRFToken": csrfToken,
+              "X-Requested-With": "XMLHttpRequest"
+            },
+            body: new URLSearchParams({callid: callId, decision: value}).toString()
+          });
+          const data = await response.json();
+          if (!response.ok || !data.ok) {
+            return;
+          }
+          decision = value;
+          paused = value === "answered";
+          renderPause();
+          hideModal();
+          if (value === "answered" && data.bitrix_url) {
+            window.open(data.bitrix_url, "_blank", "noopener");
+          }
+          evaluate(latestSnapshot);
+        }
+
+        async function triggerNext() {
+          if (paused || autoAdvanceTriggered) return;
+          autoAdvanceTriggered = true;
+          const response = await fetch(autoNextUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+              "X-CSRFToken": csrfToken,
+              "X-Requested-With": "XMLHttpRequest"
+            },
+            body: new URLSearchParams({completed_callid: callId}).toString()
+          });
+          const data = await response.json();
+          if (data.started && data.redirect_url) {
+            window.location.href = data.redirect_url;
+          }
+        }
+
+        function evaluate(snapshot) {
+          if (!snapshot) return;
+          const clientAnswered = snapshot.last_event_type === "ACCEPTED" && snapshot.last_event_direction === "out";
+          if (clientAnswered && !decision) {
+            paused = true;
+            renderPause();
+            showModal();
+          }
+          if (!snapshot.latest_history_status) {
+            return;
+          }
+          if (decision === "answered") {
+            paused = true;
+            renderPause();
+            return;
+          }
+          if (decision === "failed") {
+            if (!paused) {
+              triggerNext();
+            }
+            return;
+          }
+          if (!clientAnswered) {
+            if (!paused) {
+              triggerNext();
+            }
+          }
+        }
+
+        async function poll() {
+          const response = await fetch(`${statusUrl}?callid=${encodeURIComponent(callId)}`, {
+            headers: {"X-Requested-With": "XMLHttpRequest"}
+          });
+          const data = await response.json();
+          if (!response.ok || !data.ok) return;
+          latestSnapshot = data.snapshot;
+          markerNode.textContent = latestSnapshot.marker.label;
+          finalNode.textContent = latestSnapshot.latest_history_status || "—";
+          renderTimeline(latestSnapshot.timeline || []);
+          evaluate(latestSnapshot);
+        }
+
+        pauseToggle.addEventListener("click", () => {
+          paused = !paused;
+          autoAdvanceTriggered = false;
+          renderPause();
+          evaluate(latestSnapshot);
+        });
+
+        document.querySelectorAll("[data-decision]").forEach((button) => {
+          button.addEventListener("click", () => submitDecision(button.dataset.decision));
+        });
+
+        renderPause();
+        poll();
+        setInterval(poll, 3000);
+      })();
+    </script>
+  {% endif %}
+</body>
+</html>

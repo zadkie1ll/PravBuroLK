@@ -15,9 +15,16 @@ from django.conf import settings
 
 from leadreport.models import SalesManager
 
-from .forms import CallResultForm, CallSessionCreateForm, MegafonPhoneListForm, MegafonTestCallForm
+from .forms import (
+    CallResultForm,
+    CallSessionCreateForm,
+    MegafonPhoneListForm,
+    MegafonTestCallForm,
+    ProductionRecallForm,
+)
 from .models import BitrixSyncLog, CallQueueItem, CallSession, CallSessionStatus
 from .selectors import get_active_item_for_manager, get_recent_sessions, get_session_with_stats
+from .services.bitrix.deal_service import BitrixDealService
 from .services.telephony.megafon import MegafonAPIError, MegafonTelephonyService
 from .services.queue_service import QueueService
 
@@ -34,6 +41,11 @@ MEGAFON_TEST_CALL_CONFIG_SESSION_KEY = "megafon_test_call_config"
 MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY = "megafon_test_active_call_id"
 MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY = "megafon_test_last_completed_call_id"
 MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY = "megafon_test_phone_results"
+MEGAFON_PROD_QUEUE_SESSION_KEY = "megafon_prod_queue"
+MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY = "megafon_prod_queue_index"
+MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY = "megafon_prod_queue_config"
+MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY = "megafon_prod_active_call_id"
+MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY = "megafon_prod_last_completed_call_id"
 
 
 def append_megafon_log(event_type: str, payload: dict):
@@ -297,6 +309,78 @@ def build_megafon_test_call_url(call_id: str, auto_dial: bool = False) -> str:
     return url
 
 
+def get_prod_queue(request) -> list[dict]:
+    value = request.session.get(MEGAFON_PROD_QUEUE_SESSION_KEY, [])
+    return value if isinstance(value, list) else []
+
+
+def save_prod_queue(request, queue: list[dict]):
+    request.session[MEGAFON_PROD_QUEUE_SESSION_KEY] = queue
+    request.session.modified = True
+
+
+def get_prod_queue_index(request, queue: list[dict]) -> int:
+    raw_index = request.session.get(MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY, 0)
+    if not isinstance(raw_index, int):
+        raw_index = 0
+    if not queue:
+        return 0
+    return max(0, min(raw_index, len(queue) - 1))
+
+
+def get_prod_current_item(request) -> tuple[list[dict], int, dict | None]:
+    queue = get_prod_queue(request)
+    if not queue:
+        return queue, 0, None
+    index = get_prod_queue_index(request, queue)
+    return queue, index, queue[index]
+
+
+def build_prod_handler_url(call_id: str = "", auto_dial: bool = False) -> str:
+    url = reverse("call_queue:production_handler")
+    params = []
+    if call_id:
+        params.append(f"callid={call_id}")
+    if auto_dial:
+        params.append("autodial=1")
+    if params:
+        return f"{url}?{'&'.join(params)}"
+    return url
+
+
+def reset_prod_queue_state(request, *, clear_queue: bool = False):
+    keys = [
+        MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY,
+        MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY,
+        MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY,
+    ]
+    if clear_queue:
+        keys.extend([MEGAFON_PROD_QUEUE_SESSION_KEY, MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY])
+    for key in keys:
+        request.session.pop(key, None)
+    request.session.modified = True
+
+
+def get_manager_short_name(manager_profile: SalesManager) -> str:
+    raw_name = (manager_profile.name or "").strip()
+    if not raw_name:
+        return "менеджер"
+    return raw_name.split()[0].lower()
+
+
+def format_unanswered_comment(manager_profile: SalesManager) -> str:
+    return f"{timezone.localdate():%d.%m} ({get_manager_short_name(manager_profile)}) недозвон"
+
+
+def mark_prod_item(request, index: int, **updates) -> dict | None:
+    queue = get_prod_queue(request)
+    if not queue or index < 0 or index >= len(queue):
+        return None
+    queue[index] = {**queue[index], **updates}
+    save_prod_queue(request, queue)
+    return queue[index]
+
+
 def start_megafon_test_call(
     request,
     *,
@@ -340,6 +424,27 @@ def start_megafon_test_call(
             "response": response,
         },
     )
+    return call_id, response
+
+
+def start_megafon_production_call(
+    request,
+    *,
+    sales_manager: SalesManager,
+    item: dict,
+    show_phone: bool = True,
+) -> tuple[str, dict]:
+    telephony_service = MegafonTelephonyService()
+    response = telephony_service.make_call(
+        phone=item["phone"],
+        user=sales_manager.megafon_user or None,
+        group=sales_manager.megafon_group or None,
+        clid=sales_manager.megafon_clid or None,
+        show_phone=show_phone,
+    )
+    call_id = str(response.get("callid") or "")
+    request.session[MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY] = call_id
+    request.session.modified = True
     return call_id, response
 
 
@@ -647,6 +752,272 @@ def megafon_auto_next_call(request):
             "phone": next_phone,
             "index": next_index,
             "redirect_url": build_megafon_test_call_url(next_call_id, auto_dial=True),
+        }
+    )
+
+
+@login_required
+@sales_manager_required
+@require_http_methods(["GET", "POST"])
+def production_handler(request):
+    bitrix_service = BitrixDealService()
+    today = timezone.localdate()
+    queue, current_index, current_item = get_prod_current_item(request)
+    config = request.session.get(MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY, {}) or {}
+
+    if request.method == "POST":
+        action = request.POST.get("action", "build_queue")
+
+        if action == "reset_queue":
+            reset_prod_queue_state(request, clear_queue=True)
+            messages.success(request, "Продовая очередь очищена.")
+            return redirect("call_queue:production_handler")
+
+        if action == "build_queue":
+            form = ProductionRecallForm(request.POST)
+            if form.is_valid():
+                items = bitrix_service.fetch_production_recall_deals(
+                    date_from=form.cleaned_data["date_from"],
+                    date_to=form.cleaned_data["date_to"],
+                    stage_id=form.cleaned_data["stage_id"],
+                )
+                queue = [
+                    {
+                        **item,
+                        "status": "pending",
+                        "manual_decision": "",
+                        "comment_logged": False,
+                        "call_id": "",
+                    }
+                    for item in items
+                ]
+                request.session[MEGAFON_PROD_QUEUE_SESSION_KEY] = queue
+                request.session[MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY] = 0
+                request.session[MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY] = {
+                    "date_from": form.cleaned_data["date_from"].isoformat(),
+                    "date_to": form.cleaned_data["date_to"].isoformat(),
+                    "stage_id": form.cleaned_data["stage_id"],
+                    "auto_dial": bool(form.cleaned_data.get("auto_dial")),
+                }
+                request.session.pop(MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY, None)
+                request.session.pop(MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY, None)
+                request.session.modified = True
+                messages.success(request, f"Сформирована очередь: {len(queue)} сделок.")
+                return redirect("call_queue:production_handler")
+        elif action == "start_call":
+            form = ProductionRecallForm(
+                initial={
+                    "date_from": config.get("date_from") or today,
+                    "date_to": config.get("date_to") or today,
+                    "stage_id": config.get("stage_id") or "PREPARATION",
+                    "auto_dial": bool(config.get("auto_dial", True)),
+                }
+            )
+            if not current_item:
+                messages.error(request, "Сначала сформируйте очередь сделок.")
+                return redirect("call_queue:production_handler")
+            try:
+                call_id, _response = start_megafon_production_call(
+                    request,
+                    sales_manager=request.sales_manager_profile,
+                    item=current_item,
+                    show_phone=True,
+                )
+            except MegafonAPIError as exc:
+                messages.error(request, f"Не удалось запустить звонок: {exc}")
+            except Exception as exc:
+                messages.error(request, f"Ошибка при запросе в МегаФон АТС: {exc}")
+            else:
+                updated_item = mark_prod_item(
+                    request,
+                    current_index,
+                    call_id=call_id,
+                    status="calling",
+                    manual_decision="",
+                )
+                auto_dial = bool(config.get("auto_dial", True))
+                messages.success(
+                    request,
+                    f"Звонок запущен для {updated_item['client_name'] or updated_item['phone']}.",
+                )
+                return redirect(build_prod_handler_url(call_id, auto_dial=auto_dial))
+        else:
+            form = ProductionRecallForm(
+                initial={
+                    "date_from": config.get("date_from") or today,
+                    "date_to": config.get("date_to") or today,
+                    "stage_id": config.get("stage_id") or "PREPARATION",
+                    "auto_dial": bool(config.get("auto_dial", True)),
+                }
+            )
+    else:
+        form = ProductionRecallForm(
+            initial={
+                "date_from": config.get("date_from") or today,
+                "date_to": config.get("date_to") or today,
+                "stage_id": config.get("stage_id") or "PREPARATION",
+                "auto_dial": bool(config.get("auto_dial", True)),
+            }
+        )
+
+    queue, current_index, current_item = get_prod_current_item(request)
+    current_call_id = request.GET.get("callid", "").strip() or (current_item.get("call_id", "") if current_item else "")
+    current_snapshot = build_megafon_call_snapshot(current_call_id) if current_call_id else None
+
+    return render(
+        request,
+        "call_queue/production_handler.html",
+        {
+            "form": form,
+            "sales_manager_profile": request.sales_manager_profile,
+            "queue": queue,
+            "queue_size": len(queue),
+            "current_index": current_index,
+            "current_item": current_item,
+            "current_call_id": current_call_id,
+            "current_snapshot": current_snapshot,
+            "auto_dial_enabled": bool(config.get("auto_dial", True)),
+        },
+    )
+
+
+@login_required
+@sales_manager_required
+@require_http_methods(["GET"])
+def production_handler_status(request):
+    queue = get_prod_queue(request)
+    current_call_id = request.GET.get("callid", "").strip()
+    current_item = next((item for item in queue if item.get("call_id") == current_call_id), None)
+    if not current_call_id or not current_item:
+        return JsonResponse({"ok": False, "error": "callid is required"}, status=400)
+    return JsonResponse(
+        {
+            "ok": True,
+            "snapshot": build_megafon_call_snapshot(current_call_id),
+            "item": current_item,
+        }
+    )
+
+
+@login_required
+@sales_manager_required
+@require_http_methods(["POST"])
+def production_handler_resolve(request):
+    call_id = request.POST.get("callid", "").strip()
+    decision = request.POST.get("decision", "").strip()
+    queue = get_prod_queue(request)
+    if decision not in {"answered", "failed"}:
+        return JsonResponse({"ok": False, "error": "invalid decision"}, status=400)
+    item_index = next((idx for idx, item in enumerate(queue) if item.get("call_id") == call_id), None)
+    if item_index is None:
+        return JsonResponse({"ok": False, "error": "call not found"}, status=404)
+
+    item = queue[item_index]
+    item = mark_prod_item(
+        request,
+        item_index,
+        manual_decision=decision,
+        status="answered" if decision == "answered" else "failed",
+    )
+    if decision == "failed" and not item.get("comment_logged"):
+        comment_line = format_unanswered_comment(request.sales_manager_profile)
+        updated_comments = BitrixDealService().append_deal_comment(item["deal_id"], comment_line)
+        item = mark_prod_item(
+            request,
+            item_index,
+            comment_logged=True,
+            comments=updated_comments,
+        )
+    return JsonResponse(
+        {
+            "ok": True,
+            "decision": decision,
+            "bitrix_url": item.get("bitrix_url", "") if decision == "answered" else "",
+            "item": item,
+        }
+    )
+
+
+@login_required
+@sales_manager_required
+@require_http_methods(["POST"])
+def production_handler_auto_next(request):
+    completed_call_id = request.POST.get("completed_callid", "").strip()
+    if not completed_call_id:
+        return JsonResponse({"ok": False, "error": "completed_callid is required"}, status=400)
+
+    snapshot = build_megafon_call_snapshot(completed_call_id)
+    if not snapshot["latest_history_status"]:
+        return JsonResponse({"ok": False, "error": "call is not completed yet"}, status=409)
+
+    if request.session.get(MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY) == completed_call_id:
+        return JsonResponse({"ok": True, "started": False, "already_processed": True})
+
+    queue = get_prod_queue(request)
+    item_index = next((idx for idx, item in enumerate(queue) if item.get("call_id") == completed_call_id), None)
+    if item_index is None:
+        return JsonResponse({"ok": False, "error": "call not found"}, status=404)
+
+    item = queue[item_index]
+    if snapshot["requires_manager_confirmation"] and item.get("manual_decision") not in {"answered", "failed", "voicemail"}:
+        return JsonResponse({"ok": True, "started": False, "await_manager_decision": True})
+
+    if item.get("manual_decision") == "answered":
+        request.session[MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY] = completed_call_id
+        request.session.modified = True
+        return JsonResponse({"ok": True, "started": False, "hold_for_manager": True})
+
+    if not item.get("comment_logged") and (
+        item.get("manual_decision") == "failed"
+        or snapshot["latest_history_status"] in {"Busy", "NotAvailable", "missed"}
+    ):
+        comment_line = format_unanswered_comment(request.sales_manager_profile)
+        updated_comments = BitrixDealService().append_deal_comment(item["deal_id"], comment_line)
+        item = mark_prod_item(
+            request,
+            item_index,
+            manual_decision="failed",
+            status="failed",
+            comment_logged=True,
+            comments=updated_comments,
+        )
+
+    if item_index >= len(queue) - 1:
+        request.session[MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY] = completed_call_id
+        request.session.modified = True
+        return JsonResponse({"ok": True, "started": False, "no_next": True})
+
+    next_index = item_index + 1
+    next_item = queue[next_index]
+    try:
+        next_call_id, _response = start_megafon_production_call(
+            request,
+            sales_manager=request.sales_manager_profile,
+            item=next_item,
+            show_phone=True,
+        )
+    except MegafonAPIError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=502)
+    except Exception as exc:
+        return JsonResponse({"ok": False, "error": f"Ошибка при запросе в МегаФон АТС: {exc}"}, status=500)
+
+    request.session[MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY] = next_index
+    request.session[MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY] = completed_call_id
+    request.session.modified = True
+    mark_prod_item(
+        request,
+        next_index,
+        call_id=next_call_id,
+        status="calling",
+        manual_decision="",
+    )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "started": True,
+            "call_id": next_call_id,
+            "redirect_url": build_prod_handler_url(next_call_id, auto_dial=True),
         }
     )
 

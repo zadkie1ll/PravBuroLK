@@ -190,11 +190,13 @@
                             {% endif %}
                         </td>
                         <td class="py-5 px-8 font-semibold text-slate-900">
-                            {% if record.transferred_amount != None %}
-                                {{ record.transferred_amount|floatformat:2 }} ₽
-                            {% else %}
-                                <span class="text-slate-400">—</span>
-                            {% endif %}
+                            {% with transferred_amount=record.transferred_amount|floatformat:2 %}
+                                {% if transferred_amount %}
+                                    {{ transferred_amount }} ₽
+                                {% else %}
+                                    <span class="text-slate-400">—</span>
+                                {% endif %}
+                            {% endwith %}
                         </td>
                         <td class="py-5 px-8 font-bold text-lg
                             {% if record.tail_amount > 0 %}text-amber-600{% else %}text-emerald-600{% endif %}">
