@@ -80,6 +80,26 @@
           </div>
         </div>
 
+        {% if queue %}
+          <div class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div class="text-sm uppercase tracking-[0.15em] text-emerald-700">Старт обзвона</div>
+                <p class="mt-1 text-sm text-emerald-900">
+                  Очередь сформирована. Можно сразу запустить {% if auto_dial_enabled %}автопрозвон{% else %}обзвон{% endif %} с текущей сделки.
+                </p>
+              </div>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="start_call">
+                <button type="submit" class="rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-emerald-500">
+                  Начать обзвон
+                </button>
+              </form>
+            </div>
+          </div>
+        {% endif %}
+
         {% if current_item %}
           <div class="mt-5 rounded-2xl border border-slate-200 p-4">
             <div class="text-sm text-slate-500">Текущая сделка</div>
@@ -93,13 +113,6 @@
               </div>
             {% endif %}
             <div class="mt-4 flex flex-wrap gap-3">
-              <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="start_call">
-                <button type="submit" class="rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-emerald-500">
-                  {% if auto_dial_enabled %}Запустить автопрозвон очереди{% else %}Позвонить{% endif %}
-                </button>
-              </form>
               {% if current_item.bitrix_url %}
                 <a href="{{ current_item.bitrix_url }}" target="_blank" rel="noopener" class="rounded-full bg-white px-5 py-3 text-sm font-medium text-slate-900 shadow-sm ring-1 ring-slate-300 transition hover:bg-slate-100">
                   Открыть сделку в Bitrix
