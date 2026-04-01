@@ -788,6 +788,34 @@ class CallQueueMegafonViewTests(TestCase):
             "Менеджер подтвердил: клиент ответил",
         )
 
+    def test_call_status_uses_manual_resolution_for_same_call_id(self):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = {
+            "79990000001": {
+                "call_id": "CALLMANUAL",
+                "state": "voicemail",
+                "label": "Менеджер подтвердил: автоответчик",
+                "decision": "voicemail",
+            }
+        }
+        session.save()
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALLMANUAL",
+            action="history:Success",
+            request_payload={"payload": {"cmd": "history", "status": "Success", "callid": "CALLMANUAL"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("call_queue:megafon_call_status"), {"callid": "CALLMANUAL"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["snapshot"]["requires_manager_confirmation"])
+        self.assertEqual(payload["snapshot"]["phone_result"]["decision"], "voicemail")
+
     def test_resolve_call_marks_voicemail(self):
         session = self.client.session
         session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001"]

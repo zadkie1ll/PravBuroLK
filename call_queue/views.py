@@ -175,6 +175,15 @@ def get_megafon_test_phone_results(request) -> dict:
     return value if isinstance(value, dict) else {}
 
 
+def get_megafon_test_result_by_call_id(request, call_id: str) -> dict:
+    if not call_id:
+        return {}
+    for phone_result in get_megafon_test_phone_results(request).values():
+        if isinstance(phone_result, dict) and phone_result.get("call_id") == call_id:
+            return phone_result
+    return {}
+
+
 def reset_megafon_test_state(request, *, clear_phone_list: bool = False):
     keys = [
         MEGAFON_TEST_CALL_CONFIG_SESSION_KEY,
@@ -215,6 +224,22 @@ def build_megafon_phone_result(snapshot: dict) -> dict:
         return {"state": "cancelled", "label": "Сброс или отмена"}
 
     return {"state": "pending", "label": "Ожидаем результат"}
+
+
+def apply_manual_resolution_to_snapshot(snapshot: dict, manual_result: dict) -> dict:
+    if not manual_result:
+        return snapshot
+    updated = dict(snapshot)
+    updated["phone_result"] = manual_result
+    updated["manual_decision"] = manual_result.get("decision", "")
+    updated["requires_manager_confirmation"] = False
+    if manual_result.get("decision") == "answered":
+        updated["marker"] = {"state": "completed", "label": "Менеджер подтвердил: клиент ответил"}
+    elif manual_result.get("decision") == "voicemail":
+        updated["marker"] = {"state": "completed", "label": "Менеджер подтвердил: автоответчик"}
+    elif manual_result.get("decision") == "failed":
+        updated["marker"] = {"state": "completed", "label": "Менеджер подтвердил: не дозвонились"}
+    return updated
 
 
 def update_megafon_phone_result(request, *, phone: str, snapshot: dict, call_id: str):
@@ -471,6 +496,11 @@ def megafon_test_call(request):
     current_call_id = request.GET.get("callid", "").strip()
     auto_dial_enabled = request.GET.get("autodial") == "1"
     current_snapshot = build_megafon_call_snapshot(current_call_id) if current_call_id else None
+    if current_snapshot:
+        current_snapshot = apply_manual_resolution_to_snapshot(
+            current_snapshot,
+            get_megafon_test_result_by_call_id(request, current_call_id),
+        )
     phone_results = get_megafon_test_phone_results(request)
     current_phone_result = phone_results.get(current_phone, {}) if current_phone else {}
     phone_entries = [
@@ -509,7 +539,12 @@ def megafon_call_status(request):
     call_id = request.GET.get("callid", "").strip()
     if not call_id:
         return JsonResponse({"ok": False, "error": "callid is required"}, status=400)
-    return JsonResponse({"ok": True, "snapshot": build_megafon_call_snapshot(call_id)})
+    snapshot = build_megafon_call_snapshot(call_id)
+    snapshot = apply_manual_resolution_to_snapshot(
+        snapshot,
+        get_megafon_test_result_by_call_id(request, call_id),
+    )
+    return JsonResponse({"ok": True, "snapshot": snapshot})
 
 
 @login_required

@@ -24,6 +24,7 @@ def _parse_money(value: str, *, allow_empty: bool = False):
 def client_withdrawals_page(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
     records = client.withdrawal_records.all()
+    total_withdrawal_amount = sum((record.withdrawal_amount for record in records), Decimal("0.00"))
 
     return render(
         request,
@@ -31,6 +32,7 @@ def client_withdrawals_page(request, client_id):
         {
             "client": client,
             "records": records,
+            "total_withdrawal_amount": total_withdrawal_amount,
         },
     )
 
