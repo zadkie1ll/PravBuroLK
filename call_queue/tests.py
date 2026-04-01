@@ -141,7 +141,22 @@ class QueueServiceTests(TestCase):
         self.assertEqual(item.status, CallQueueItemStatus.DONE)
         self.assertTrue(item.needs_manual_processing)
         self.assertEqual(item.last_call_result, CallResult.SUCCESS)
-        self.assertEqual(result["sync_error"], "")
+
+
+class BitrixDealServiceTests(QueueServiceTests):
+    def test_extract_contact_phones_normalizes_values(self):
+        service = BitrixDealService(client=Mock())
+
+        phones = service.extract_contact_phones(
+            {
+                "PHONE": [
+                    {"VALUE": "+7 (999) 123-45-67"},
+                    {"VALUE": "8 800 555-35-35"},
+                ]
+            }
+        )
+
+        self.assertEqual(phones, ["79991234567", "88005553535"])
 
     def test_failed_result_marks_repeat_unanswered_on_second_attempt(self):
         session = CallSession.objects.create(

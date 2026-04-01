@@ -20,6 +20,13 @@ def _safe_int(value):
         return None
 
 
+def _normalize_phone(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return "".join(ch for ch in raw if ch.isdigit())
+
+
 class BitrixDealService:
     deal_select_fields = [
         "ID",
@@ -191,7 +198,7 @@ class BitrixDealService:
             return []
         phones = []
         for entry in raw_phone:
-            value = str((entry or {}).get("VALUE") or "").strip()
+            value = _normalize_phone((entry or {}).get("VALUE") or "")
             if value:
                 phones.append(value)
         return phones
