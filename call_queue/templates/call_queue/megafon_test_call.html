@@ -166,11 +166,27 @@
         </div>
 
         <div class="mt-6">
+          <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <div>
+              <div class="text-sm uppercase tracking-[0.15em] text-slate-500">Автопрозвон</div>
+              <p class="mt-1 text-sm text-slate-600" data-pause-status>
+                {% if auto_dial_enabled %}
+                  Активен. Следующий номер пойдёт только после ручного выбора исхода и завершения текущего звонка.
+                {% else %}
+                  Выключен.
+                {% endif %}
+              </p>
+            </div>
+            <button type="button" class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700" data-pause-toggle>
+              Пауза
+            </button>
+          </div>
+
           <div class="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4" data-decision-panel>
             <div class="text-sm uppercase tracking-[0.15em] text-slate-500">Исход звонка</div>
             <h3 class="mt-2 text-lg font-semibold text-slate-900">Менеджер фиксирует результат во время разговора</h3>
             <p class="mt-2 text-sm text-slate-600" data-decision-help>
-              Можно нажать исход заранее. Следующий звонок стартует только после фактического завершения текущего.
+              Выберите ручной итог звонка. Статусы МегаФона используются только как подтверждение, что звонок завершился.
             </p>
             <div class="mt-4 grid gap-3 sm:grid-cols-3">
               <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
@@ -250,10 +266,29 @@
         const decisionPanel = panel.querySelector("[data-decision-panel]");
         const decisionHelpNode = panel.querySelector("[data-decision-help]");
         const decisionModal = document.querySelector("[data-decision-modal]");
+        const pauseToggleButton = panel.querySelector("[data-pause-toggle]");
+        const pauseStatusNode = panel.querySelector("[data-pause-status]");
         let autoAdvanceTriggered = false;
         let decisionInFlight = false;
+        let paused = !autoDialEnabled;
         let confirmationResolved = {% if current_phone_result.decision %}true{% else %}false{% endif %};
         let confirmationDecision = "{{ current_phone_result.decision|default:''|escapejs }}";
+
+        function shouldAskManager(snapshot) {
+          return !confirmationResolved && (snapshot.requires_manager_confirmation || Boolean(snapshot.latest_history_status));
+        }
+
+        function renderPauseState() {
+          if (!pauseToggleButton || !pauseStatusNode) return;
+          pauseToggleButton.textContent = paused ? "Возобновить" : "Пауза";
+          if (!autoDialEnabled) {
+            pauseStatusNode.textContent = "Автопрозвон выключен.";
+            return;
+          }
+          pauseStatusNode.textContent = paused
+            ? "Автопрозвон на паузе. После завершения текущего звонка следующий не стартует, пока вы не возобновите."
+            : "Автопрозвон активен. Следующий номер пойдёт только после ручного выбора исхода и завершения текущего звонка.";
+        }
 
         function markerClass(state) {
           if (state === "connected") return "rounded-full px-4 py-2 text-sm font-medium bg-sky-100 text-sky-800";
@@ -307,15 +342,19 @@
           if (!decisionPanel || !decisionHelpNode) return;
           if (confirmationResolved) {
             if (confirmationDecision === "answered") {
-              decisionHelpNode.textContent = "Клиент подтверждён менеджером. После завершения звонка автопрозвон остановится.";
+              decisionHelpNode.textContent = "Клиент подтверждён менеджером. После завершения звонка автопрозвон встанет на паузу.";
             } else if (confirmationDecision === "voicemail") {
-              decisionHelpNode.textContent = "Автоответчик отмечен. После завершения текущего звонка стартует следующий номер.";
+              decisionHelpNode.textContent = paused
+                ? "Автоответчик отмечен. После завершения текущего звонка автопрозвон останется на паузе."
+                : "Автоответчик отмечен. После завершения текущего звонка стартует следующий номер.";
             } else if (confirmationDecision === "failed") {
-              decisionHelpNode.textContent = "Менеджер отметил, что дозвона нет. После завершения текущего звонка стартует следующий номер.";
+              decisionHelpNode.textContent = paused
+                ? "Менеджер отметил, что дозвона нет. После завершения текущего звонка автопрозвон останется на паузе."
+                : "Менеджер отметил, что дозвона нет. После завершения текущего звонка стартует следующий номер.";
             }
             return;
           }
-          decisionHelpNode.textContent = "Можно нажать исход заранее. Следующий звонок стартует только после фактического завершения текущего.";
+          decisionHelpNode.textContent = "Выберите ручной итог звонка. Статусы МегаФона используются только как подтверждение, что звонок завершился.";
         }
 
         function showDecisionModal() {
@@ -351,20 +390,24 @@
             }
             confirmationResolved = true;
             confirmationDecision = decision;
+            if (decision === "answered") {
+              paused = true;
+            }
+            renderPauseState();
             renderDecisionPanel();
             hideDecisionModal();
             renderCurrentPhoneBadge(data.result || null);
             stateNode.textContent = data.result?.label || "Решение сохранено";
             if (decision === "voicemail") {
-              stateNode.textContent = autoDialEnabled
-                ? "Автоответчик отмечен. Ждём завершения звонка, затем стартуем следующий номер."
-                : "Автоответчик отмечен. Следующий звонок можно запускать после завершения текущего.";
+              stateNode.textContent = paused
+                ? "Автоответчик отмечен. Ждём завершения звонка, затем автопрозвон останется на паузе."
+                : "Автоответчик отмечен. Ждём завершения звонка, затем стартуем следующий номер.";
             } else if (decision === "failed") {
-              stateNode.textContent = autoDialEnabled
-                ? "Отмечено, что дозвона нет. Ждём завершения звонка, затем стартуем следующий номер."
-                : "Отмечено, что дозвона нет. Следующий звонок можно запускать после завершения текущего.";
+              stateNode.textContent = paused
+                ? "Отмечено, что дозвона нет. Ждём завершения звонка, затем автопрозвон останется на паузе."
+                : "Отмечено, что дозвона нет. Ждём завершения звонка, затем стартуем следующий номер.";
             } else if (decision === "answered") {
-              stateNode.textContent = "Клиент подтверждён менеджером. После завершения звонка автопрозвон остановится.";
+              stateNode.textContent = "Клиент подтверждён менеджером. После завершения звонка автопрозвон встанет на паузу.";
             }
           } catch (error) {
             console.error(error);
@@ -375,7 +418,7 @@
         }
 
         async function triggerNextCall() {
-          if (!autoDialEnabled || autoAdvanceTriggered) return;
+          if (!autoDialEnabled || paused || autoAdvanceTriggered) return;
           autoAdvanceTriggered = true;
           stateNode.textContent = "Запускаем следующий номер...";
 
@@ -403,7 +446,9 @@
               return;
             }
             if (data.hold_for_manager) {
-              stateNode.textContent = "Звонок завершён. Клиент подтверждён менеджером, автопрозвон остановлен.";
+              paused = true;
+              renderPauseState();
+              stateNode.textContent = "Звонок завершён. Клиент подтверждён менеджером, автопрозвон поставлен на паузу.";
               return;
             }
             if (data.no_next) {
@@ -434,31 +479,48 @@
             renderCurrentPhoneBadge(snapshot.phone_result || null);
             renderTimeline(snapshot.timeline || []);
             renderDecisionPanel();
-            if (snapshot.requires_manager_confirmation && !confirmationResolved) {
+            if (shouldAskManager(snapshot)) {
               showDecisionModal();
             } else {
               hideDecisionModal();
             }
             if (snapshot.latest_history_status && confirmationResolved && (confirmationDecision === "voicemail" || confirmationDecision === "failed")) {
+              if (paused) {
+                stateNode.textContent = "Звонок завершён. Автопрозвон на паузе, следующий номер не запускается.";
+                return;
+              }
               triggerNextCall();
               return;
             }
             if (snapshot.latest_history_status && confirmationResolved && confirmationDecision === "answered") {
-              stateNode.textContent = "Звонок завершён. Клиент подтверждён менеджером, автопрозвон остановлен.";
+              paused = true;
+              renderPauseState();
+              stateNode.textContent = "Звонок завершён. Клиент подтверждён менеджером, автопрозвон поставлен на паузу.";
               return;
             }
-            if (snapshot.latest_history_status && !snapshot.requires_manager_confirmation) {
-              triggerNextCall();
+            if (snapshot.latest_history_status && !confirmationResolved) {
+              stateNode.textContent = "Звонок завершён. Выберите ручной исход в попапе, чтобы решить, что делать дальше.";
             }
           } catch (error) {
             console.error(error);
           }
         }
 
+        if (pauseToggleButton) {
+          pauseToggleButton.addEventListener("click", () => {
+            paused = !paused;
+            renderPauseState();
+            if (!paused) {
+              poll();
+            }
+          });
+        }
+
         document.querySelectorAll("[data-decision]").forEach((button) => {
           button.addEventListener("click", () => submitDecision(button.dataset.decision));
         });
 
+        renderPauseState();
         renderDecisionPanel();
         poll();
         setInterval(poll, 3000);

@@ -692,6 +692,14 @@ class CallQueueMegafonViewTests(TestCase):
             "clid": "",
             "show_phone": True,
         }
+        session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = {
+            "79990000001": {
+                "call_id": "9002",
+                "state": "voicemail",
+                "label": "Менеджер подтвердил: автоответчик",
+                "decision": "voicemail",
+            }
+        }
         session[MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY] = "9002"
         session.save()
         BitrixSyncLog.objects.create(
@@ -722,7 +730,7 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY], "9002")
         self.assertEqual(
             session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY]["79990000001"]["label"],
-            "Соединение есть, но клиент не подтверждён",
+            "Менеджер подтвердил: автоответчик",
         )
 
     def test_auto_next_call_marks_manager_side_cancel(self):
@@ -787,6 +795,7 @@ class CallQueueMegafonViewTests(TestCase):
             self.client.session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY]["79990000001"]["label"],
             "Менеджер подтвердил: клиент ответил",
         )
+        self.assertNotIn(MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY, self.client.session)
 
     def test_call_status_uses_manual_resolution_for_same_call_id(self):
         session = self.client.session
@@ -928,4 +937,37 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload["hold_for_manager"])
+        self.assertFalse(payload["started"])
+
+    def test_auto_next_waits_for_manual_decision(self):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001", "79990000002"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = {
+            "79990000001": {
+                "call_id": "CALL107",
+                "state": "connected",
+                "label": "Соединение есть, но клиент не подтверждён",
+            }
+        }
+        session.save()
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALL107",
+            action="history:Success",
+            request_payload={"payload": {"cmd": "history", "status": "Success", "callid": "CALL107"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_auto_next_call"),
+            {"completed_callid": "CALL107"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["await_manager_decision"])
         self.assertFalse(payload["started"])

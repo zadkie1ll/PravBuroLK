@@ -558,8 +558,6 @@ def megafon_resolve_call(request):
         return JsonResponse({"ok": False, "error": "callid, phone and valid decision are required"}, status=400)
 
     result = set_megafon_manual_phone_result(request, phone=phone, call_id=call_id, decision=decision)
-    request.session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY] = call_id
-    request.session.modified = True
     return JsonResponse({"ok": True, "result": result})
 
 
@@ -592,6 +590,15 @@ def megafon_auto_next_call(request):
     phone_results = get_megafon_test_phone_results(request)
     existing_result = phone_results.get(current_phone, {})
     update_megafon_phone_result(request, phone=current_phone, snapshot=snapshot, call_id=completed_call_id)
+
+    if existing_result.get("call_id") != completed_call_id or existing_result.get("decision") not in {"answered", "voicemail", "failed"}:
+        return JsonResponse(
+            {
+                "ok": True,
+                "started": False,
+                "await_manager_decision": True,
+            }
+        )
 
     if not phone_list:
         return JsonResponse({"ok": True, "started": False, "no_next": True})
