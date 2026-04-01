@@ -507,7 +507,7 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(self.item.last_provider_call_id, "2015948553")
         self.assertEqual(BitrixSyncLog.objects.filter(entity_type="megafon_call", success=True).count(), 1)
 
-    def test_call_status_endpoint_returns_success_marker(self):
+    def test_call_status_endpoint_returns_connected_marker_for_success_history(self):
         BitrixSyncLog.objects.create(
             entity_type="megafon_webhook",
             entity_id="CALL42",
@@ -531,7 +531,8 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["snapshot"]["marker"]["state"], "success")
+        self.assertEqual(payload["snapshot"]["marker"]["state"], "connected")
+        self.assertEqual(payload["snapshot"]["phone_result"]["state"], "connected")
 
     def test_call_status_endpoint_returns_unreachable_marker(self):
         BitrixSyncLog.objects.create(
@@ -550,7 +551,7 @@ class CallQueueMegafonViewTests(TestCase):
         payload = response.json()
         self.assertEqual(payload["snapshot"]["marker"]["state"], "unreachable")
 
-    def test_call_status_endpoint_marks_answered_on_accepted_outgoing_event(self):
+    def test_call_status_endpoint_marks_outgoing_accepted_as_unconfirmed_connection(self):
         BitrixSyncLog.objects.create(
             entity_type="megafon_webhook",
             entity_id="CALL77",
@@ -565,7 +566,7 @@ class CallQueueMegafonViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["snapshot"]["phone_result"]["label"], "Взял трубку")
+        self.assertEqual(payload["snapshot"]["phone_result"]["label"], "Есть ответ, но клиент не подтверждён")
 
     def test_call_status_endpoint_marks_invalid_number_on_not_available(self):
         BitrixSyncLog.objects.create(
@@ -697,7 +698,7 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY], "9002")
         self.assertEqual(
             session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY]["79990000001"]["label"],
-            "Взял трубку",
+            "Соединение есть, но клиент не подтверждён",
         )
 
     def test_auto_next_call_marks_manager_side_cancel(self):

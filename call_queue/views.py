@@ -23,7 +23,7 @@ from .services.queue_service import QueueService
 
 
 MEGAFON_FINAL_STATUS_LABELS = {
-    "Success": ("success", "Клиент взял трубку"),
+    "Success": ("connected", "Соединение установлено, клиент не подтверждён"),
     "Busy": ("unreachable", "Не дозвонились: занято"),
     "NotAvailable": ("unreachable", "Номер недоступен или набран неверно"),
     "missed": ("unreachable", "Не дозвонились: не взял трубку"),
@@ -175,7 +175,7 @@ def get_megafon_test_phone_results(request) -> dict:
 def build_megafon_phone_result(snapshot: dict) -> dict:
     history_status = snapshot.get("latest_history_status")
     if history_status == "Success":
-        return {"state": "answered", "label": "Взял трубку"}
+        return {"state": "connected", "label": "Соединение есть, но клиент не подтверждён"}
     if history_status == "missed":
         return {"state": "unanswered", "label": "Не взял трубку"}
     if history_status == "Busy":
@@ -187,7 +187,7 @@ def build_megafon_phone_result(snapshot: dict) -> dict:
     last_event_direction = snapshot.get("last_event_direction")
     if last_event_type == "ACCEPTED":
         if last_event_direction == "out":
-            return {"state": "answered", "label": "Взял трубку"}
+            return {"state": "connected", "label": "Есть ответ, но клиент не подтверждён"}
         if last_event_direction == "in":
             return {"state": "in_progress", "label": "Менеджер взял трубку"}
     if last_event_type == "CANCELLED":

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Тестовый звонок МегаФон</title>
+  <title>Тестовый звонок МегаФон111111</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-900">
@@ -94,7 +94,7 @@
                         <span class="text-sm text-slate-500">#{{ entry.index|add:1 }}</span>
                         <span class="ml-2 font-medium">{{ entry.phone }}</span>
                       </div>
-                      <span data-phone-badge data-phone="{{ entry.phone }}" class="rounded-full px-3 py-1 text-xs font-medium {% if entry.result.state == 'answered' %}bg-emerald-100 text-emerald-800{% elif entry.result.state == 'in_progress' %}bg-amber-100 text-amber-800{% elif entry.result.state == 'cancelled' %}bg-violet-100 text-violet-800{% elif entry.result.state == 'unanswered' %}bg-rose-100 text-rose-800{% elif entry.result.state == 'invalid' %}bg-orange-100 text-orange-800{% else %}bg-slate-100 text-slate-700{% endif %} {% if not entry.result.label %}hidden{% endif %}">
+                      <span data-phone-badge data-phone="{{ entry.phone }}" class="rounded-full px-3 py-1 text-xs font-medium {% if entry.result.state == 'connected' %}bg-sky-100 text-sky-800{% elif entry.result.state == 'in_progress' %}bg-amber-100 text-amber-800{% elif entry.result.state == 'cancelled' %}bg-violet-100 text-violet-800{% elif entry.result.state == 'unanswered' %}bg-rose-100 text-rose-800{% elif entry.result.state == 'invalid' %}bg-orange-100 text-orange-800{% else %}bg-slate-100 text-slate-700{% endif %} {% if not entry.result.label %}hidden{% endif %}">
                         {{ entry.result.label }}
                       </span>
                     </div>
@@ -130,7 +130,7 @@
             <p class="mt-1 text-sm text-slate-500">Call ID: <span class="font-mono">{{ current_call_id }}</span></p>
           </div>
           <div class="rounded-full px-4 py-2 text-sm font-medium
-            {% if current_snapshot.marker.state == 'success' %}bg-emerald-100 text-emerald-800
+            {% if current_snapshot.marker.state == 'connected' %}bg-sky-100 text-sky-800
             {% elif current_snapshot.marker.state == 'unreachable' %}bg-rose-100 text-rose-800
             {% elif current_snapshot.marker.state == 'in_progress' %}bg-amber-100 text-amber-800
             {% else %}bg-slate-100 text-slate-700{% endif %}"
@@ -194,14 +194,14 @@
         let autoAdvanceTriggered = false;
 
         function markerClass(state) {
-          if (state === "success") return "rounded-full px-4 py-2 text-sm font-medium bg-emerald-100 text-emerald-800";
+          if (state === "connected") return "rounded-full px-4 py-2 text-sm font-medium bg-sky-100 text-sky-800";
           if (state === "unreachable") return "rounded-full px-4 py-2 text-sm font-medium bg-rose-100 text-rose-800";
           if (state === "in_progress") return "rounded-full px-4 py-2 text-sm font-medium bg-amber-100 text-amber-800";
           return "rounded-full px-4 py-2 text-sm font-medium bg-slate-100 text-slate-700";
         }
 
         function phoneBadgeClass(state) {
-          if (state === "answered") return "rounded-full px-3 py-1 text-xs font-medium bg-emerald-100 text-emerald-800";
+          if (state === "connected") return "rounded-full px-3 py-1 text-xs font-medium bg-sky-100 text-sky-800";
           if (state === "in_progress") return "rounded-full px-3 py-1 text-xs font-medium bg-amber-100 text-amber-800";
           if (state === "cancelled") return "rounded-full px-3 py-1 text-xs font-medium bg-violet-100 text-violet-800";
           if (state === "unanswered") return "rounded-full px-3 py-1 text-xs font-medium bg-rose-100 text-rose-800";
