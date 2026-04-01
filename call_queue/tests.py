@@ -978,3 +978,37 @@ class CallQueueMegafonViewTests(TestCase):
         payload = response.json()
         self.assertTrue(payload["await_manager_decision"])
         self.assertFalse(payload["started"])
+
+    @patch("call_queue.views.MegafonTelephonyService.make_call")
+    def test_auto_next_does_not_wait_for_manual_decision_on_not_available(self, make_call_mock):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001", "79990000002"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session[MEGAFON_TEST_CALL_CONFIG_SESSION_KEY] = {
+            "sales_manager_id": self.sales_manager.pk,
+            "clid": "",
+            "show_phone": True,
+        }
+        session[MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY] = "CALL109"
+        session.save()
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALL109",
+            action="history:NotAvailable",
+            request_payload={"payload": {"cmd": "history", "status": "NotAvailable", "callid": "CALL109"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        make_call_mock.return_value = {"callid": "CALL110", "clid": "79990000000"}
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_auto_next_call"),
+            {"completed_callid": "CALL109"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["started"])
+        self.assertEqual(payload["call_id"], "CALL110")

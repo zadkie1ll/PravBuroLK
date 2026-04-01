@@ -591,7 +591,10 @@ def megafon_auto_next_call(request):
     existing_result = phone_results.get(current_phone, {})
     update_megafon_phone_result(request, phone=current_phone, snapshot=snapshot, call_id=completed_call_id)
 
-    if existing_result.get("call_id") != completed_call_id or existing_result.get("decision") not in {"answered", "voicemail", "failed"}:
+    if snapshot["requires_manager_confirmation"] and (
+        existing_result.get("call_id") != completed_call_id
+        or existing_result.get("decision") not in {"answered", "failed", "voicemail"}
+    ):
         return JsonResponse(
             {
                 "ok": True,
