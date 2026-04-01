@@ -781,3 +781,100 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["result"]["state"], "voicemail")
+
+    def test_resolve_call_marks_failed(self):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session.save()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_resolve_call"),
+            {"callid": "CALL105", "phone": "79990000001", "decision": "failed"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["result"]["state"], "failed_manual")
+
+    @patch("call_queue.views.MegafonTelephonyService.make_call")
+    def test_auto_next_preserves_manual_voicemail_decision_until_call_ends(self, make_call_mock):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001", "79990000002"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session[MEGAFON_TEST_CALL_CONFIG_SESSION_KEY] = {
+            "sales_manager_id": self.sales_manager.pk,
+            "clid": "",
+            "show_phone": True,
+        }
+        session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = {
+            "79990000001": {
+                "call_id": "CALL102",
+                "state": "voicemail",
+                "label": "Менеджер подтвердил: автоответчик",
+                "decision": "voicemail",
+            }
+        }
+        session[MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY] = "CALL102"
+        session.save()
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALL102",
+            action="history:Success",
+            request_payload={"payload": {"cmd": "history", "status": "Success", "callid": "CALL102"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        make_call_mock.return_value = {"callid": "CALL103", "clid": "79990000000"}
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_auto_next_call"),
+            {"completed_callid": "CALL102"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["started"])
+        self.assertEqual(payload["call_id"], "CALL103")
+        self.assertEqual(
+            self.client.session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY]["79990000001"]["label"],
+            "Менеджер подтвердил: автоответчик",
+        )
+
+    def test_auto_next_holds_queue_after_manual_answered_confirmation(self):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001", "79990000002"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = {
+            "79990000001": {
+                "call_id": "CALL106",
+                "state": "answered_confirmed",
+                "label": "Менеджер подтвердил: клиент ответил",
+                "decision": "answered",
+            }
+        }
+        session.save()
+        BitrixSyncLog.objects.create(
+            entity_type="megafon_webhook",
+            entity_id="CALL106",
+            action="history:Success",
+            request_payload={"payload": {"cmd": "history", "status": "Success", "callid": "CALL106"}},
+            response_payload={"accepted": True},
+            success=True,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_auto_next_call"),
+            {"completed_callid": "CALL106"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["hold_for_manager"])
+        self.assertFalse(payload["started"])

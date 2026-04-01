@@ -207,6 +207,9 @@ def update_megafon_phone_result(request, *, phone: str, snapshot: dict, call_id:
     if not phone:
         return
     results = get_megafon_test_phone_results(request)
+    existing = results.get(phone, {})
+    if existing.get("call_id") == call_id and existing.get("decision") in {"answered", "voicemail"}:
+        return
     result = build_megafon_phone_result(snapshot)
     results[phone] = {
         "call_id": call_id,
@@ -225,6 +228,13 @@ def set_megafon_manual_phone_result(request, *, phone: str, call_id: str, decisi
             "call_id": call_id,
             "state": "answered_confirmed",
             "label": "Менеджер подтвердил: клиент ответил",
+            "decision": decision,
+        }
+    elif decision == "failed":
+        result = {
+            "call_id": call_id,
+            "state": "failed_manual",
+            "label": "Менеджер подтвердил: не дозвонились",
             "decision": decision,
         }
     else:
@@ -441,6 +451,7 @@ def megafon_test_call(request):
     auto_dial_enabled = request.GET.get("autodial") == "1"
     current_snapshot = build_megafon_call_snapshot(current_call_id) if current_call_id else None
     phone_results = get_megafon_test_phone_results(request)
+    current_phone_result = phone_results.get(current_phone, {}) if current_phone else {}
     phone_entries = [
         {
             "index": idx,
@@ -464,6 +475,7 @@ def megafon_test_call(request):
             "current_snapshot": current_snapshot,
             "phone_entries": phone_entries,
             "current_phone": current_phone,
+            "current_phone_result": current_phone_result,
             "auto_dial_enabled": auto_dial_enabled,
         },
     )
@@ -486,7 +498,7 @@ def megafon_resolve_call(request):
     call_id = request.POST.get("callid", "").strip()
     phone = request.POST.get("phone", "").strip()
     decision = request.POST.get("decision", "").strip()
-    if not call_id or not phone or decision not in {"answered", "voicemail"}:
+    if not call_id or not phone or decision not in {"answered", "voicemail", "failed"}:
         return JsonResponse({"ok": False, "error": "callid, phone and valid decision are required"}, status=400)
 
     result = set_megafon_manual_phone_result(request, phone=phone, call_id=call_id, decision=decision)
@@ -521,10 +533,18 @@ def megafon_auto_next_call(request):
     phone_list = get_megafon_test_phone_list(request)
     current_index = get_megafon_test_phone_index(request, phone_list)
     current_phone = phone_list[current_index] if phone_list else ""
+    phone_results = get_megafon_test_phone_results(request)
+    existing_result = phone_results.get(current_phone, {})
     update_megafon_phone_result(request, phone=current_phone, snapshot=snapshot, call_id=completed_call_id)
 
     if not phone_list:
         return JsonResponse({"ok": True, "started": False, "no_next": True})
+
+    if existing_result.get("call_id") == completed_call_id and existing_result.get("decision") == "answered":
+        request.session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY] = completed_call_id
+        request.session.modified = True
+        return JsonResponse({"ok": True, "started": False, "hold_for_manager": True})
+
     if current_index >= len(phone_list) - 1:
         request.session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY] = completed_call_id
         request.session.modified = True

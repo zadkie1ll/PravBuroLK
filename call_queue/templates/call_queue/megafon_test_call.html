@@ -155,6 +155,25 @@
         </div>
 
         <div class="mt-6">
+          <div class="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4" data-decision-panel>
+            <div class="text-sm uppercase tracking-[0.15em] text-slate-500">Исход звонка</div>
+            <h3 class="mt-2 text-lg font-semibold text-slate-900">Менеджер фиксирует результат во время разговора</h3>
+            <p class="mt-2 text-sm text-slate-600" data-decision-help>
+              Можно нажать исход заранее. Следующий звонок стартует только после фактического завершения текущего.
+            </p>
+            <div class="mt-4 grid gap-3 sm:grid-cols-3">
+              <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
+                Клиент ответил
+              </button>
+              <button type="button" data-decision="voicemail" class="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-amber-400">
+                Автоответчик
+              </button>
+              <button type="button" data-decision="failed" class="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-500">
+                Не дозвонились
+              </button>
+            </div>
+          </div>
+
           <h3 class="text-lg font-semibold">Этапы звонка</h3>
           <div class="mt-4 space-y-3" data-call-timeline>
             {% for entry in current_snapshot.timeline %}
@@ -174,26 +193,6 @@
         </div>
       </section>
 
-      <div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/40 px-4" data-decision-modal>
-        <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
-          <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Подтверждение</div>
-          <h3 class="mt-2 text-2xl font-semibold text-slate-900">Кто ответил на звонок?</h3>
-          <p class="mt-3 text-sm text-slate-600">
-            Система увидела соединение, но не может отличить живого клиента от автоответчика. Подтвердите результат вручную.
-          </p>
-          <div class="mt-6 grid gap-3 sm:grid-cols-2">
-            <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
-              Клиент ответил
-            </button>
-            <button type="button" data-decision="voicemail" class="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-amber-400">
-              Это автоответчик
-            </button>
-          </div>
-          <p class="mt-4 text-xs text-slate-500">
-            Пока решение не принято, следующий номер не стартует автоматически.
-          </p>
-        </div>
-      </div>
     {% endif %}
   </div>
 
@@ -213,10 +212,12 @@
         const resolveUrl = panel.dataset.resolveUrl;
         const csrfToken = panel.dataset.csrfToken;
         const currentPhone = "{{ current_phone|escapejs }}";
-        const decisionModal = document.querySelector("[data-decision-modal]");
+        const decisionPanel = panel.querySelector("[data-decision-panel]");
+        const decisionHelpNode = panel.querySelector("[data-decision-help]");
         let autoAdvanceTriggered = false;
         let decisionInFlight = false;
-        let confirmationResolved = false;
+        let confirmationResolved = {% if current_phone_result.decision %}true{% else %}false{% endif %};
+        let confirmationDecision = "{{ current_phone_result.decision|default:''|escapejs }}";
 
         function markerClass(state) {
           if (state === "connected") return "rounded-full px-4 py-2 text-sm font-medium bg-sky-100 text-sky-800";
@@ -227,8 +228,11 @@
 
         function phoneBadgeClass(state) {
           if (state === "connected") return "rounded-full px-3 py-1 text-xs font-medium bg-sky-100 text-sky-800";
+          if (state === "answered_confirmed") return "rounded-full px-3 py-1 text-xs font-medium bg-emerald-100 text-emerald-800";
           if (state === "in_progress") return "rounded-full px-3 py-1 text-xs font-medium bg-amber-100 text-amber-800";
+          if (state === "voicemail") return "rounded-full px-3 py-1 text-xs font-medium bg-amber-100 text-amber-800";
           if (state === "cancelled") return "rounded-full px-3 py-1 text-xs font-medium bg-violet-100 text-violet-800";
+          if (state === "failed_manual") return "rounded-full px-3 py-1 text-xs font-medium bg-rose-100 text-rose-800";
           if (state === "unanswered") return "rounded-full px-3 py-1 text-xs font-medium bg-rose-100 text-rose-800";
           if (state === "invalid") return "rounded-full px-3 py-1 text-xs font-medium bg-orange-100 text-orange-800";
           return "rounded-full px-3 py-1 text-xs font-medium bg-slate-100 text-slate-700";
@@ -263,16 +267,19 @@
           `).join("");
         }
 
-        function showDecisionModal() {
-          if (!decisionModal || confirmationResolved || decisionInFlight) return;
-          decisionModal.classList.remove("hidden");
-          decisionModal.classList.add("flex");
-        }
-
-        function hideDecisionModal() {
-          if (!decisionModal) return;
-          decisionModal.classList.add("hidden");
-          decisionModal.classList.remove("flex");
+        function renderDecisionPanel() {
+          if (!decisionPanel || !decisionHelpNode) return;
+          if (confirmationResolved) {
+            if (confirmationDecision === "answered") {
+              decisionHelpNode.textContent = "Клиент подтверждён менеджером. После завершения звонка автопрозвон остановится.";
+            } else if (confirmationDecision === "voicemail") {
+              decisionHelpNode.textContent = "Автоответчик отмечен. После завершения текущего звонка стартует следующий номер.";
+            } else if (confirmationDecision === "failed") {
+              decisionHelpNode.textContent = "Менеджер отметил, что дозвона нет. После завершения текущего звонка стартует следующий номер.";
+            }
+            return;
+          }
+          decisionHelpNode.textContent = "Можно нажать исход заранее. Следующий звонок стартует только после фактического завершения текущего.";
         }
 
         async function submitDecision(decision) {
@@ -295,11 +302,20 @@
               return;
             }
             confirmationResolved = true;
-            hideDecisionModal();
+            confirmationDecision = decision;
+            renderDecisionPanel();
             renderCurrentPhoneBadge(data.result || null);
             stateNode.textContent = data.result?.label || "Решение сохранено";
-            if (decision === "voicemail" && autoDialEnabled) {
-              triggerNextCall();
+            if (decision === "voicemail") {
+              stateNode.textContent = autoDialEnabled
+                ? "Автоответчик отмечен. Ждём завершения звонка, затем стартуем следующий номер."
+                : "Автоответчик отмечен. Следующий звонок можно запускать после завершения текущего.";
+            } else if (decision === "failed") {
+              stateNode.textContent = autoDialEnabled
+                ? "Отмечено, что дозвона нет. Ждём завершения звонка, затем стартуем следующий номер."
+                : "Отмечено, что дозвона нет. Следующий звонок можно запускать после завершения текущего.";
+            } else if (decision === "answered") {
+              stateNode.textContent = "Клиент подтверждён менеджером. После завершения звонка автопрозвон остановится.";
             }
           } catch (error) {
             console.error(error);
@@ -337,6 +353,10 @@
               stateNode.textContent = "Ожидаем следующий номер";
               return;
             }
+            if (data.hold_for_manager) {
+              stateNode.textContent = "Звонок завершён. Клиент подтверждён менеджером, автопрозвон остановлен.";
+              return;
+            }
             if (data.no_next) {
               stateNode.textContent = "Список завершён";
               return;
@@ -364,11 +384,15 @@
             stateNode.textContent = snapshot.marker.label;
             renderCurrentPhoneBadge(snapshot.phone_result || null);
             renderTimeline(snapshot.timeline || []);
-            if (snapshot.requires_manager_confirmation && !confirmationResolved) {
-              showDecisionModal();
+            renderDecisionPanel();
+            if (snapshot.latest_history_status && confirmationResolved && (confirmationDecision === "voicemail" || confirmationDecision === "failed")) {
+              triggerNextCall();
               return;
             }
-            hideDecisionModal();
+            if (snapshot.latest_history_status && confirmationResolved && confirmationDecision === "answered") {
+              stateNode.textContent = "Звонок завершён. Клиент подтверждён менеджером, автопрозвон остановлен.";
+              return;
+            }
             if (snapshot.latest_history_status && !snapshot.requires_manager_confirmation) {
               triggerNextCall();
             }
@@ -377,12 +401,11 @@
           }
         }
 
-        if (decisionModal) {
-          decisionModal.querySelectorAll("[data-decision]").forEach((button) => {
-            button.addEventListener("click", () => submitDecision(button.dataset.decision));
-          });
-        }
+        panel.querySelectorAll("[data-decision]").forEach((button) => {
+          button.addEventListener("click", () => submitDecision(button.dataset.decision));
+        });
 
+        renderDecisionPanel();
         poll();
         setInterval(poll, 3000);
       })();
