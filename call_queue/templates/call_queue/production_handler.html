@@ -104,7 +104,8 @@
           <div class="mt-5 rounded-2xl border border-slate-200 p-4">
             <div class="text-sm text-slate-500">Текущая сделка</div>
             <div class="mt-2 text-lg font-semibold">{{ current_item.client_name|default:"Без имени" }}</div>
-            <div class="mt-2 text-sm text-slate-600">Телефон: {{ current_item.phone }}</div>
+            <div class="mt-2 text-sm text-slate-600">Телефон из Bitrix: {{ current_item.raw_phone|default:current_item.phone }}</div>
+            <div class="mt-1 text-sm font-medium text-emerald-700">Телефон для МегаФона: {{ current_item.phone }}</div>
             <div class="mt-1 text-sm text-slate-600">Bitrix Deal ID: {{ current_item.deal_id }}</div>
             {% if current_item.comments %}
               <div class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
@@ -136,7 +137,8 @@
                     <div>
                       <div class="text-xs uppercase tracking-[0.15em] text-slate-500">#{{ forloop.counter }}</div>
                       <div class="mt-1 font-medium text-slate-900">{{ item.client_name|default:"Без названия" }}</div>
-                      <div class="mt-1 text-sm text-slate-600">{{ item.phone }}</div>
+                      <div class="mt-1 text-sm text-slate-600">Bitrix: {{ item.raw_phone|default:item.phone }}</div>
+                      <div class="mt-1 text-sm font-medium text-emerald-700">МегаФон: {{ item.phone }}</div>
                       <div class="mt-1 text-xs text-slate-500">Deal ID: {{ item.deal_id }}</div>
                     </div>
                     <span class="rounded-full px-3 py-1 text-xs font-medium

@@ -24,7 +24,12 @@ def _normalize_phone(value: Any) -> str:
     raw = str(value or "").strip()
     if not raw:
         return ""
-    return "".join(ch for ch in raw if ch.isdigit())
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if len(digits) == 11 and digits.startswith("8") and not digits.startswith("8800"):
+        return f"7{digits[1:]}"
+    if len(digits) == 10:
+        return f"7{digits}"
+    return digits
 
 
 class BitrixDealService:
@@ -168,6 +173,7 @@ class BitrixDealService:
                 continue
             contact = self.get_contact(contact_id)
             phones = self.extract_contact_phones(contact)
+            raw_phones = self.extract_contact_raw_phones(contact)
             if not phones:
                 continue
             deal_id = _safe_int(deal.get("ID"))
@@ -177,6 +183,7 @@ class BitrixDealService:
                     "contact_id": contact_id,
                     "client_name": self.extract_contact_name(contact) or (deal.get("TITLE") or "").strip(),
                     "phone": phones[0],
+                    "raw_phone": raw_phones[0] if raw_phones else phones[0],
                     "phones": phones,
                     "bitrix_url": self.build_entity_url(CallEntityType.DEAL, deal_id),
                     "comments": (deal.get("COMMENTS") or "").strip(),
@@ -199,6 +206,17 @@ class BitrixDealService:
         phones = []
         for entry in raw_phone:
             value = _normalize_phone((entry or {}).get("VALUE") or "")
+            if value:
+                phones.append(value)
+        return phones
+
+    def extract_contact_raw_phones(self, contact: dict[str, Any]) -> list[str]:
+        raw_phone = contact.get("PHONE") or []
+        if not isinstance(raw_phone, list):
+            return []
+        phones = []
+        for entry in raw_phone:
+            value = str((entry or {}).get("VALUE") or "").strip()
             if value:
                 phones.append(value)
         return phones
