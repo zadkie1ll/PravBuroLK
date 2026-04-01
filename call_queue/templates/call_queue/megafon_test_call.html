@@ -268,6 +268,7 @@
         let confirmationResolved = {% if current_phone_result.decision %}true{% else %}false{% endif %};
         let confirmationDecision = "{{ current_phone_result.decision|default:''|escapejs }}";
         let clientAnsweredEventSeen = false;
+        let latestSnapshot = null;
 
         function shouldAskManager(snapshot) {
           return !confirmationResolved && snapshot.last_event_type === "ACCEPTED" && snapshot.last_event_direction === "out";
@@ -427,23 +428,61 @@
               return;
             }
             if (data.already_processed) {
-              stateNode.textContent = "Ожидаем следующий номер";
-              return;
-            }
-            if (data.hold_for_manager) {
-              paused = true;
-              renderPauseState();
-              stateNode.textContent = "Звонок завершён. Клиент подтверждён менеджером, автопрозвон поставлен на паузу.";
+              stateNode.textContent = "Текущий звонок уже обработан.";
               return;
             }
             if (data.no_next) {
               stateNode.textContent = "Список завершён";
               return;
             }
+            if (data.await_manager_decision) {
+              paused = true;
+              renderPauseState();
+              stateNode.textContent = "Ждём ваш ручной выбор исхода звонка.";
+              return;
+            }
             stateNode.textContent = "Ожидаем следующий номер";
           } catch (error) {
             console.error(error);
             stateNode.textContent = "Не удалось запустить следующий номер";
+          }
+        }
+
+        function evaluateCurrentState(snapshot) {
+          if (!snapshot) return;
+          if (shouldAskManager(snapshot)) {
+            paused = true;
+            renderPauseState();
+            showDecisionModal();
+          } else {
+            hideDecisionModal();
+          }
+          if (!snapshot.latest_history_status) {
+            return;
+          }
+          if (confirmationResolved && (confirmationDecision === "failed" || confirmationDecision === "answered")) {
+            if (paused) {
+              stateNode.textContent = confirmationDecision === "answered"
+                ? "Звонок завершён. Клиент подтверждён менеджером, автопрозвон на паузе."
+                : "Звонок завершён. Автопрозвон на паузе, следующий номер не запускается.";
+              return;
+            }
+            triggerNextCall();
+            return;
+          }
+          if (!confirmationResolved && clientAnsweredEventSeen) {
+            paused = true;
+            renderPauseState();
+            stateNode.textContent = "Звонок завершён. Нужен ваш выбор в попапе, прежде чем двигаться дальше.";
+            showDecisionModal();
+            return;
+          }
+          if (!clientAnsweredEventSeen && !confirmationResolved) {
+            if (!paused) {
+              triggerNextCall();
+              return;
+            }
+            stateNode.textContent = "Звонок завершён. Автопрозвон на паузе.";
           }
         }
 
@@ -456,6 +495,7 @@
             const data = await response.json();
             if (!data.ok) return;
             const snapshot = data.snapshot;
+            latestSnapshot = snapshot;
             markerNode.className = markerClass(snapshot.marker.state);
             markerNode.textContent = snapshot.marker.label;
             finalNode.textContent = snapshot.latest_history_status || "—";
@@ -471,39 +511,7 @@
             }
             renderPauseState();
             renderDecisionPanel();
-            if (shouldAskManager(snapshot)) {
-              showDecisionModal();
-            } else {
-              hideDecisionModal();
-            }
-            if (snapshot.latest_history_status && confirmationResolved && confirmationDecision === "failed") {
-              if (paused) {
-                stateNode.textContent = "Звонок завершён. Автопрозвон на паузе, следующий номер не запускается.";
-                return;
-              }
-              triggerNextCall();
-              return;
-            }
-            if (snapshot.latest_history_status && confirmationResolved && confirmationDecision === "answered") {
-              paused = true;
-              renderPauseState();
-              stateNode.textContent = "Звонок завершён. Клиент подтверждён менеджером, автопрозвон поставлен на паузу.";
-              return;
-            }
-            if (snapshot.latest_history_status && !confirmationResolved && clientAnsweredEventSeen) {
-              paused = true;
-              renderPauseState();
-              stateNode.textContent = "Звонок завершён. Нужен ваш выбор в попапе, прежде чем двигаться дальше.";
-              showDecisionModal();
-              return;
-            }
-            if (snapshot.latest_history_status && !clientAnsweredEventSeen && !confirmationResolved) {
-              if (!paused) {
-                triggerNextCall();
-                return;
-              }
-              stateNode.textContent = "Звонок завершён. Автопрозвон на паузе.";
-            }
+            evaluateCurrentState(snapshot);
           } catch (error) {
             console.error(error);
           }
@@ -512,12 +520,10 @@
         if (pauseToggleButton) {
           pauseToggleButton.addEventListener("click", () => {
             paused = !paused;
+            autoAdvanceTriggered = false;
             renderPauseState();
-            if (!paused && confirmationResolved && confirmationDecision === "failed") {
-              triggerNextCall();
-              return;
-            }
             if (!paused) {
+              evaluateCurrentState(latestSnapshot);
               poll();
             }
           });

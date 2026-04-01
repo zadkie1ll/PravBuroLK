@@ -905,10 +905,16 @@ class CallQueueMegafonViewTests(TestCase):
             "Менеджер подтвердил: автоответчик",
         )
 
-    def test_auto_next_holds_queue_after_manual_answered_confirmation(self):
+    @patch("call_queue.views.MegafonTelephonyService.make_call")
+    def test_auto_next_can_continue_after_manual_answered_confirmation(self, make_call_mock):
         session = self.client.session
         session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001", "79990000002"]
         session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session[MEGAFON_TEST_CALL_CONFIG_SESSION_KEY] = {
+            "sales_manager_id": self.sales_manager.pk,
+            "clid": "",
+            "show_phone": True,
+        }
         session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = {
             "79990000001": {
                 "call_id": "CALL106",
@@ -927,6 +933,7 @@ class CallQueueMegafonViewTests(TestCase):
             success=True,
         )
         self.client.force_login(self.user)
+        make_call_mock.return_value = {"callid": "CALL108", "clid": "79990000000"}
 
         response = self.client.post(
             reverse("call_queue:megafon_auto_next_call"),
@@ -936,8 +943,8 @@ class CallQueueMegafonViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertTrue(payload["hold_for_manager"])
-        self.assertFalse(payload["started"])
+        self.assertTrue(payload["started"])
+        self.assertEqual(payload["call_id"], "CALL108")
 
     def test_auto_next_waits_for_manual_decision(self):
         session = self.client.session

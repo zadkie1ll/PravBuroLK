@@ -603,11 +603,6 @@ def megafon_auto_next_call(request):
     if not phone_list:
         return JsonResponse({"ok": True, "started": False, "no_next": True})
 
-    if existing_result.get("call_id") == completed_call_id and existing_result.get("decision") == "answered":
-        request.session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY] = completed_call_id
-        request.session.modified = True
-        return JsonResponse({"ok": True, "started": False, "hold_for_manager": True})
-
     if current_index >= len(phone_list) - 1:
         request.session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY] = completed_call_id
         request.session.modified = True
