@@ -97,7 +97,7 @@
                 {% csrf_token %}
                 <input type="hidden" name="action" value="start_call">
                 <button type="submit" class="rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-emerald-500">
-                  Позвонить
+                  {% if auto_dial_enabled %}Запустить автопрозвон очереди{% else %}Позвонить{% endif %}
                 </button>
               </form>
               {% if current_item.bitrix_url %}
@@ -110,6 +110,41 @@
         {% else %}
           <div class="mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
             Очередь пока не сформирована.
+          </div>
+        {% endif %}
+
+        {% if queue %}
+          <div class="mt-6">
+            <h3 class="text-lg font-semibold">Сделки в очереди</h3>
+            <div class="mt-4 max-h-[32rem] space-y-2 overflow-y-auto pr-1">
+              {% for item in queue %}
+                <div class="rounded-2xl border px-4 py-3 {% if forloop.counter0 == current_index %}border-emerald-300 bg-emerald-50{% else %}border-slate-200 bg-white{% endif %}">
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div class="text-xs uppercase tracking-[0.15em] text-slate-500">#{{ forloop.counter }}</div>
+                      <div class="mt-1 font-medium text-slate-900">{{ item.client_name|default:"Без названия" }}</div>
+                      <div class="mt-1 text-sm text-slate-600">{{ item.phone }}</div>
+                      <div class="mt-1 text-xs text-slate-500">Deal ID: {{ item.deal_id }}</div>
+                    </div>
+                    <span class="rounded-full px-3 py-1 text-xs font-medium
+                      {% if item.manual_decision == 'answered' %}bg-emerald-100 text-emerald-800
+                      {% elif item.status == 'calling' %}bg-amber-100 text-amber-800
+                      {% elif item.manual_decision == 'failed' or item.status == 'failed' %}bg-rose-100 text-rose-800
+                      {% else %}bg-slate-100 text-slate-700{% endif %}">
+                      {% if item.manual_decision == 'answered' %}
+                        Клиент ответил
+                      {% elif item.status == 'calling' %}
+                        В звонке
+                      {% elif item.manual_decision == 'failed' or item.status == 'failed' %}
+                        Недозвон
+                      {% else %}
+                        Ожидает
+                      {% endif %}
+                    </span>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
           </div>
         {% endif %}
       </aside>
@@ -150,6 +185,11 @@
           <button type="button" class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-700" data-pause-toggle>
             Пауза
           </button>
+          {% if auto_dial_enabled %}
+            <div class="rounded-full bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
+              Автопрозвон активен: после первого старта очередь сама пойдёт дальше по недозвонам.
+            </div>
+          {% endif %}
         </div>
 
         <div class="mt-6">
