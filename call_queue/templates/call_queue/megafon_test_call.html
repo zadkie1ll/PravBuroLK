@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Тестовый звонок МегаФон111111</title>
+  <title>Тестовый звонок МегаФон</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-900">
@@ -123,7 +123,7 @@
     </div>
 
     {% if current_call_id %}
-      <section class="mt-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200" data-call-panel data-callid="{{ current_call_id }}" data-autodial="{% if auto_dial_enabled %}1{% else %}0{% endif %}" data-auto-next-url="{% url 'call_queue:megafon_auto_next_call' %}" data-csrf-token="{{ csrf_token }}">
+      <section class="mt-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200" data-call-panel data-callid="{{ current_call_id }}" data-autodial="{% if auto_dial_enabled %}1{% else %}0{% endif %}" data-auto-next-url="{% url 'call_queue:megafon_auto_next_call' %}" data-resolve-url="{% url 'call_queue:megafon_resolve_call' %}" data-csrf-token="{{ csrf_token }}">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 class="text-xl font-semibold">Статус текущего тестового звонка</h2>
@@ -173,6 +173,27 @@
           </div>
         </div>
       </section>
+
+      <div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/40 px-4" data-decision-modal>
+        <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+          <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Подтверждение</div>
+          <h3 class="mt-2 text-2xl font-semibold text-slate-900">Кто ответил на звонок?</h3>
+          <p class="mt-3 text-sm text-slate-600">
+            Система увидела соединение, но не может отличить живого клиента от автоответчика. Подтвердите результат вручную.
+          </p>
+          <div class="mt-6 grid gap-3 sm:grid-cols-2">
+            <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
+              Клиент ответил
+            </button>
+            <button type="button" data-decision="voicemail" class="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-amber-400">
+              Это автоответчик
+            </button>
+          </div>
+          <p class="mt-4 text-xs text-slate-500">
+            Пока решение не принято, следующий номер не стартует автоматически.
+          </p>
+        </div>
+      </div>
     {% endif %}
   </div>
 
@@ -189,9 +210,13 @@
         const timelineNode = panel.querySelector("[data-call-timeline]");
         const autoDialEnabled = panel.dataset.autodial === "1";
         const autoNextUrl = panel.dataset.autoNextUrl;
+        const resolveUrl = panel.dataset.resolveUrl;
         const csrfToken = panel.dataset.csrfToken;
         const currentPhone = "{{ current_phone|escapejs }}";
+        const decisionModal = document.querySelector("[data-decision-modal]");
         let autoAdvanceTriggered = false;
+        let decisionInFlight = false;
+        let confirmationResolved = false;
 
         function markerClass(state) {
           if (state === "connected") return "rounded-full px-4 py-2 text-sm font-medium bg-sky-100 text-sky-800";
@@ -236,6 +261,52 @@
               <div class="mt-2 text-sm text-slate-600">direction: ${entry.direction || "—"} | cmd: ${entry.cmd || "—"} | type: ${entry.type || "—"} | status: ${entry.status || "—"}</div>
             </div>
           `).join("");
+        }
+
+        function showDecisionModal() {
+          if (!decisionModal || confirmationResolved || decisionInFlight) return;
+          decisionModal.classList.remove("hidden");
+          decisionModal.classList.add("flex");
+        }
+
+        function hideDecisionModal() {
+          if (!decisionModal) return;
+          decisionModal.classList.add("hidden");
+          decisionModal.classList.remove("flex");
+        }
+
+        async function submitDecision(decision) {
+          if (decisionInFlight) return;
+          decisionInFlight = true;
+          try {
+            const response = await fetch(resolveUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-CSRFToken": csrfToken,
+                "X-Requested-With": "XMLHttpRequest"
+              },
+              body: new URLSearchParams({callid: callId, phone: currentPhone, decision}).toString()
+            });
+            const data = await response.json();
+            if (!response.ok || !data.ok) {
+              stateNode.textContent = data.error || "Не удалось сохранить решение";
+              decisionInFlight = false;
+              return;
+            }
+            confirmationResolved = true;
+            hideDecisionModal();
+            renderCurrentPhoneBadge(data.result || null);
+            stateNode.textContent = data.result?.label || "Решение сохранено";
+            if (decision === "voicemail" && autoDialEnabled) {
+              triggerNextCall();
+            }
+          } catch (error) {
+            console.error(error);
+            stateNode.textContent = "Не удалось сохранить решение";
+          } finally {
+            decisionInFlight = false;
+          }
         }
 
         async function triggerNextCall() {
@@ -293,12 +364,23 @@
             stateNode.textContent = snapshot.marker.label;
             renderCurrentPhoneBadge(snapshot.phone_result || null);
             renderTimeline(snapshot.timeline || []);
-            if (snapshot.latest_history_status) {
+            if (snapshot.requires_manager_confirmation && !confirmationResolved) {
+              showDecisionModal();
+              return;
+            }
+            hideDecisionModal();
+            if (snapshot.latest_history_status && !snapshot.requires_manager_confirmation) {
               triggerNextCall();
             }
           } catch (error) {
             console.error(error);
           }
+        }
+
+        if (decisionModal) {
+          decisionModal.querySelectorAll("[data-decision]").forEach((button) => {
+            button.addEventListener("click", () => submitDecision(button.dataset.decision));
+          });
         }
 
         poll();

@@ -567,6 +567,7 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["snapshot"]["phone_result"]["label"], "Есть ответ, но клиент не подтверждён")
+        self.assertTrue(payload["snapshot"]["requires_manager_confirmation"])
 
     def test_call_status_endpoint_marks_invalid_number_on_not_available(self):
         BitrixSyncLog.objects.create(
@@ -741,3 +742,42 @@ class CallQueueMegafonViewTests(TestCase):
             session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY]["79990000001"]["label"],
             "Не взял трубку",
         )
+
+    def test_resolve_call_marks_client_answered(self):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session.save()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_resolve_call"),
+            {"callid": "CALL100", "phone": "79990000001", "decision": "answered"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["result"]["state"], "answered_confirmed")
+        self.assertEqual(
+            self.client.session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY]["79990000001"]["label"],
+            "Менеджер подтвердил: клиент ответил",
+        )
+
+    def test_resolve_call_marks_voicemail(self):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session.save()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_resolve_call"),
+            {"callid": "CALL101", "phone": "79990000001", "decision": "voicemail"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["result"]["state"], "voicemail")

@@ -130,6 +130,14 @@ def build_megafon_call_snapshot(call_id: str) -> dict:
     elif timeline:
         marker = {"state": "in_progress", "label": "Звонок в процессе"}
 
+    phone_result = build_megafon_phone_result(
+        {
+            "latest_history_status": latest_history_status,
+            "last_event_type": last_event_type,
+            "last_event_direction": last_event_direction,
+        }
+    )
+
     return {
         "call_id": call_id,
         "marker": marker,
@@ -137,13 +145,8 @@ def build_megafon_call_snapshot(call_id: str) -> dict:
         "latest_history_status": latest_history_status,
         "last_event_type": last_event_type,
         "last_event_direction": last_event_direction,
-        "phone_result": build_megafon_phone_result(
-            {
-                "latest_history_status": latest_history_status,
-                "last_event_type": last_event_type,
-                "last_event_direction": last_event_direction,
-            }
-        ),
+        "phone_result": phone_result,
+        "requires_manager_confirmation": phone_result["state"] == "connected",
         "timeline": timeline[-20:],
     }
 
@@ -212,6 +215,30 @@ def update_megafon_phone_result(request, *, phone: str, snapshot: dict, call_id:
     }
     request.session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = results
     request.session.modified = True
+
+
+def set_megafon_manual_phone_result(request, *, phone: str, call_id: str, decision: str):
+    if not phone:
+        return {}
+    if decision == "answered":
+        result = {
+            "call_id": call_id,
+            "state": "answered_confirmed",
+            "label": "Менеджер подтвердил: клиент ответил",
+            "decision": decision,
+        }
+    else:
+        result = {
+            "call_id": call_id,
+            "state": "voicemail",
+            "label": "Менеджер подтвердил: автоответчик",
+            "decision": decision,
+        }
+    results = get_megafon_test_phone_results(request)
+    results[phone] = result
+    request.session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = results
+    request.session.modified = True
+    return result
 
 
 def build_megafon_test_call_url(call_id: str, auto_dial: bool = False) -> str:
@@ -450,6 +477,22 @@ def megafon_call_status(request):
     if not call_id:
         return JsonResponse({"ok": False, "error": "callid is required"}, status=400)
     return JsonResponse({"ok": True, "snapshot": build_megafon_call_snapshot(call_id)})
+
+
+@login_required
+@sales_manager_required
+@require_http_methods(["POST"])
+def megafon_resolve_call(request):
+    call_id = request.POST.get("callid", "").strip()
+    phone = request.POST.get("phone", "").strip()
+    decision = request.POST.get("decision", "").strip()
+    if not call_id or not phone or decision not in {"answered", "voicemail"}:
+        return JsonResponse({"ok": False, "error": "callid, phone and valid decision are required"}, status=400)
+
+    result = set_megafon_manual_phone_result(request, phone=phone, call_id=call_id, decision=decision)
+    request.session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY] = call_id
+    request.session.modified = True
+    return JsonResponse({"ok": True, "result": result})
 
 
 @login_required
