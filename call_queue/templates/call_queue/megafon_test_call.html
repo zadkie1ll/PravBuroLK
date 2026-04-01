@@ -171,7 +171,7 @@
               <div class="text-sm uppercase tracking-[0.15em] text-slate-500">Автопрозвон</div>
               <p class="mt-1 text-sm text-slate-600" data-pause-status>
                 {% if auto_dial_enabled %}
-                  Активен. Следующий номер пойдёт только после ручного выбора исхода и завершения текущего звонка.
+                  Активен. При ответе со стороны клиента автопрозвон ставится на паузу до вашего решения.
                 {% else %}
                   Выключен.
                 {% endif %}
@@ -188,12 +188,9 @@
             <p class="mt-2 text-sm text-slate-600" data-decision-help>
               Выберите ручной итог звонка. Статусы МегаФона используются только как подтверждение, что звонок завершился.
             </p>
-            <div class="mt-4 grid gap-3 sm:grid-cols-3">
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
               <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
                 Клиент ответил
-              </button>
-              <button type="button" data-decision="voicemail" class="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-amber-400">
-                Автоответчик
               </button>
               <button type="button" data-decision="failed" class="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-500">
                 Не дозвонились
@@ -227,12 +224,9 @@
           <p class="mt-3 text-sm text-slate-600">
             МегаФон сообщил, что на стороне клиента есть ответ. Подтвердите исход звонка вручную.
           </p>
-          <div class="mt-6 grid gap-3 sm:grid-cols-3">
+          <div class="mt-6 grid gap-3 sm:grid-cols-2">
             <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
               Клиент ответил
-            </button>
-            <button type="button" data-decision="voicemail" class="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-medium text-slate-950 transition hover:bg-amber-400">
-              Автоответчик
             </button>
             <button type="button" data-decision="failed" class="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-500">
               Не дозвонились
@@ -273,9 +267,10 @@
         let paused = !autoDialEnabled;
         let confirmationResolved = {% if current_phone_result.decision %}true{% else %}false{% endif %};
         let confirmationDecision = "{{ current_phone_result.decision|default:''|escapejs }}";
+        let clientAnsweredEventSeen = false;
 
         function shouldAskManager(snapshot) {
-          return !confirmationResolved && (snapshot.requires_manager_confirmation || Boolean(snapshot.latest_history_status));
+          return !confirmationResolved && snapshot.last_event_type === "ACCEPTED" && snapshot.last_event_direction === "out";
         }
 
         function renderPauseState() {
@@ -287,7 +282,7 @@
           }
           pauseStatusNode.textContent = paused
             ? "Автопрозвон на паузе. После завершения текущего звонка следующий не стартует, пока вы не возобновите."
-            : "Автопрозвон активен. Следующий номер пойдёт только после ручного выбора исхода и завершения текущего звонка.";
+            : "Автопрозвон активен. При ответе со стороны клиента автопрозвон ставится на паузу до вашего решения.";
         }
 
         function markerClass(state) {
@@ -343,10 +338,6 @@
           if (confirmationResolved) {
             if (confirmationDecision === "answered") {
               decisionHelpNode.textContent = "Клиент подтверждён менеджером. После завершения звонка автопрозвон встанет на паузу.";
-            } else if (confirmationDecision === "voicemail") {
-              decisionHelpNode.textContent = paused
-                ? "Автоответчик отмечен. После завершения текущего звонка автопрозвон останется на паузе."
-                : "Автоответчик отмечен. После завершения текущего звонка стартует следующий номер.";
             } else if (confirmationDecision === "failed") {
               decisionHelpNode.textContent = paused
                 ? "Менеджер отметил, что дозвона нет. После завершения текущего звонка автопрозвон останется на паузе."
@@ -390,19 +381,13 @@
             }
             confirmationResolved = true;
             confirmationDecision = decision;
-            if (decision === "answered") {
-              paused = true;
-            }
+            paused = decision === "answered";
             renderPauseState();
             renderDecisionPanel();
             hideDecisionModal();
             renderCurrentPhoneBadge(data.result || null);
             stateNode.textContent = data.result?.label || "Решение сохранено";
-            if (decision === "voicemail") {
-              stateNode.textContent = paused
-                ? "Автоответчик отмечен. Ждём завершения звонка, затем автопрозвон останется на паузе."
-                : "Автоответчик отмечен. Ждём завершения звонка, затем стартуем следующий номер.";
-            } else if (decision === "failed") {
+            if (decision === "failed") {
               stateNode.textContent = paused
                 ? "Отмечено, что дозвона нет. Ждём завершения звонка, затем автопрозвон останется на паузе."
                 : "Отмечено, что дозвона нет. Ждём завершения звонка, затем стартуем следующий номер.";
@@ -478,13 +463,20 @@
             stateNode.textContent = snapshot.marker.label;
             renderCurrentPhoneBadge(snapshot.phone_result || null);
             renderTimeline(snapshot.timeline || []);
+            if (snapshot.last_event_type === "ACCEPTED" && snapshot.last_event_direction === "out") {
+              clientAnsweredEventSeen = true;
+              if (!confirmationResolved) {
+                paused = true;
+              }
+            }
+            renderPauseState();
             renderDecisionPanel();
             if (shouldAskManager(snapshot)) {
               showDecisionModal();
             } else {
               hideDecisionModal();
             }
-            if (snapshot.latest_history_status && confirmationResolved && (confirmationDecision === "voicemail" || confirmationDecision === "failed")) {
+            if (snapshot.latest_history_status && confirmationResolved && confirmationDecision === "failed") {
               if (paused) {
                 stateNode.textContent = "Звонок завершён. Автопрозвон на паузе, следующий номер не запускается.";
                 return;
@@ -498,8 +490,19 @@
               stateNode.textContent = "Звонок завершён. Клиент подтверждён менеджером, автопрозвон поставлен на паузу.";
               return;
             }
-            if (snapshot.latest_history_status && !confirmationResolved) {
-              stateNode.textContent = "Звонок завершён. Выберите ручной исход в попапе, чтобы решить, что делать дальше.";
+            if (snapshot.latest_history_status && !confirmationResolved && clientAnsweredEventSeen) {
+              paused = true;
+              renderPauseState();
+              stateNode.textContent = "Звонок завершён. Нужен ваш выбор в попапе, прежде чем двигаться дальше.";
+              showDecisionModal();
+              return;
+            }
+            if (snapshot.latest_history_status && !clientAnsweredEventSeen && !confirmationResolved) {
+              if (!paused) {
+                triggerNextCall();
+                return;
+              }
+              stateNode.textContent = "Звонок завершён. Автопрозвон на паузе.";
             }
           } catch (error) {
             console.error(error);
@@ -510,6 +513,10 @@
           pauseToggleButton.addEventListener("click", () => {
             paused = !paused;
             renderPauseState();
+            if (!paused && confirmationResolved && confirmationDecision === "failed") {
+              triggerNextCall();
+              return;
+            }
             if (!paused) {
               poll();
             }
