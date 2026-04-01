@@ -637,6 +637,29 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY], ["79990000001", "79990000002"])
         self.assertEqual(session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY], 0)
 
+    def test_manual_test_call_page_can_reset_test_state(self):
+        session = self.client.session
+        session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY] = ["79990000001"]
+        session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = 0
+        session[MEGAFON_TEST_CALL_CONFIG_SESSION_KEY] = {"sales_manager_id": self.sales_manager.pk}
+        session[MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY] = "CALLRESET"
+        session[MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY] = "CALLRESET"
+        session[MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY] = {"79990000001": {"state": "voicemail"}}
+        session.save()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:megafon_test_call"),
+            {"action": "reset_test_state"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        session = self.client.session
+        self.assertEqual(session[MEGAFON_TEST_PHONE_LIST_SESSION_KEY], ["79990000001"])
+        self.assertNotIn(MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY, session)
+        self.assertNotIn(MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY, session)
+        self.assertNotIn(MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY, session)
+
     @patch("call_queue.views.MegafonTelephonyService.make_call")
     def test_manual_test_call_keeps_current_phone_until_call_completes(self, make_call_mock):
         session = self.client.session

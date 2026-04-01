@@ -175,6 +175,20 @@ def get_megafon_test_phone_results(request) -> dict:
     return value if isinstance(value, dict) else {}
 
 
+def reset_megafon_test_state(request, *, clear_phone_list: bool = False):
+    keys = [
+        MEGAFON_TEST_CALL_CONFIG_SESSION_KEY,
+        MEGAFON_TEST_ACTIVE_CALL_ID_SESSION_KEY,
+        MEGAFON_TEST_LAST_COMPLETED_CALL_ID_SESSION_KEY,
+        MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY,
+    ]
+    if clear_phone_list:
+        keys.extend([MEGAFON_TEST_PHONE_LIST_SESSION_KEY, MEGAFON_TEST_PHONE_INDEX_SESSION_KEY])
+    for key in keys:
+        request.session.pop(key, None)
+    request.session.modified = True
+
+
 def build_megafon_phone_result(snapshot: dict) -> dict:
     history_status = snapshot.get("latest_history_status")
     if history_status == "Success":
@@ -397,6 +411,13 @@ def megafon_test_call(request):
             except ValueError:
                 phone_index = 0
             request.session[MEGAFON_TEST_PHONE_INDEX_SESSION_KEY] = phone_index
+            return redirect("call_queue:megafon_test_call")
+        elif action == "reset_test_state":
+            reset_megafon_test_state(
+                request,
+                clear_phone_list=request.POST.get("clear_phone_list") == "on",
+            )
+            messages.success(request, "Тестовое состояние очищено.")
             return redirect("call_queue:megafon_test_call")
         else:
             form = MegafonTestCallForm(request.POST)

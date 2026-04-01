@@ -77,6 +77,17 @@
               Сохранить список
             </button>
           </form>
+          <form method="post" class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reset_test_state">
+            <label class="flex items-center gap-3 text-sm text-slate-700">
+              <input type="checkbox" name="clear_phone_list" class="h-4 w-4 rounded border-slate-300">
+              <span>Очистить ещё и список номеров</span>
+            </label>
+            <button type="submit" class="mt-4 rounded-full bg-white px-5 py-3 text-sm font-medium text-slate-900 shadow-sm ring-1 ring-slate-300 transition hover:bg-slate-100">
+              Сбросить тестовое состояние
+            </button>
+          </form>
           {% if phone_entries %}
             <div class="rounded-2xl bg-slate-50 p-4">
               <div class="font-medium text-slate-900">Текущий номер</div>
