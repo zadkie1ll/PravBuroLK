@@ -1203,7 +1203,7 @@ class CallQueueMegafonViewTests(TestCase):
             response_payload={"accepted": True},
             success=True,
         )
-        append_mock.return_value = "31.03 (менеджер) недозвон"
+        append_mock.return_value = "31.03 (менеджер) номер недоступен"
         start_call_mock.return_value = ("PROD-CALL-3", {"callid": "PROD-CALL-3"})
         self.client.force_login(self.user)
 
@@ -1217,3 +1217,4 @@ class CallQueueMegafonViewTests(TestCase):
         payload = response.json()
         self.assertTrue(payload["started"])
         append_mock.assert_called_once()
+        self.assertEqual(append_mock.call_args.args[1], "02.04 (менеджер) номер недоступен")

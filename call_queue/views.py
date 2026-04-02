@@ -407,6 +407,10 @@ def format_unanswered_comment(manager_profile: SalesManager) -> str:
     return f"{timezone.localdate():%d.%m} ({get_manager_short_name(manager_profile)}) недозвон"
 
 
+def format_unavailable_comment(manager_profile: SalesManager) -> str:
+    return f"{timezone.localdate():%d.%m} ({get_manager_short_name(manager_profile)}) номер недоступен"
+
+
 def mark_prod_item(request, index: int, **updates) -> dict | None:
     queue = get_prod_queue(request)
     if not queue or index < 0 or index >= len(queue):
@@ -1066,7 +1070,10 @@ def production_handler_auto_next(request):
         item.get("manual_decision") == "failed"
         or snapshot["latest_history_status"] in {"Busy", "NotAvailable", "missed"}
     ):
-        comment_line = format_unanswered_comment(request.sales_manager_profile)
+        if snapshot["latest_history_status"] == "NotAvailable" and item.get("manual_decision") != "failed":
+            comment_line = format_unavailable_comment(request.sales_manager_profile)
+        else:
+            comment_line = format_unanswered_comment(request.sales_manager_profile)
         updated_comments = BitrixDealService().append_entity_comment(
             item.get("entity_type") or CallEntityType.DEAL,
             item.get("entity_id") or item.get("deal_id"),
