@@ -22,7 +22,7 @@ from .forms import (
     MegafonTestCallForm,
     ProductionRecallForm,
 )
-from .models import BitrixSyncLog, CallQueueItem, CallSession, CallSessionStatus
+from .models import BitrixSyncLog, CallEntityType, CallQueueItem, CallSession, CallSessionStatus
 from .selectors import get_active_item_for_manager, get_recent_sessions, get_session_with_stats
 from .services.bitrix.deal_service import BitrixDealService
 from .services.telephony.megafon import MegafonAPIError, MegafonTelephonyService
@@ -346,6 +346,16 @@ def build_prod_handler_url(call_id: str = "", auto_dial: bool = False) -> str:
     if params:
         return f"{url}?{'&'.join(params)}"
     return url
+
+
+def get_production_form_initial(config: dict, today):
+    return {
+        "entity_type": config.get("entity_type") or CallEntityType.DEAL,
+        "date_from": config.get("date_from") or today,
+        "date_to": config.get("date_to") or today,
+        "stage_id": config.get("stage_id") or "",
+        "auto_dial": bool(config.get("auto_dial", True)),
+    }
 
 
 def reset_prod_queue_state(request, *, clear_queue: bool = False):
@@ -825,9 +835,10 @@ def production_handler(request):
             return redirect("call_queue:production_handler")
 
         if action == "build_queue":
-            form = ProductionRecallForm(request.POST)
+            form = ProductionRecallForm(request.POST, bitrix_service=bitrix_service)
             if form.is_valid():
                 items = bitrix_service.fetch_production_recall_deals(
+                    entity_type=form.cleaned_data["entity_type"],
                     date_from=form.cleaned_data["date_from"],
                     date_to=form.cleaned_data["date_to"],
                     stage_id=form.cleaned_data["stage_id"],
@@ -845,6 +856,7 @@ def production_handler(request):
                 request.session[MEGAFON_PROD_QUEUE_SESSION_KEY] = queue
                 request.session[MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY] = 0
                 request.session[MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY] = {
+                    "entity_type": form.cleaned_data["entity_type"],
                     "date_from": form.cleaned_data["date_from"].isoformat(),
                     "date_to": form.cleaned_data["date_to"].isoformat(),
                     "stage_id": form.cleaned_data["stage_id"],
@@ -853,19 +865,16 @@ def production_handler(request):
                 request.session.pop(MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY, None)
                 request.session.pop(MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY, None)
                 request.session.modified = True
-                messages.success(request, f"Сформирована очередь: {len(queue)} сделок.")
+                entity_label = "сделок" if form.cleaned_data["entity_type"] == CallEntityType.DEAL else "лидов"
+                messages.success(request, f"Сформирована очередь: {len(queue)} {entity_label}.")
                 return redirect("call_queue:production_handler")
         elif action == "start_call":
             form = ProductionRecallForm(
-                initial={
-                    "date_from": config.get("date_from") or today,
-                    "date_to": config.get("date_to") or today,
-                    "stage_id": config.get("stage_id") or "PREPARATION",
-                    "auto_dial": bool(config.get("auto_dial", True)),
-                }
+                initial=get_production_form_initial(config, today),
+                bitrix_service=bitrix_service,
             )
             if not current_item:
-                messages.error(request, "Сначала сформируйте очередь сделок.")
+                messages.error(request, "Сначала сформируйте очередь.")
                 return redirect("call_queue:production_handler")
             try:
                 call_id, _response = start_megafon_production_call(
@@ -894,22 +903,17 @@ def production_handler(request):
                 return redirect(build_prod_handler_url(call_id, auto_dial=auto_dial))
         else:
             form = ProductionRecallForm(
-                initial={
-                    "date_from": config.get("date_from") or today,
-                    "date_to": config.get("date_to") or today,
-                    "stage_id": config.get("stage_id") or "PREPARATION",
-                    "auto_dial": bool(config.get("auto_dial", True)),
-                }
+                initial=get_production_form_initial(config, today),
+                bitrix_service=bitrix_service,
             )
     else:
-        form = ProductionRecallForm(
-            initial={
-                "date_from": config.get("date_from") or today,
-                "date_to": config.get("date_to") or today,
-                "stage_id": config.get("stage_id") or "PREPARATION",
-                "auto_dial": bool(config.get("auto_dial", True)),
-            }
-        )
+        if request.GET:
+            form = ProductionRecallForm(request.GET, bitrix_service=bitrix_service)
+        else:
+            form = ProductionRecallForm(
+                initial=get_production_form_initial(config, today),
+                bitrix_service=bitrix_service,
+            )
 
     queue, current_index, current_item = get_prod_current_item(request)
     current_call_id = request.GET.get("callid", "").strip() or (current_item.get("call_id", "") if current_item else "")
@@ -928,6 +932,7 @@ def production_handler(request):
             "current_call_id": current_call_id,
             "current_snapshot": current_snapshot,
             "auto_dial_enabled": bool(config.get("auto_dial", True)),
+            "current_entity_type": config.get("entity_type") or CallEntityType.DEAL,
         },
     )
 
@@ -972,7 +977,11 @@ def production_handler_resolve(request):
     )
     if decision == "failed" and not item.get("comment_logged"):
         comment_line = format_unanswered_comment(request.sales_manager_profile)
-        updated_comments = BitrixDealService().append_deal_comment(item["deal_id"], comment_line)
+        updated_comments = BitrixDealService().append_entity_comment(
+            item.get("entity_type") or CallEntityType.DEAL,
+            item.get("entity_id") or item.get("deal_id"),
+            comment_line,
+        )
         item = mark_prod_item(
             request,
             item_index,
@@ -1023,7 +1032,11 @@ def production_handler_auto_next(request):
         or snapshot["latest_history_status"] in {"Busy", "NotAvailable", "missed"}
     ):
         comment_line = format_unanswered_comment(request.sales_manager_profile)
-        updated_comments = BitrixDealService().append_deal_comment(item["deal_id"], comment_line)
+        updated_comments = BitrixDealService().append_entity_comment(
+            item.get("entity_type") or CallEntityType.DEAL,
+            item.get("entity_id") or item.get("deal_id"),
+            comment_line,
+        )
         item = mark_prod_item(
             request,
             item_index,
@@ -1174,6 +1187,7 @@ def call_session_detail(request, session_id: int):
     session = get_session_with_stats(session.pk)
     attempts = current_item.attempts.select_related("manager").all()[:10] if current_item else []
     result_form = CallResultForm(initial={"queue_item_id": current_item.pk}) if current_item else CallResultForm()
+    session_items = session.items.order_by("id")[:100]
 
     return render(
         request,
@@ -1183,6 +1197,7 @@ def call_session_detail(request, session_id: int):
             "current_item": current_item,
             "attempts": attempts,
             "result_form": result_form,
+            "session_items": session_items,
             "sales_manager_profile": request.sales_manager_profile,
         },
     )

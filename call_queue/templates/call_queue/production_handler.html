@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Продовый обзвон сделок</title>
+  <title>Продовый обзвон Bitrix</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen bg-slate-100 text-slate-900">
   <div class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
     <div class="mb-8 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-700 p-8 text-white shadow-2xl">
       <p class="mb-2 text-sm uppercase tracking-[0.3em] text-emerald-200">Call Queue</p>
-      <h1 class="text-3xl font-semibold sm:text-4xl">Продовый обработчик сделок</h1>
+      <h1 class="text-3xl font-semibold sm:text-4xl">Продовый обработчик очереди</h1>
       <p class="mt-3 max-w-3xl text-sm text-slate-200 sm:text-base">
-        Менеджер выбирает даты, получает сделки из Bitrix24 в колонке PREPARATION, а дальше идёт по очереди и фиксирует дозвон.
+        Менеджер выбирает даты, тип сущности и стадию из Bitrix24, а дальше идёт по очереди и фиксирует дозвон.
       </p>
     </div>
 
@@ -48,7 +48,7 @@
           {% endfor %}
           <div class="flex flex-wrap gap-3">
             <button type="submit" class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-slate-700">
-              Загрузить сделки
+              Загрузить очередь
             </button>
           </div>
         </form>
@@ -86,7 +86,7 @@
               <div>
                 <div class="text-sm uppercase tracking-[0.15em] text-emerald-700">Старт обзвона</div>
                 <p class="mt-1 text-sm text-emerald-900">
-                  Очередь сформирована. Можно сразу запустить {% if auto_dial_enabled %}автопрозвон{% else %}обзвон{% endif %} с текущей сделки.
+                  Очередь сформирована. Можно сразу запустить {% if auto_dial_enabled %}автопрозвон{% else %}обзвон{% endif %} с текущего элемента.
                 </p>
               </div>
               <form method="post">
@@ -102,11 +102,14 @@
 
         {% if current_item %}
           <div class="mt-5 rounded-2xl border border-slate-200 p-4">
-            <div class="text-sm text-slate-500">Текущая сделка</div>
+            <div class="text-sm text-slate-500">Текущий элемент</div>
             <div class="mt-2 text-lg font-semibold">{{ current_item.client_name|default:"Без имени" }}</div>
             <div class="mt-2 text-sm text-slate-600">Телефон из Bitrix: {{ current_item.raw_phone|default:current_item.phone }}</div>
             <div class="mt-1 text-sm font-medium text-emerald-700">Телефон для МегаФона: {{ current_item.phone }}</div>
-            <div class="mt-1 text-sm text-slate-600">Bitrix Deal ID: {{ current_item.deal_id }}</div>
+            <div class="mt-1 text-sm text-slate-600">
+              Bitrix {% if current_entity_type == 'lead' %}Lead{% else %}Deal{% endif %} ID:
+              {{ current_item.entity_id|default:current_item.deal_id|default:current_item.lead_id }}
+            </div>
             {% if current_item.comments %}
               <div class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
                 <div class="mb-2 font-medium text-slate-900">COMMENTS</div>
@@ -116,7 +119,7 @@
             <div class="mt-4 flex flex-wrap gap-3">
               {% if current_item.bitrix_url %}
                 <a href="{{ current_item.bitrix_url }}" target="_blank" rel="noopener" class="rounded-full bg-white px-5 py-3 text-sm font-medium text-slate-900 shadow-sm ring-1 ring-slate-300 transition hover:bg-slate-100">
-                  Открыть сделку в Bitrix
+                  Открыть в Bitrix
                 </a>
               {% endif %}
             </div>
@@ -129,7 +132,7 @@
 
         {% if queue %}
           <div class="mt-6">
-            <h3 class="text-lg font-semibold">Сделки в очереди</h3>
+            <h3 class="text-lg font-semibold">{% if current_entity_type == 'lead' %}Лиды{% else %}Сделки{% endif %} в очереди</h3>
             <div class="mt-4 max-h-[32rem] space-y-2 overflow-y-auto pr-1">
               {% for item in queue %}
                 <div class="rounded-2xl border px-4 py-3 {% if forloop.counter0 == current_index %}border-emerald-300 bg-emerald-50{% else %}border-slate-200 bg-white{% endif %}">
@@ -139,7 +142,13 @@
                       <div class="mt-1 font-medium text-slate-900">{{ item.client_name|default:"Без названия" }}</div>
                       <div class="mt-1 text-sm text-slate-600">Bitrix: {{ item.raw_phone|default:item.phone }}</div>
                       <div class="mt-1 text-sm font-medium text-emerald-700">МегаФон: {{ item.phone }}</div>
-                      <div class="mt-1 text-xs text-slate-500">Deal ID: {{ item.deal_id }}</div>
+                      <div class="mt-1 text-xs text-slate-500">
+                        {% if item.entity_type == 'lead' %}Lead{% else %}Deal{% endif %} ID:
+                        {{ item.entity_id|default:item.deal_id|default:item.lead_id }}
+                      </div>
+                      <div class="mt-1 text-xs text-slate-500">
+                        {% if item.entity_type == 'lead' %}Статус{% else %}Стадия{% endif %}: {{ item.stage_id|default:"—" }}
+                      </div>
                     </div>
                     <span class="rounded-full px-3 py-1 text-xs font-medium
                       {% if item.manual_decision == 'answered' %}bg-emerald-100 text-emerald-800
@@ -418,5 +427,29 @@
       })();
     </script>
   {% endif %}
+  <script>
+    (function () {
+      const entityField = document.getElementById("id_entity_type");
+      if (!entityField) return;
+      entityField.addEventListener("change", function () {
+        const params = new URLSearchParams(window.location.search);
+        const dateFrom = document.getElementById("id_date_from");
+        const dateTo = document.getElementById("id_date_to");
+        const autoDial = document.getElementById("id_auto_dial");
+        params.set("entity_type", entityField.value);
+        if (dateFrom && dateFrom.value) params.set("date_from", dateFrom.value);
+        if (dateTo && dateTo.value) params.set("date_to", dateTo.value);
+        if (autoDial) {
+          if (autoDial.checked) {
+            params.set("auto_dial", "on");
+          } else {
+            params.delete("auto_dial");
+          }
+        }
+        params.delete("stage_id");
+        window.location.href = `${window.location.pathname}?${params.toString()}`;
+      });
+    })();
+  </script>
 </body>
 </html>

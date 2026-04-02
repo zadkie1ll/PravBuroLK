@@ -66,6 +66,19 @@ class BitrixDealService:
         "COMMENTS",
         "ASSIGNED_BY_ID",
     ]
+    production_lead_select_fields = [
+        "ID",
+        "TITLE",
+        "CONTACT_ID",
+        "STATUS_ID",
+        "DATE_CREATE",
+        "COMMENTS",
+        "ASSIGNED_BY_ID",
+        "PHONE",
+        "NAME",
+        "LAST_NAME",
+        "SECOND_NAME",
+    ]
 
     def __init__(self, client: BitrixClient | None = None):
         self.client = client or BitrixClient()
@@ -147,48 +160,64 @@ class BitrixDealService:
     def fetch_production_recall_deals(
         self,
         *,
+        entity_type: str = CallEntityType.DEAL,
         date_from,
         date_to,
         stage_id: str = "PREPARATION",
     ) -> list[dict[str, Any]]:
         from_dt = timezone.make_aware(datetime.combine(date_from, time.min))
         to_dt = timezone.make_aware(datetime.combine(date_to, time.max))
-        deals = self.client.paginated_call(
-            "crm.deal.list",
+        method = "crm.deal.list" if entity_type == CallEntityType.DEAL else "crm.lead.list"
+        stage_field = "STAGE_ID" if entity_type == CallEntityType.DEAL else "STATUS_ID"
+        contact_filter_field = "!CONTACT_ID"
+        select_fields = (
+            self.production_deal_select_fields
+            if entity_type == CallEntityType.DEAL
+            else self.production_lead_select_fields
+        )
+        entities = self.client.paginated_call(
+            method,
             {
                 "filter": {
                     ">=DATE_CREATE": from_dt.isoformat(),
                     "<=DATE_CREATE": to_dt.isoformat(),
-                    "STAGE_ID": stage_id,
-                    "!CONTACT_ID": None,
+                    stage_field: stage_id,
+                    contact_filter_field: None,
                 },
-                "select": self.production_deal_select_fields,
+                "select": select_fields,
                 "order": {"DATE_CREATE": "ASC", "ID": "ASC"},
             },
         )
         items: list[dict[str, Any]] = []
-        for deal in deals:
-            contact_id = _safe_int(deal.get("CONTACT_ID"))
+        for entity in entities:
+            contact_id = _safe_int(entity.get("CONTACT_ID"))
             if not contact_id:
                 continue
             contact = self.get_contact(contact_id)
             phones = self.extract_contact_phones(contact)
             raw_phones = self.extract_contact_raw_phones(contact)
             if not phones:
+                phones = self.extract_entity_phones(entity)
+                raw_phones = self.extract_entity_raw_phones(entity)
+            if not phones:
                 continue
-            deal_id = _safe_int(deal.get("ID"))
+            entity_id = _safe_int(entity.get("ID"))
+            client_name = self.extract_contact_name(contact) or self.extract_entity_name(entity)
             items.append(
                 {
-                    "deal_id": deal_id,
+                    "entity_type": entity_type,
+                    "entity_id": entity_id,
+                    "deal_id": entity_id if entity_type == CallEntityType.DEAL else None,
+                    "lead_id": entity_id if entity_type == CallEntityType.LEAD else None,
                     "contact_id": contact_id,
-                    "client_name": self.extract_contact_name(contact) or (deal.get("TITLE") or "").strip(),
+                    "client_name": client_name,
                     "phone": phones[0],
                     "raw_phone": raw_phones[0] if raw_phones else phones[0],
                     "phones": phones,
-                    "bitrix_url": self.build_entity_url(CallEntityType.DEAL, deal_id),
-                    "comments": (deal.get("COMMENTS") or "").strip(),
-                    "stage_id": str(deal.get("STAGE_ID") or ""),
-                    "created_at": deal.get("DATE_CREATE") or "",
+                    "bitrix_url": self.build_entity_url(entity_type, entity_id),
+                    "comments": (entity.get("COMMENTS") or "").strip(),
+                    "stage_id": str(entity.get(stage_field) or ""),
+                    "created_at": entity.get("DATE_CREATE") or "",
                 }
             )
         return items
@@ -199,16 +228,28 @@ class BitrixDealService:
     def get_deal(self, deal_id: int) -> dict[str, Any]:
         return self.client.call("crm.deal.get", {"id": int(deal_id)})
 
+    def get_lead(self, lead_id: int) -> dict[str, Any]:
+        return self.client.call("crm.lead.get", {"id": int(lead_id)})
+
     def extract_contact_phones(self, contact: dict[str, Any]) -> list[str]:
         raw_phone = contact.get("PHONE") or []
         if not isinstance(raw_phone, list):
             return []
-        phones = []
+        prioritized = []
         for entry in raw_phone:
             value = _normalize_phone((entry or {}).get("VALUE") or "")
             if value:
-                phones.append(value)
-        return phones
+                value_type = str((entry or {}).get("VALUE_TYPE") or "").upper()
+                priority = {
+                    "MOBILE": 0,
+                    "WORK": 1,
+                    "OTHER": 2,
+                    "HOME": 3,
+                    "FAX": 4,
+                }.get(value_type, 9)
+                prioritized.append((priority, value))
+        prioritized.sort(key=lambda item: item[0])
+        return [value for _, value in prioritized]
 
     def extract_contact_raw_phones(self, contact: dict[str, Any]) -> list[str]:
         raw_phone = contact.get("PHONE") or []
@@ -229,6 +270,37 @@ class BitrixDealService:
         ]
         return " ".join(part for part in name_parts if part).strip()
 
+    def extract_entity_name(self, entity: dict[str, Any]) -> str:
+        name_parts = [
+            str(entity.get("NAME") or "").strip(),
+            str(entity.get("SECOND_NAME") or "").strip(),
+            str(entity.get("LAST_NAME") or "").strip(),
+        ]
+        full_name = " ".join(part for part in name_parts if part).strip()
+        return full_name or str(entity.get("TITLE") or "").strip()
+
+    def extract_entity_phones(self, entity: dict[str, Any]) -> list[str]:
+        raw_phone = entity.get("PHONE") or []
+        if not isinstance(raw_phone, list):
+            return []
+        phones = []
+        for entry in raw_phone:
+            value = _normalize_phone((entry or {}).get("VALUE") or "")
+            if value:
+                phones.append(value)
+        return phones
+
+    def extract_entity_raw_phones(self, entity: dict[str, Any]) -> list[str]:
+        raw_phone = entity.get("PHONE") or []
+        if not isinstance(raw_phone, list):
+            return []
+        phones = []
+        for entry in raw_phone:
+            value = str((entry or {}).get("VALUE") or "").strip()
+            if value:
+                phones.append(value)
+        return phones
+
     def append_deal_comment(self, deal_id: int, line: str) -> str:
         deal = self.get_deal(deal_id)
         current_comments = str(deal.get("COMMENTS") or "").strip()
@@ -243,6 +315,23 @@ class BitrixDealService:
             },
         )
         return new_comments
+
+    def append_entity_comment(self, entity_type: str, entity_id: int, line: str) -> str:
+        if entity_type == CallEntityType.LEAD:
+            entity = self.get_lead(entity_id)
+            current_comments = str(entity.get("COMMENTS") or "").strip()
+            new_comments = f"{current_comments}\n{line}".strip() if current_comments else line
+            self.client.call(
+                "crm.lead.update",
+                {
+                    "id": int(entity_id),
+                    "fields": {
+                        "COMMENTS": new_comments,
+                    },
+                },
+            )
+            return new_comments
+        return self.append_deal_comment(entity_id, line)
 
     def normalize_entity(self, entity: dict[str, Any], entity_type: str) -> dict[str, Any]:
         raw_phone = entity.get("PHONE")

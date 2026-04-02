@@ -135,6 +135,16 @@ class MegafonPhoneListForm(forms.Form):
 
 
 class ProductionRecallForm(forms.Form):
+    entity_type = forms.ChoiceField(
+        label="Что обзваниваем",
+        choices=CallEntityType.choices,
+        initial=CallEntityType.DEAL,
+        widget=forms.Select(
+            attrs={
+                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
+            }
+        ),
+    )
     date_from = forms.DateField(
         label="Дата от",
         widget=forms.DateInput(
@@ -155,8 +165,7 @@ class ProductionRecallForm(forms.Form):
     )
     stage_id = forms.ChoiceField(
         label="Колонка CRM",
-        choices=[("PREPARATION", "PREPARATION")],
-        initial="PREPARATION",
+        required=False,
         widget=forms.Select(
             attrs={
                 "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
@@ -171,6 +180,24 @@ class ProductionRecallForm(forms.Form):
             attrs={"class": "h-4 w-4 rounded border-slate-300"}
         ),
     )
+
+    def __init__(self, *args, bitrix_service: BitrixDealService | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        service = bitrix_service or BitrixDealService()
+        entity_type = (
+            (self.data.get("entity_type") if self.is_bound else None)
+            or self.initial.get("entity_type")
+            or CallEntityType.DEAL
+        )
+        submitted_stage = (self.data.get("stage_id") if self.is_bound else None) or self.initial.get("stage_id") or ""
+        blank = [("", "---------")]
+        stage_choices = service.get_stage_choices(entity_type)
+        if submitted_stage and submitted_stage not in {value for value, _label in stage_choices}:
+            stage_choices = stage_choices + [(submitted_stage, submitted_stage)]
+        self.fields["stage_id"].choices = blank + stage_choices
+        self.fields["stage_id"].label = "Стадия сделки" if entity_type == CallEntityType.DEAL else "Статус лида"
+        if not self.initial.get("stage_id") and stage_choices:
+            self.initial["stage_id"] = stage_choices[0][0]
 
     def clean(self):
         cleaned_data = super().clean()

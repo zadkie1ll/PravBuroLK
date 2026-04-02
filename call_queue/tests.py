@@ -1052,6 +1052,7 @@ class CallQueueMegafonViewTests(TestCase):
             reverse("call_queue:production_handler"),
             {
                 "action": "build_queue",
+                "entity_type": CallEntityType.DEAL,
                 "date_from": "2026-03-01",
                 "date_to": "2026-03-31",
                 "stage_id": "PREPARATION",
@@ -1064,6 +1065,44 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(session[MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY], 0)
         self.assertEqual(session[MEGAFON_PROD_QUEUE_SESSION_KEY][0]["deal_id"], 701)
         self.assertEqual(session[MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY]["stage_id"], "PREPARATION")
+        self.assertEqual(session[MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY]["entity_type"], CallEntityType.DEAL)
+
+    @patch("call_queue.views.BitrixDealService.fetch_production_recall_deals")
+    def test_production_handler_builds_lead_queue_from_bitrix(self, fetch_mock):
+        fetch_mock.return_value = [
+            {
+                "entity_type": CallEntityType.LEAD,
+                "entity_id": 901,
+                "lead_id": 901,
+                "contact_id": 801,
+                "client_name": "Лид Ирина",
+                "phone": "79990000001",
+                "raw_phone": "+7 (999) 000-00-01",
+                "phones": ["79990000001"],
+                "bitrix_url": "https://example.bitrix24.ru/crm/lead/details/901/",
+                "comments": "",
+                "stage_id": "IN_PROCESS",
+                "created_at": "2026-04-01T10:00:00+03:00",
+            }
+        ]
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:production_handler"),
+            {
+                "action": "build_queue",
+                "entity_type": CallEntityType.LEAD,
+                "date_from": "2026-03-01",
+                "date_to": "2026-03-31",
+                "stage_id": "IN_PROCESS",
+                "auto_dial": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        session = self.client.session
+        self.assertEqual(session[MEGAFON_PROD_QUEUE_SESSION_KEY][0]["lead_id"], 901)
+        self.assertEqual(session[MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY]["entity_type"], CallEntityType.LEAD)
 
     def test_production_handler_resolve_answered_returns_bitrix_url(self):
         session = self.client.session

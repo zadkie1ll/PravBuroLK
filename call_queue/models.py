@@ -69,7 +69,7 @@ class CallSession(models.Model):
         return f"Сессия #{self.pk} ({self.date_from} - {self.date_to})"
 
     def get_absolute_url(self):
-        return reverse("call_queue:session_detail", kwargs={"session_id": self.pk})
+        return reverse("call_queue:production_handler")
 
 
 class CallQueueItem(models.Model):
