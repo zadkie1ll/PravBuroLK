@@ -311,7 +311,32 @@ def build_megafon_test_call_url(call_id: str, auto_dial: bool = False) -> str:
 
 def get_prod_queue(request) -> list[dict]:
     value = request.session.get(MEGAFON_PROD_QUEUE_SESSION_KEY, [])
-    return value if isinstance(value, list) else []
+    if not isinstance(value, list):
+        return []
+    normalized_queue = []
+    changed = False
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        normalized = dict(item)
+        entity_type = normalized.get("entity_type") or CallEntityType.DEAL
+        normalized.setdefault("entity_type", entity_type)
+        if not normalized.get("entity_id"):
+            fallback_id = normalized.get("deal_id") if entity_type == CallEntityType.DEAL else normalized.get("lead_id")
+            if not fallback_id:
+                fallback_id = normalized.get("deal_id") or normalized.get("lead_id")
+            if fallback_id:
+                normalized["entity_id"] = fallback_id
+                changed = True
+        normalized.setdefault("deal_id", normalized.get("entity_id") if entity_type == CallEntityType.DEAL else None)
+        normalized.setdefault("lead_id", normalized.get("entity_id") if entity_type == CallEntityType.LEAD else None)
+        normalized_queue.append(normalized)
+        if normalized != item:
+            changed = True
+    if changed:
+        request.session[MEGAFON_PROD_QUEUE_SESSION_KEY] = normalized_queue
+        request.session.modified = True
+    return normalized_queue
 
 
 def save_prod_queue(request, queue: list[dict]):

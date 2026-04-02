@@ -108,7 +108,7 @@
             <div class="mt-1 text-sm font-medium text-emerald-700">Телефон для МегаФона: {{ current_item.phone }}</div>
             <div class="mt-1 text-sm text-slate-600">
               Bitrix {% if current_entity_type == 'lead' %}Lead{% else %}Deal{% endif %} ID:
-              {{ current_item.entity_id|default:current_item.deal_id|default:current_item.lead_id }}
+              {% firstof current_item.entity_id current_item.deal_id current_item.lead_id "—" %}
             </div>
             {% if current_item.comments %}
               <div class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
@@ -144,7 +144,7 @@
                       <div class="mt-1 text-sm font-medium text-emerald-700">МегаФон: {{ item.phone }}</div>
                       <div class="mt-1 text-xs text-slate-500">
                         {% if item.entity_type == 'lead' %}Lead{% else %}Deal{% endif %} ID:
-                        {{ item.entity_id|default:item.deal_id|default:item.lead_id }}
+                        {% firstof item.entity_id item.deal_id item.lead_id "—" %}
                       </div>
                       <div class="mt-1 text-xs text-slate-500">
                         {% if item.entity_type == 'lead' %}Статус{% else %}Стадия{% endif %}: {{ item.stage_id|default:"—" }}
