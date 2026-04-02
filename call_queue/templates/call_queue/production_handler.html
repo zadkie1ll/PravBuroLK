@@ -330,7 +330,11 @@
         async function submitDecision(value) {
           let bitrixWindow = null;
           if (value === "answered") {
-            bitrixWindow = window.open("", "_blank", "noopener");
+            bitrixWindow = window.open("about:blank", "_blank");
+            if (bitrixWindow && bitrixWindow.document) {
+              bitrixWindow.document.write("<title>Открываем сделку Bitrix...</title><p style='font-family: sans-serif; padding: 24px;'>Открываем сделку в Bitrix...</p>");
+              bitrixWindow.document.close();
+            }
           }
           const response = await fetch(resolveUrl, {
             method: "POST",

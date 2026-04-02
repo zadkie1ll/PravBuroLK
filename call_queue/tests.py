@@ -1133,6 +1133,36 @@ class CallQueueMegafonViewTests(TestCase):
         self.assertEqual(payload["decision"], "answered")
         self.assertEqual(payload["bitrix_url"], "https://example.bitrix24.ru/crm/deal/details/701/")
 
+    @override_settings(BITRIX_BASE_URL="https://example.bitrix24.ru")
+    def test_production_handler_resolve_answered_builds_fallback_bitrix_url(self):
+        session = self.client.session
+        session[MEGAFON_PROD_QUEUE_SESSION_KEY] = [
+            {
+                "entity_type": CallEntityType.DEAL,
+                "entity_id": 701,
+                "deal_id": 701,
+                "contact_id": 801,
+                "client_name": "Ирина",
+                "phone": "79990000001",
+                "manual_decision": "",
+                "comment_logged": False,
+                "call_id": "PROD-CALL-FALLBACK",
+                "status": "calling",
+            }
+        ]
+        session.save()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:production_handler_resolve"),
+            {"callid": "PROD-CALL-FALLBACK", "decision": "answered"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["bitrix_url"], "https://example.bitrix24.ru/crm/deal/details/701/")
+
     @patch("call_queue.views.start_megafon_production_call")
     @patch("call_queue.views.BitrixDealService.append_deal_comment")
     def test_production_handler_auto_next_logs_comment_for_not_available(self, append_mock, start_call_mock):

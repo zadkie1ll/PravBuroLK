@@ -987,6 +987,7 @@ def production_handler_resolve(request):
     call_id = request.POST.get("callid", "").strip()
     decision = request.POST.get("decision", "").strip()
     queue = get_prod_queue(request)
+    bitrix_service = BitrixDealService()
     if decision not in {"answered", "failed"}:
         return JsonResponse({"ok": False, "error": "invalid decision"}, status=400)
     item_index = next((idx for idx, item in enumerate(queue) if item.get("call_id") == call_id), None)
@@ -1017,7 +1018,15 @@ def production_handler_resolve(request):
         {
             "ok": True,
             "decision": decision,
-            "bitrix_url": item.get("bitrix_url", "") if decision == "answered" else "",
+            "bitrix_url": (
+                item.get("bitrix_url")
+                or bitrix_service.build_entity_url(
+                    item.get("entity_type") or CallEntityType.DEAL,
+                    item.get("entity_id") or item.get("deal_id") or item.get("lead_id"),
+                )
+            )
+            if decision == "answered"
+            else "",
             "item": item,
         }
     )
