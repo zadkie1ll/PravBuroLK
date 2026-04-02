@@ -381,13 +381,12 @@ def mark_prod_item(request, index: int, **updates) -> dict | None:
     return queue[index]
 
 
-def start_megafon_test_call(
-    request,
+def execute_megafon_call(
     *,
     sales_manager: SalesManager,
     phone: str,
-    clid: str,
-    show_phone: bool,
+    clid: str = "",
+    show_phone: bool = True,
 ) -> tuple[str, dict]:
     telephony_service = MegafonTelephonyService()
     response = telephony_service.make_call(
@@ -398,6 +397,23 @@ def start_megafon_test_call(
         show_phone=show_phone,
     )
     call_id = str(response.get("callid") or "")
+    return call_id, response
+
+
+def start_megafon_test_call(
+    request,
+    *,
+    sales_manager: SalesManager,
+    phone: str,
+    clid: str,
+    show_phone: bool,
+) -> tuple[str, dict]:
+    call_id, response = execute_megafon_call(
+        sales_manager=sales_manager,
+        phone=phone,
+        clid=clid,
+        show_phone=show_phone,
+    )
     request.session[MEGAFON_TEST_CALL_CONFIG_SESSION_KEY] = {
         "sales_manager_id": sales_manager.pk,
         "clid": clid or "",
@@ -434,17 +450,33 @@ def start_megafon_production_call(
     item: dict,
     show_phone: bool = True,
 ) -> tuple[str, dict]:
-    telephony_service = MegafonTelephonyService()
-    response = telephony_service.make_call(
+    call_id, response = execute_megafon_call(
+        sales_manager=sales_manager,
         phone=item["phone"],
-        user=sales_manager.megafon_user or None,
-        group=sales_manager.megafon_group or None,
-        clid=sales_manager.megafon_clid or None,
         show_phone=show_phone,
     )
-    call_id = str(response.get("callid") or "")
+    request.session[MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY] = {
+        **(request.session.get(MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY, {}) or {}),
+        "sales_manager_id": sales_manager.pk,
+        "clid": sales_manager.megafon_clid or "",
+        "show_phone": bool(show_phone),
+    }
     request.session[MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY] = call_id
     request.session.modified = True
+    append_megafon_log(
+        "production_call",
+        {
+            "phone": item["phone"],
+            "raw_phone": item.get("raw_phone", ""),
+            "deal_id": item.get("deal_id"),
+            "sales_manager_id": sales_manager.pk,
+            "sales_manager_name": sales_manager.name,
+            "megafon_user": sales_manager.megafon_user,
+            "megafon_group": sales_manager.megafon_group,
+            "clid": sales_manager.megafon_clid or "",
+            "response": response,
+        },
+    )
     return call_id, response
 
 
@@ -774,6 +806,22 @@ def production_handler(request):
         if action == "reset_queue":
             reset_prod_queue_state(request, clear_queue=True)
             messages.success(request, "Продовая очередь очищена.")
+            return redirect("call_queue:production_handler")
+
+        if action == "remove_item":
+            try:
+                remove_index = int(request.POST.get("item_index", "-1"))
+            except ValueError:
+                remove_index = -1
+            if queue and 0 <= remove_index < len(queue):
+                removed = queue.pop(remove_index)
+                request.session[MEGAFON_PROD_QUEUE_SESSION_KEY] = queue
+                if queue:
+                    request.session[MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY] = max(0, min(current_index, len(queue) - 1))
+                else:
+                    request.session.pop(MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY, None)
+                request.session.modified = True
+                messages.success(request, f"Сделка {removed.get('client_name') or removed.get('deal_id')} удалена из очереди.")
             return redirect("call_queue:production_handler")
 
         if action == "build_queue":
