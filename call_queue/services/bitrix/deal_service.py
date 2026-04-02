@@ -169,21 +169,21 @@ class BitrixDealService:
         to_dt = timezone.make_aware(datetime.combine(date_to, time.max))
         method = "crm.deal.list" if entity_type == CallEntityType.DEAL else "crm.lead.list"
         stage_field = "STAGE_ID" if entity_type == CallEntityType.DEAL else "STATUS_ID"
-        contact_filter_field = "!CONTACT_ID"
         select_fields = (
             self.production_deal_select_fields
             if entity_type == CallEntityType.DEAL
             else self.production_lead_select_fields
         )
+        bitrix_filter = {
+            ">=DATE_CREATE": from_dt.isoformat(),
+            "<=DATE_CREATE": to_dt.isoformat(),
+        }
+        if stage_id:
+            bitrix_filter[stage_field] = stage_id
         entities = self.client.paginated_call(
             method,
             {
-                "filter": {
-                    ">=DATE_CREATE": from_dt.isoformat(),
-                    "<=DATE_CREATE": to_dt.isoformat(),
-                    stage_field: stage_id,
-                    contact_filter_field: None,
-                },
+                "filter": bitrix_filter,
                 "select": select_fields,
                 "order": {"DATE_CREATE": "ASC", "ID": "ASC"},
             },
