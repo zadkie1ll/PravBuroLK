@@ -24,6 +24,89 @@
       </div>
     {% endif %}
 
+    {% if current_item and current_call_id %}
+      <section class="mb-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200" data-prod-panel data-callid="{{ current_call_id }}" data-autodial="{% if auto_dial_enabled %}1{% else %}0{% endif %}" data-status-url="{% url 'call_queue:production_handler_status' %}" data-resolve-url="{% url 'call_queue:production_handler_resolve' %}" data-auto-next-url="{% url 'call_queue:production_handler_auto_next' %}" data-csrf-token="{{ csrf_token }}">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-semibold">Текущий звонок</h2>
+            <p class="mt-1 text-sm text-slate-500">Call ID: <span class="font-mono">{{ current_call_id }}</span></p>
+          </div>
+          <div class="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700" data-call-marker>
+            {% if current_snapshot %}{{ current_snapshot.marker.label }}{% else %}Ожидаем события{% endif %}
+          </div>
+        </div>
+
+        <div class="mt-4 grid gap-4 md:grid-cols-4">
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Клиент</div>
+            <div class="mt-1 font-medium">{{ current_item.client_name|default:"Без имени" }}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Телефон</div>
+            <div class="mt-1 font-medium">{{ current_item.phone }}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">История</div>
+            <div class="mt-1 font-medium" data-call-final>{% if current_snapshot %}{{ current_snapshot.latest_history_status|default:"—" }}{% else %}—{% endif %}</div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 p-4">
+            <div class="text-sm text-slate-500">Пауза</div>
+            <div class="mt-1 font-medium" data-pause-status>{% if auto_dial_enabled %}Выключена{% else %}Включена{% endif %}</div>
+          </div>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-3">
+          <button type="button" class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-700" data-pause-toggle>
+            Пауза
+          </button>
+          {% if auto_dial_enabled %}
+            <div class="rounded-full bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
+              Автопрозвон активен: после первого старта очередь сама пойдёт дальше по недозвонам.
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="mt-6">
+          <h3 class="text-lg font-semibold">Этапы звонка</h3>
+          <div class="mt-4 space-y-3" data-call-timeline>
+            {% if current_snapshot and current_snapshot.timeline %}
+              {% for entry in current_snapshot.timeline %}
+                <div class="rounded-2xl border border-slate-200 p-4">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="font-medium text-slate-900">{{ entry.title }}</div>
+                    <div class="text-xs text-slate-500">{{ entry.created_at }}</div>
+                  </div>
+                  <div class="mt-2 text-sm text-slate-600">direction: {{ entry.direction|default:"—" }} | cmd: {{ entry.cmd|default:"—" }} | type: {{ entry.type|default:"—" }} | status: {{ entry.status|default:"—" }}</div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
+                Событий по звонку пока нет.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </section>
+
+      <div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/40 px-4" data-decision-modal>
+        <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+          <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Подтверждение дозвона</div>
+          <h3 class="mt-2 text-2xl font-semibold text-slate-900">Клиент взял трубку?</h3>
+          <p class="mt-3 text-sm text-slate-600">
+            Подтвердите итог. Если клиент ответил, карточка сделки сразу откроется в новой вкладке.
+          </p>
+          <div class="mt-6 grid gap-3 sm:grid-cols-2">
+            <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
+              Клиент взял трубку
+            </button>
+            <button type="button" data-decision="failed" class="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-500">
+              Недозвон
+            </button>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
     <div class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
       <section class="rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
         <h2 class="text-xl font-semibold">Формирование очереди</h2>
@@ -184,88 +267,6 @@
       </aside>
     </div>
 
-    {% if current_item and current_call_id %}
-      <section class="mt-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200" data-prod-panel data-callid="{{ current_call_id }}" data-autodial="{% if auto_dial_enabled %}1{% else %}0{% endif %}" data-status-url="{% url 'call_queue:production_handler_status' %}" data-resolve-url="{% url 'call_queue:production_handler_resolve' %}" data-auto-next-url="{% url 'call_queue:production_handler_auto_next' %}" data-csrf-token="{{ csrf_token }}">
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 class="text-xl font-semibold">Текущий звонок</h2>
-            <p class="mt-1 text-sm text-slate-500">Call ID: <span class="font-mono">{{ current_call_id }}</span></p>
-          </div>
-          <div class="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700" data-call-marker>
-            {% if current_snapshot %}{{ current_snapshot.marker.label }}{% else %}Ожидаем события{% endif %}
-          </div>
-        </div>
-
-        <div class="mt-4 grid gap-4 md:grid-cols-4">
-          <div class="rounded-2xl bg-slate-50 p-4">
-            <div class="text-sm text-slate-500">Клиент</div>
-            <div class="mt-1 font-medium">{{ current_item.client_name|default:"Без имени" }}</div>
-          </div>
-          <div class="rounded-2xl bg-slate-50 p-4">
-            <div class="text-sm text-slate-500">Телефон</div>
-            <div class="mt-1 font-medium">{{ current_item.phone }}</div>
-          </div>
-          <div class="rounded-2xl bg-slate-50 p-4">
-            <div class="text-sm text-slate-500">История</div>
-            <div class="mt-1 font-medium" data-call-final>{% if current_snapshot %}{{ current_snapshot.latest_history_status|default:"—" }}{% else %}—{% endif %}</div>
-          </div>
-          <div class="rounded-2xl bg-slate-50 p-4">
-            <div class="text-sm text-slate-500">Пауза</div>
-            <div class="mt-1 font-medium" data-pause-status>{% if auto_dial_enabled %}Выключена{% else %}Включена{% endif %}</div>
-          </div>
-        </div>
-
-        <div class="mt-5 flex flex-wrap gap-3">
-          <button type="button" class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-700" data-pause-toggle>
-            Пауза
-          </button>
-          {% if auto_dial_enabled %}
-            <div class="rounded-full bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
-              Автопрозвон активен: после первого старта очередь сама пойдёт дальше по недозвонам.
-            </div>
-          {% endif %}
-        </div>
-
-        <div class="mt-6">
-          <h3 class="text-lg font-semibold">Этапы звонка</h3>
-          <div class="mt-4 space-y-3" data-call-timeline>
-            {% if current_snapshot and current_snapshot.timeline %}
-              {% for entry in current_snapshot.timeline %}
-                <div class="rounded-2xl border border-slate-200 p-4">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div class="font-medium text-slate-900">{{ entry.title }}</div>
-                    <div class="text-xs text-slate-500">{{ entry.created_at }}</div>
-                  </div>
-                  <div class="mt-2 text-sm text-slate-600">direction: {{ entry.direction|default:"—" }} | cmd: {{ entry.cmd|default:"—" }} | type: {{ entry.type|default:"—" }} | status: {{ entry.status|default:"—" }}</div>
-                </div>
-              {% endfor %}
-            {% else %}
-              <div class="rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
-                Событий по звонку пока нет.
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      </section>
-
-      <div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/40 px-4" data-decision-modal>
-        <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
-          <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Подтверждение дозвона</div>
-          <h3 class="mt-2 text-2xl font-semibold text-slate-900">Клиент взял трубку?</h3>
-          <p class="mt-3 text-sm text-slate-600">
-            Подтвердите итог. Если клиент ответил, карточка сделки сразу откроется в новой вкладке.
-          </p>
-          <div class="mt-6 grid gap-3 sm:grid-cols-2">
-            <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
-              Клиент взял трубку
-            </button>
-            <button type="button" data-decision="failed" class="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-500">
-              Недозвон
-            </button>
-          </div>
-        </div>
-      </div>
-    {% endif %}
   </div>
 
   {% if current_item and current_call_id %}
@@ -350,7 +351,7 @@
           evaluate(latestSnapshot);
         }
 
-        async function triggerNext() {
+        async function triggerNext(forceResume = false) {
           if (paused || autoAdvanceTriggered) return;
           autoAdvanceTriggered = true;
           const response = await fetch(autoNextUrl, {
@@ -360,12 +361,21 @@
               "X-CSRFToken": csrfToken,
               "X-Requested-With": "XMLHttpRequest"
             },
-            body: new URLSearchParams({completed_callid: callId}).toString()
+            body: new URLSearchParams({
+              completed_callid: callId,
+              force_resume: forceResume ? "1" : "0"
+            }).toString()
           });
           const data = await response.json();
+          if (!response.ok || !data.ok) {
+            autoAdvanceTriggered = false;
+            return;
+          }
           if (data.started && data.redirect_url) {
             window.location.href = data.redirect_url;
+            return;
           }
+          autoAdvanceTriggered = false;
         }
 
         function evaluate(snapshot) {
@@ -411,9 +421,14 @@
         }
 
         pauseToggle.addEventListener("click", () => {
+          const wasPaused = paused;
           paused = !paused;
           autoAdvanceTriggered = false;
           renderPause();
+          if (wasPaused && !paused && latestSnapshot && latestSnapshot.latest_history_status && decision === "answered") {
+            triggerNext(true);
+            return;
+          }
           evaluate(latestSnapshot);
         });
 

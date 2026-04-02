@@ -1028,6 +1028,7 @@ def production_handler_resolve(request):
 @require_http_methods(["POST"])
 def production_handler_auto_next(request):
     completed_call_id = request.POST.get("completed_callid", "").strip()
+    force_resume = request.POST.get("force_resume") == "1"
     if not completed_call_id:
         return JsonResponse({"ok": False, "error": "completed_callid is required"}, status=400)
 
@@ -1047,7 +1048,7 @@ def production_handler_auto_next(request):
     if snapshot["requires_manager_confirmation"] and item.get("manual_decision") not in {"answered", "failed", "voicemail"}:
         return JsonResponse({"ok": True, "started": False, "await_manager_decision": True})
 
-    if item.get("manual_decision") == "answered":
+    if item.get("manual_decision") == "answered" and not force_resume:
         request.session[MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY] = completed_call_id
         request.session.modified = True
         return JsonResponse({"ok": True, "started": False, "hold_for_manager": True})
