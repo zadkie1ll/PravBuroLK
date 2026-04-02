@@ -383,6 +383,36 @@ class BitrixDealServiceFilterTests(TestCase):
         params = client.paginated_call.call_args.args[1]
         self.assertEqual(params["filter"]["STATUS_ID"], "IN_PROCESS")
 
+    def test_fetch_production_recall_leads_uses_phone_from_lead_when_contact_missing(self):
+        client = Mock()
+        client.paginated_call.return_value = [
+            {
+                "ID": "901",
+                "TITLE": "Лид без контакта",
+                "CONTACT_ID": "",
+                "STATUS_ID": "IN_PROCESS",
+                "DATE_CREATE": "2026-04-01T10:00:00+03:00",
+                "COMMENTS": "",
+                "PHONE": [{"VALUE": "+7 (999) 000-00-01", "VALUE_TYPE": "WORK"}],
+                "NAME": "Ирина",
+                "LAST_NAME": "Петрова",
+                "SECOND_NAME": "",
+            }
+        ]
+        service = BitrixDealService(client=client)
+
+        items = service.fetch_production_recall_deals(
+            entity_type=CallEntityType.LEAD,
+            date_from=timezone.localdate(),
+            date_to=timezone.localdate(),
+            stage_id="IN_PROCESS",
+        )
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["lead_id"], 901)
+        self.assertEqual(items[0]["contact_id"], None)
+        self.assertEqual(items[0]["phone"], "79990000001")
+
 
 class MegafonTelephonyTests(TestCase):
     @override_settings(

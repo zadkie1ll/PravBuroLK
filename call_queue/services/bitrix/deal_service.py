@@ -191,11 +191,13 @@ class BitrixDealService:
         items: list[dict[str, Any]] = []
         for entity in entities:
             contact_id = _safe_int(entity.get("CONTACT_ID"))
-            if not contact_id:
-                continue
-            contact = self.get_contact(contact_id)
-            phones = self.extract_contact_phones(contact)
-            raw_phones = self.extract_contact_raw_phones(contact)
+            contact: dict[str, Any] = {}
+            phones: list[str] = []
+            raw_phones: list[str] = []
+            if contact_id:
+                contact = self.get_contact(contact_id)
+                phones = self.extract_contact_phones(contact)
+                raw_phones = self.extract_contact_raw_phones(contact)
             if not phones:
                 phones = self.extract_entity_phones(entity)
                 raw_phones = self.extract_entity_raw_phones(entity)
