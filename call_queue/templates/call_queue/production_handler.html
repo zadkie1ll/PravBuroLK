@@ -328,6 +328,10 @@
         }
 
         async function submitDecision(value) {
+          let bitrixWindow = null;
+          if (value === "answered") {
+            bitrixWindow = window.open("", "_blank", "noopener");
+          }
           const response = await fetch(resolveUrl, {
             method: "POST",
             headers: {
@@ -339,6 +343,9 @@
           });
           const data = await response.json();
           if (!response.ok || !data.ok) {
+            if (bitrixWindow && !bitrixWindow.closed) {
+              bitrixWindow.close();
+            }
             return;
           }
           decision = value;
@@ -346,7 +353,13 @@
           renderPause();
           hideModal();
           if (value === "answered" && data.bitrix_url) {
-            window.open(data.bitrix_url, "_blank", "noopener");
+            if (bitrixWindow && !bitrixWindow.closed) {
+              bitrixWindow.location.href = data.bitrix_url;
+            } else {
+              window.open(data.bitrix_url, "_blank", "noopener");
+            }
+          } else if (bitrixWindow && !bitrixWindow.closed) {
+            bitrixWindow.close();
           }
           evaluate(latestSnapshot);
         }
