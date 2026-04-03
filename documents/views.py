@@ -202,9 +202,48 @@ def _extract_file_id(file_value):
     return None
 
 
-def _resolve_contract_download_url(file_value) -> str | None:
+def _extract_file_url(file_value) -> str | None:
+    if not file_value:
+        return None
+
+    if isinstance(file_value, dict):
+        for key in (
+            "url",
+            "URL",
+            "downloadUrl",
+            "DOWNLOAD_URL",
+            "detailUrl",
+            "DETAIL_URL",
+            "src",
+            "SRC",
+        ):
+            value = file_value.get(key)
+            if isinstance(value, str) and value.startswith(("http://", "https://")):
+                return value
+
+        for value in file_value.values():
+            nested_url = _extract_file_url(value)
+            if nested_url:
+                return nested_url
+        return None
+
+    if isinstance(file_value, (list, tuple)):
+        for item in file_value:
+            nested_url = _extract_file_url(item)
+            if nested_url:
+                return nested_url
+        return None
+
     if isinstance(file_value, str) and file_value.startswith(("http://", "https://")):
         return file_value
+
+    return None
+
+
+def _resolve_contract_download_url(file_value) -> str | None:
+    direct_url = _extract_file_url(file_value)
+    if direct_url:
+        return direct_url
 
     file_id = _extract_file_id(file_value)
     if not file_id:
@@ -213,9 +252,18 @@ def _resolve_contract_download_url(file_value) -> str | None:
     if isinstance(file_id, str) and file_id.startswith(("http://", "https://")):
         return file_id
 
-    payload = _bitrix_get("disk.file.get", {"id": file_id})
+    try:
+        payload = _bitrix_get("disk.file.get", {"id": file_id})
+    except Exception:
+        logger.exception("Failed to resolve Bitrix disk file URL for file_id=%s", file_id)
+        return None
+
     file_data = payload.get("result") or {}
-    return file_data.get("DOWNLOAD_URL") or file_data.get("DETAIL_URL") or file_data.get("SRC")
+    return (
+        file_data.get("DOWNLOAD_URL")
+        or file_data.get("DETAIL_URL")
+        or file_data.get("SRC")
+    )
 
 
 def _build_contract_page_url(request, deal_id: str) -> str:
@@ -295,6 +343,8 @@ def contract_confirmation_page(request, deal_id: int):
                 error_message = f"Не удалось сохранить подтверждение: {exc}"
 
     contract_download_url = _resolve_contract_download_url(deal_data.get(CONTRACT_FILE_FIELD))
+    if not contract_download_url and not error_message:
+        error_message = "Не удалось получить прямую ссылку на файл договора. Подтверждение остается доступным."
     contract_preview_url = _build_office_preview_url(contract_download_url)
     is_confirmed = str(deal_data.get(CONTRACT_ACCEPTED_FIELD)).upper() in {"1", "Y", "TRUE"}
 

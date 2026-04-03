@@ -5,6 +5,7 @@ from pathlib import Path
 
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from requests import HTTPError
 
 from documents.views import CONTRACT_ACCEPTED_FIELD, _build_contract_token, dogovor
 
@@ -82,6 +83,35 @@ class ContractConfirmationPageTests(TestCase):
             {"token": "bad-token"},
         )
         self.assertEqual(response.status_code, 404)
+
+    @patch("documents.views.requests.get")
+    def test_contract_page_survives_disk_401(self, mock_get):
+        disk_response = Mock()
+        disk_response.raise_for_status.side_effect = HTTPError("401 Client Error")
+
+        mock_get.side_effect = [
+            self._response(
+                {
+                    "result": {
+                        "TITLE": "Сидоров Сидор Сидорович",
+                        "UF_CRM_1745892727271": "88/2026",
+                        "UF_CRM_1745892619372": 73840,
+                        CONTRACT_ACCEPTED_FIELD: 0,
+                    }
+                }
+            ),
+            disk_response,
+        ]
+
+        deal_id = 15348
+        token = _build_contract_token(str(deal_id))
+        response = self.client.get(
+            reverse("contract_confirmation_page", args=[deal_id]),
+            {"token": token},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Не удалось получить прямую ссылку на файл договора")
 
 
 class DogovorWebhookTests(TestCase):
