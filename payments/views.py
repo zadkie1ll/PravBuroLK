@@ -42,6 +42,60 @@ BOT_TOKEN = "8208949436:AAEIzi6eP5R04crpwpIchWnpqCCFv8TROvY"
 CHAT_ID = "-4907127148"
 
 
+def _extract_contract_deal_id_from_order(order_number: str) -> int | None:
+    match = re.match(r"^contract-(\d+)-\d+$", str(order_number or ""))
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def _add_bitrix_timeline_comment_for_deal(deal_id: int, comment: str) -> None:
+    bitrix_webhook = (
+        getattr(settings, "BITRIX_WEBHOOK_URL", "")
+        or getattr(settings, "BITRIX_WEBHOOK", "")
+    ).rstrip("/")
+    if not bitrix_webhook:
+        raise RuntimeError("BITRIX_WEBHOOK_URL is not configured")
+
+    response = requests.post(
+        f"{bitrix_webhook}/crm.timeline.comment.add",
+        data={
+            "fields[ENTITY_ID]": str(deal_id),
+            "fields[ENTITY_TYPE]": "deal",
+            "fields[COMMENT]": comment,
+        },
+        timeout=15,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("error"):
+        raise RuntimeError(payload.get("error_description") or payload["error"])
+
+
+def _handle_contract_payment_callback(order_number: str, amount: Decimal) -> JsonResponse:
+    deal_id = _extract_contract_deal_id_from_order(order_number)
+    if not deal_id:
+        return JsonResponse({"error": f"Invalid contract payment orderNumber: {order_number}"}, status=400)
+
+    comment = (
+        "Поступила успешная оплата по договору\n"
+        f"Сумма: {amount} ₽\n"
+        f"Номер платежа: {order_number}"
+    )
+    _add_bitrix_timeline_comment_for_deal(deal_id, comment)
+
+    return JsonResponse(
+        {
+            "status": "success",
+            "deal_id": deal_id,
+            "orderNumber": order_number,
+            "amount": str(amount),
+            "comment_added": True,
+        },
+        status=200,
+    )
+
+
 @csrf_exempt
 def calculate_payments(num_payments, total_amount, discount, start_date, first_payment, second_payment_day):
     if num_payments == 1 and first_payment >= (total_amount - discount):
@@ -1138,6 +1192,20 @@ def payment_callback(request):
         amount = Decimal(amount_str) / Decimal("100")
     except Exception:
         amount = Decimal("0.00")
+
+    contract_deal_id = _extract_contract_deal_id_from_order(order_number)
+    if contract_deal_id:
+        try:
+            return _handle_contract_payment_callback(order_number, amount)
+        except Exception as exc:
+            return JsonResponse(
+                {
+                    "error": f"Failed to process contract payment callback: {exc}",
+                    "orderNumber": order_number,
+                    "deal_id": contract_deal_id,
+                },
+                status=500,
+            )
 
     # Создаем фактический платёж
     actual_payment = ActualPayment.objects.create(
