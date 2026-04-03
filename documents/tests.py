@@ -8,7 +8,8 @@ from django.urls import reverse
 from django.test.utils import override_settings
 from requests import HTTPError
 
-from documents.views import CONTRACT_ACCEPTED_FIELD, _build_contract_token, dogovor
+from documents.views import CONTRACT_ACCEPTED_FIELD, _build_contract_token, contract_document_file, dogovor
+from documents.views import _resolve_contract_download_url
 
 
 class ContractConfirmationPageTests(TestCase):
@@ -85,6 +86,19 @@ class ContractConfirmationPageTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
+    @override_settings(BITRIX_WEBHOOK_URL="https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/")
+    def test_resolve_contract_download_url_from_relative_bitrix_field(self):
+        value = {
+            "id": 73840,
+            "showUrl": "/bitrix/components/bitrix/crm.deal.show/show_file.php?ownerId=15348&fieldName=UF_CRM_1745892619372&dynamic=Y&fileId=73840",
+            "downloadUrl": "/bitrix/components/bitrix/crm.deal.show/show_file.php?auth=&ownerId=15348&fieldName=UF_CRM_1745892619372&dynamic=Y&fileId=73840",
+        }
+        resolved = _resolve_contract_download_url(value)
+        self.assertEqual(
+            resolved,
+            "https://prav-buro.bitrix24.ru/bitrix/components/bitrix/crm.deal.show/show_file.php?auth=&ownerId=15348&fieldName=UF_CRM_1745892619372&dynamic=Y&fileId=73840",
+        )
+
     @patch("documents.views.requests.get")
     def test_contract_page_survives_disk_401(self, mock_get):
         disk_response = Mock()
@@ -150,6 +164,35 @@ class ContractConfirmationPageTests(TestCase):
         self.assertContains(response, "https://cdn.example.com/fallback.docx")
 
 
+class ContractDocumentFileTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.documents_dir = Path(self.temp_dir.name)
+        (self.documents_dir / "generated_docs").mkdir(parents=True, exist_ok=True)
+        (self.documents_dir / "generated_docs" / "dogovor_123.docx").write_bytes(b"test-doc")
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    @patch("documents.views._get_documents_dir")
+    def test_anonymous_user_can_download_generated_contract_by_token(self, mock_get_documents_dir):
+        mock_get_documents_dir.return_value = self.documents_dir
+        token = _build_contract_token("123")
+        request = self.factory.get(
+            reverse("contract_document_file", args=[123]),
+            {"token": token},
+        )
+
+        response = contract_document_file(request, 123)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+
 class DogovorWebhookTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
@@ -170,7 +213,6 @@ class DogovorWebhookTests(TestCase):
 
     @patch("documents.views.generate_contract")
     @patch("documents.views._get_documents_dir")
-    @patch("documents.views._resolve_contract_download_url", return_value="https://cdn.example.com/generated.docx")
     @patch("documents.views._update_contract_link")
     @patch("documents.views.upload_to_bitrix", return_value={"status": "success"})
     @patch("documents.views.get_phone_number", return_value="+79990000000")
@@ -181,7 +223,6 @@ class DogovorWebhookTests(TestCase):
         mock_get_phone_number,
         mock_upload_to_bitrix,
         mock_update_contract_link,
-        mock_resolve_contract_download_url,
         mock_get_documents_dir,
         mock_generate_contract,
     ):
@@ -226,4 +267,4 @@ class DogovorWebhookTests(TestCase):
         payload = json.loads(response.content)
         self.assertIn("confirmation_url", payload)
         mock_update_contract_link.assert_called_once_with("123", payload["confirmation_url"])
-        self.assertEqual(payload["contract_download_url"], "https://cdn.example.com/generated.docx")
+        self.assertIn("/dogovor/123/document/?token=", payload["contract_download_url"])

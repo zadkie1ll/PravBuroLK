@@ -8,7 +8,7 @@ import traceback
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import requests
 import telebot
@@ -17,7 +17,7 @@ from django.conf import settings
 from django.core import signing
 from django.db.models import Sum
 from django.forms.models import model_to_dict
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.timezone import now
@@ -50,6 +50,24 @@ def _iter_bitrix_webhook_urls(*urls: str | None):
             continue
         seen.add(normalized)
         yield normalized
+
+
+def _iter_bitrix_portal_urls() -> list[str]:
+    portals = []
+    seen = set()
+    for webhook_url in _iter_bitrix_webhook_urls(
+        WEBHOOK_URL,
+        getattr(settings, "BITRIX_WEBHOOK_URL", None),
+    ):
+        parts = urlsplit(webhook_url)
+        if not parts.scheme or not parts.netloc:
+            continue
+        portal_url = f"{parts.scheme}://{parts.netloc}"
+        if portal_url in seen:
+            continue
+        seen.add(portal_url)
+        portals.append(portal_url)
+    return portals
 
 
 def generate_document(request):
@@ -120,6 +138,10 @@ def document_form(request):
 
 def _get_documents_dir() -> Path:
     return Path(settings.BASE_DIR) / "documents"
+
+
+def _get_generated_contract_path(deal_id: str | int) -> Path:
+    return _get_documents_dir() / "generated_docs" / f"dogovor_{deal_id}.docx"
 
 
 def _extract_deal_id(post_data) -> str | None:
@@ -229,14 +251,21 @@ def _extract_file_url(file_value) -> str | None:
             "URL",
             "downloadUrl",
             "DOWNLOAD_URL",
+            "showUrl",
+            "SHOW_URL",
             "detailUrl",
             "DETAIL_URL",
             "src",
             "SRC",
         ):
             value = file_value.get(key)
-            if isinstance(value, str) and value.startswith(("http://", "https://")):
-                return value
+            if isinstance(value, str):
+                if value.startswith(("http://", "https://")):
+                    return value
+                if value.startswith("/"):
+                    portal_urls = _iter_bitrix_portal_urls()
+                    if portal_urls:
+                        return f"{portal_urls[0]}{value}"
 
         for value in file_value.values():
             nested_url = _extract_file_url(value)
@@ -317,6 +346,11 @@ def _build_contract_page_url(request, deal_id: str) -> str:
     return f"{base_url}?token={quote(token)}"
 
 
+def _build_contract_file_url(request, deal_id: str | int, token: str) -> str:
+    base_url = request.build_absolute_uri(reverse("contract_document_file", args=[deal_id]))
+    return f"{base_url}?token={quote(token)}"
+
+
 def _build_office_preview_url(download_url: str | None) -> str | None:
     if not download_url:
         return None
@@ -387,7 +421,12 @@ def contract_confirmation_page(request, deal_id: int):
                 logger.exception("Failed to confirm contract for deal %s", deal_id)
                 error_message = f"Не удалось сохранить подтверждение: {exc}"
 
-    contract_download_url = _resolve_contract_download_url(deal_data.get(CONTRACT_FILE_FIELD))
+    contract_download_url = None
+    generated_contract_path = _get_generated_contract_path(deal_id)
+    if generated_contract_path.exists():
+        contract_download_url = _build_contract_file_url(request, deal_id, token)
+    else:
+        contract_download_url = _resolve_contract_download_url(deal_data.get(CONTRACT_FILE_FIELD))
     if not contract_download_url and not error_message:
         error_message = "Не удалось получить прямую ссылку на файл договора. Подтверждение остается доступным."
     contract_preview_url = _build_office_preview_url(contract_download_url)
@@ -407,6 +446,23 @@ def contract_confirmation_page(request, deal_id: int):
             "contract_number": deal_data.get("UF_CRM_1745892727271", ""),
             "client_name": deal_data.get("TITLE", ""),
         },
+    )
+
+
+def contract_document_file(request, deal_id: int):
+    token = request.GET.get("token")
+    if not _validate_contract_token(str(deal_id), token):
+        raise Http404("Файл договора не найден")
+
+    contract_path = _get_generated_contract_path(deal_id)
+    if not contract_path.exists():
+        raise Http404("Файл договора не найден")
+
+    return FileResponse(
+        contract_path.open("rb"),
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        as_attachment=False,
+        filename=contract_path.name,
     )
 
 
@@ -523,14 +579,12 @@ def dogovor(request):
         return JsonResponse({'status': 'error', 'message': f'Upload error: {e}'}, status=500)
 
     confirmation_url = _build_contract_page_url(request, deal_id)
-    contract_download_url = None
-    contract_preview_url = None
+    contract_token = _build_contract_token(deal_id)
+    contract_download_url = _build_contract_file_url(request, deal_id, contract_token)
+    contract_preview_url = _build_office_preview_url(contract_download_url)
 
     try:
         _update_contract_link(deal_id, confirmation_url)
-        refreshed_deal = _get_deal_data(deal_id)
-        contract_download_url = _resolve_contract_download_url(refreshed_deal.get(CONTRACT_FILE_FIELD))
-        contract_preview_url = _build_office_preview_url(contract_download_url)
     except Exception:
         logger.exception("Failed to save or resolve contract URL for deal %s", deal_id)
 
