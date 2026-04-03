@@ -453,8 +453,10 @@ def _get_contract_payment_qr_data_uri() -> str:
 def _get_contract_payment_requisites() -> list[tuple[str, str]]:
     requisites = [
         ("Получатель", getattr(settings, "CONTRACT_PAYMENT_RECIPIENT", "").strip()),
+        ("Адрес", getattr(settings, "CONTRACT_PAYMENT_ADDRESS", "").strip()),
         ("ИНН", getattr(settings, "CONTRACT_PAYMENT_INN", "").strip()),
         ("КПП", getattr(settings, "CONTRACT_PAYMENT_KPP", "").strip()),
+        ("Валюта", getattr(settings, "CONTRACT_PAYMENT_CURRENCY", "").strip()),
         ("Банк", getattr(settings, "CONTRACT_PAYMENT_BANK", "").strip()),
         ("БИК", getattr(settings, "CONTRACT_PAYMENT_BIK", "").strip()),
         ("Расчетный счет", getattr(settings, "CONTRACT_PAYMENT_ACCOUNT", "").strip()),

@@ -82,10 +82,13 @@ class ContractConfirmationPageTests(TestCase):
         )
 
     @override_settings(
-        CONTRACT_PAYMENT_RECIPIENT="ИП Свириденко С. В.",
-        CONTRACT_PAYMENT_BANK="АО Альфа-Банк",
-        CONTRACT_PAYMENT_ACCOUNT="40702810900000000000",
-        CONTRACT_PAYMENT_BIK="044525593",
+        CONTRACT_PAYMENT_RECIPIENT="СВИРИДЕНКО СТАНИСЛАВ ВАЛЕРЬЕВИЧ (ИП)",
+        CONTRACT_PAYMENT_ADDRESS="проспект 40-летия Победы, д. 63/17, корп./ст. 3, кв./оф. 328, Ростовская область, г. Ростов-на-Дону",
+        CONTRACT_PAYMENT_CURRENCY="RUR",
+        CONTRACT_PAYMENT_BANK='ФИЛИАЛ "РОСТОВСКИЙ" АО "АЛЬФА-БАНК"',
+        CONTRACT_PAYMENT_ACCOUNT="40802810426340008508",
+        CONTRACT_PAYMENT_BIK="046015207",
+        CONTRACT_PAYMENT_CORR_ACCOUNT="30101810500000000207",
     )
     @patch("documents.views.requests.get")
     def test_contract_page_shows_payment_block_for_confirmed_deal(self, mock_get):
@@ -115,8 +118,12 @@ class ContractConfirmationPageTests(TestCase):
         self.assertContains(response, "Оплатить из Альфы")
         self.assertContains(response, "20 000 ₽")
         self.assertContains(response, "Оплата юридических услуг Петров Петр Петрович по договору №77/2026")
-        self.assertContains(response, "АО Альфа-Банк")
-        self.assertContains(response, "40702810900000000000")
+        self.assertContains(response, "СВИРИДЕНКО СТАНИСЛАВ ВАЛЕРЬЕВИЧ (ИП)")
+        self.assertContains(response, "проспект 40-летия Победы")
+        self.assertContains(response, "RUR")
+        self.assertContains(response, 'ФИЛИАЛ &quot;РОСТОВСКИЙ&quot; АО &quot;АЛЬФА-БАНК&quot;')
+        self.assertContains(response, "40802810426340008508")
+        self.assertContains(response, "30101810500000000207")
 
     def test_contract_page_with_invalid_token_returns_404(self):
         response = self.client.get(
