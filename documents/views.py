@@ -40,6 +40,18 @@ CONTRACT_PAGE_SIGN_SALT = "documents.contract.confirmation"
 logger = logging.getLogger(__name__)
 
 
+def _iter_bitrix_webhook_urls(*urls: str | None):
+    seen = set()
+    for url in urls:
+        if not url:
+            continue
+        normalized = url.rstrip("/") + "/"
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        yield normalized
+
+
 def generate_document(request):
     if request.method != "POST":
         raise Http404("Этот эндпоинт принимает только POST-запросы.")
@@ -122,9 +134,14 @@ def _extract_deal_id(post_data) -> str | None:
     return match.group(1)
 
 
-def _bitrix_get(method: str, params: dict | None = None, timeout: int = 10) -> dict:
+def _bitrix_get(
+    method: str,
+    params: dict | None = None,
+    timeout: int = 10,
+    webhook_url: str | None = None,
+) -> dict:
     response = requests.get(
-        f"{WEBHOOK_URL.rstrip('/')}/{method}.json",
+        f"{(webhook_url or WEBHOOK_URL).rstrip('/')}/{method}.json",
         params=params or {},
         timeout=timeout,
     )
@@ -252,18 +269,46 @@ def _resolve_contract_download_url(file_value) -> str | None:
     if isinstance(file_id, str) and file_id.startswith(("http://", "https://")):
         return file_id
 
-    try:
-        payload = _bitrix_get("disk.file.get", {"id": file_id})
-    except Exception:
-        logger.exception("Failed to resolve Bitrix disk file URL for file_id=%s", file_id)
-        return None
-
-    file_data = payload.get("result") or {}
-    return (
-        file_data.get("DOWNLOAD_URL")
-        or file_data.get("DETAIL_URL")
-        or file_data.get("SRC")
+    last_error = None
+    webhook_candidates = list(
+        _iter_bitrix_webhook_urls(
+            WEBHOOK_URL,
+            getattr(settings, "BITRIX_WEBHOOK_URL", None),
+        )
     )
+
+    for webhook_url in webhook_candidates:
+        try:
+            payload = _bitrix_get(
+                "disk.file.get",
+                {"id": file_id},
+                webhook_url=webhook_url,
+            )
+            file_data = payload.get("result") or {}
+            resolved_url = (
+                file_data.get("DOWNLOAD_URL")
+                or file_data.get("DETAIL_URL")
+                or file_data.get("SRC")
+            )
+            if resolved_url:
+                return resolved_url
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "Failed to resolve Bitrix disk file URL for file_id=%s via webhook=%s: %s",
+                file_id,
+                webhook_url,
+                exc,
+            )
+
+    if last_error:
+        logger.error(
+            "All Bitrix webhook attempts failed for file_id=%s: %s",
+            file_id,
+            last_error,
+        )
+
+    return None
 
 
 def _build_contract_page_url(request, deal_id: str) -> str:
