@@ -7,6 +7,7 @@ from django.utils import timezone
 from .bitrix_api import (
     BitrixAPIError,
     create_typical_task,
+    find_deals_by_contact_and_category,
     get_deal_by_id,
     get_task_by_id,
     is_task_completed,
@@ -52,6 +53,10 @@ def get_moderator_task_creator_id() -> int:
 
 def get_moderator_task_interval_days() -> int:
     return int(getattr(settings, "LEAD_CONTROL_MODERATOR_TASK_EVERY_DAYS", 3))
+
+
+def get_sales_deal_category_id() -> int:
+    return int(getattr(settings, "LEAD_CONTROL_SALES_DEAL_CATEGORY_ID", 2))
 
 
 def is_logic_disabled(deal_data: dict) -> bool:
@@ -210,11 +215,35 @@ def should_create_moderator_task(monitor: LeadMonitor, now=None) -> bool:
     return now >= next_allowed_at
 
 
-def create_periodic_moderator_task(monitor: LeadMonitor, now=None) -> int:
+def resolve_moderator_task_deal_id(monitor: LeadMonitor, deal_data: dict | None = None) -> int:
+    deal_data = deal_data or {}
+    contact_id = deal_data.get("CONTACT_ID")
+    try:
+        contact_id = int(contact_id)
+    except (TypeError, ValueError):
+        return monitor.bitrix_deal_id
+
+    sales_deals = find_deals_by_contact_and_category(
+        contact_id,
+        get_sales_deal_category_id(),
+        exclude_deal_id=monitor.bitrix_deal_id,
+    )
+    if not sales_deals:
+        return monitor.bitrix_deal_id
+
+    sales_deal_id = sales_deals[0].get("ID")
+    try:
+        return int(sales_deal_id)
+    except (TypeError, ValueError):
+        return monitor.bitrix_deal_id
+
+
+def create_periodic_moderator_task(monitor: LeadMonitor, deal_data: dict | None = None, now=None) -> int:
     now = now or timezone.localtime()
+    deal_id = resolve_moderator_task_deal_id(monitor, deal_data)
 
     task_id = create_typical_task(
-        deal_id=monitor.bitrix_deal_id,
+        deal_id=deal_id,
         responsible_id=monitor.moderator_bitrix_user_id,
         created_by_id=get_moderator_task_creator_id(),
         title=get_moderator_task_title(),
@@ -275,7 +304,7 @@ def process_monitor(monitor: LeadMonitor) -> dict:
             return {"result": "success", "moderator_task_created": moderator_task_created}
 
         if should_create_moderator_task(monitor, now):
-            create_periodic_moderator_task(monitor, now)
+            create_periodic_moderator_task(monitor, deal_data, now)
             moderator_task_created = True
 
         if not monitor.responsible_bitrix_user_id:

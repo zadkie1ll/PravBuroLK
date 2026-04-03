@@ -86,6 +86,30 @@ def get_deal_by_id(deal_id: int) -> dict:
     return result
 
 
+def find_deals_by_contact_and_category(
+    contact_id: int,
+    category_id: int,
+    *,
+    exclude_deal_id: int | None = None,
+) -> list[dict]:
+    data = _post(
+        "crm.deal.list",
+        {
+            "filter": {
+                "CONTACT_ID": contact_id,
+                "CATEGORY_ID": category_id,
+            },
+            "order": {"ID": "DESC"},
+            "select": ["ID", "CONTACT_ID", "CATEGORY_ID", "STAGE_ID"],
+        },
+    )
+    deals = data.get("result") or []
+    if exclude_deal_id is None:
+        return deals
+    exclude_id_str = str(exclude_deal_id)
+    return [deal for deal in deals if str(deal.get("ID")) != exclude_id_str]
+
+
 def get_task_by_id(task_id: int) -> dict:
     data = _post("tasks.task.get", {"taskId": task_id})
     result = data.get("result") or {}
