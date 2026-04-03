@@ -50,11 +50,11 @@
           {% if contract_preview_url %}
             <iframe
               src="{{ contract_preview_url }}"
-              class="h-[70vh] w-full rounded-[18px] bg-white"
+              class="h-[36vh] w-full rounded-[18px] bg-white sm:h-[42vh] md:h-[70vh]"
               title="Предпросмотр договора"
             ></iframe>
           {% else %}
-            <div class="flex h-[50vh] items-center justify-center rounded-[18px] border border-dashed border-slate-300 bg-white px-6 text-center text-slate-500">
+            <div class="flex h-[28vh] items-center justify-center rounded-[18px] border border-dashed border-slate-300 bg-white px-6 text-center text-slate-500 sm:h-[34vh] md:h-[50vh]">
               Предпросмотр недоступен. Вы можете открыть договор по ссылке ниже.
             </div>
           {% endif %}
