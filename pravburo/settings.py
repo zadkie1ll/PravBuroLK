@@ -249,6 +249,14 @@ ALFA_API_URL_PROD = os.getenv("ALFA_API_URL_PROD", "")
 ALFA_USER_PROD = os.getenv("ALFA_USER_PROD", "")
 ALFA_PASS_PROD = os.getenv("ALFA_PASS_PROD", "")
 
+CONTRACT_PAYMENT_RECIPIENT = os.getenv("CONTRACT_PAYMENT_RECIPIENT", "ИП Свириденко С. В.")
+CONTRACT_PAYMENT_INN = os.getenv("CONTRACT_PAYMENT_INN", "616706684677")
+CONTRACT_PAYMENT_KPP = os.getenv("CONTRACT_PAYMENT_KPP", "")
+CONTRACT_PAYMENT_BANK = os.getenv("CONTRACT_PAYMENT_BANK", "")
+CONTRACT_PAYMENT_BIK = os.getenv("CONTRACT_PAYMENT_BIK", "")
+CONTRACT_PAYMENT_ACCOUNT = os.getenv("CONTRACT_PAYMENT_ACCOUNT", "")
+CONTRACT_PAYMENT_CORR_ACCOUNT = os.getenv("CONTRACT_PAYMENT_CORR_ACCOUNT", "")
+
 # ------------------------------------------------------------------
 # BITRIX
 # ------------------------------------------------------------------

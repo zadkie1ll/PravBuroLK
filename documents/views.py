@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import mimetypes
 import os
 import re
 import time
@@ -8,7 +9,7 @@ import traceback
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
 import requests
 import telebot
@@ -18,7 +19,7 @@ from django.core import signing
 from django.db.models import Sum
 from django.forms.models import model_to_dict
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
@@ -35,6 +36,8 @@ WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/"
 CONTRACT_FILE_FIELD = "UF_CRM_1745892619372"
 CONTRACT_ACCEPTED_FIELD = "UF_CRM_1775216196958"
 CONTRACT_LINK_FIELD = "UF_CRM_1775217002"
+CONTRACT_NUMBER_FIELD = "UF_CRM_1745892727271"
+CONTRACT_FIRST_PAYMENT_FIELD = "UF_CRM_1742468532579"
 CONTRACT_PAGE_SIGN_SALT = "documents.contract.confirmation"
 
 logger = logging.getLogger(__name__)
@@ -351,10 +354,124 @@ def _build_contract_file_url(request, deal_id: str | int, token: str) -> str:
     return f"{base_url}?token={quote(token)}"
 
 
+def _build_contract_payment_url(request, deal_id: str | int, token: str) -> str:
+    base_url = request.build_absolute_uri(reverse("contract_payment_redirect", args=[deal_id]))
+    return f"{base_url}?token={quote(token)}"
+
+
 def _build_office_preview_url(download_url: str | None) -> str | None:
     if not download_url:
         return None
     return f"https://view.officeapps.live.com/op/embed.aspx?src={quote(download_url, safe='')}"
+
+
+def _extract_decimal_amount(value) -> Decimal:
+    if value in (None, "", False):
+        return Decimal("0")
+    if isinstance(value, (int, float, Decimal)):
+        return Decimal(str(value))
+
+    normalized = str(value).split("|")[0].strip().replace(" ", "").replace(",", ".")
+    if not normalized:
+        return Decimal("0")
+    return Decimal(normalized)
+
+
+def _format_amount_rub(amount: Decimal) -> str:
+    normalized = amount.quantize(Decimal("1")) if amount == amount.to_integral_value() else amount.quantize(Decimal("0.01"))
+    return f"{normalized:,.2f}".replace(",", " ").replace(".00", "")
+
+
+def _get_contract_payment_purpose(deal_data: dict) -> str:
+    client_name = (deal_data.get("TITLE") or "").strip()
+    contract_number = (deal_data.get(CONTRACT_NUMBER_FIELD) or "").strip()
+    contract_suffix = f" по договору №{contract_number}" if contract_number else ""
+    return f"Оплата юридических услуг {client_name}{contract_suffix}".strip()
+
+
+def _get_alfa_register_url() -> str:
+    configured = getattr(settings, "ALFA_API_URL_PROD", "").strip()
+    if configured:
+        return configured if configured.endswith(".do") else f"{configured.rstrip('/')}/register.do"
+    return "https://payment.alfabank.ru/payment/rest/register.do"
+
+
+def _get_alfa_username() -> str:
+    return getattr(settings, "ALFA_USER_PROD", "").strip() or "r-prav_0-api"
+
+
+def _get_alfa_password() -> str:
+    return getattr(settings, "ALFA_PASS_PROD", "").strip() or "Qwasdcvbgh243567!@"
+
+
+def _build_contract_page_return_url(request, deal_id: str | int, token: str, payment_state: str | None = None) -> str:
+    base_url = request.build_absolute_uri(reverse("contract_confirmation_page", args=[deal_id]))
+    query = {"token": token}
+    if payment_state:
+        query["payment_state"] = payment_state
+    return f"{base_url}?{urlencode(query)}"
+
+
+def _register_contract_payment(request, deal_id: str, token: str, deal_data: dict) -> str:
+    amount = _extract_decimal_amount(deal_data.get(CONTRACT_FIRST_PAYMENT_FIELD))
+    if amount <= 0:
+        raise RuntimeError("Сумма первого платежа не заполнена")
+
+    payload = {
+        "userName": _get_alfa_username(),
+        "password": _get_alfa_password(),
+        "orderNumber": f"contract-{deal_id}-{int(time.time())}",
+        "amount": int((amount * 100).quantize(Decimal("1"))),
+        "description": _get_contract_payment_purpose(deal_data),
+        "returnUrl": _build_contract_page_return_url(request, deal_id, token, "success"),
+        "failUrl": _build_contract_page_return_url(request, deal_id, token, "failed"),
+    }
+
+    response = requests.post(_get_alfa_register_url(), data=payload, timeout=15)
+    response.raise_for_status()
+    data = response.json()
+
+    if data.get("errorCode") and str(data["errorCode"]) != "0":
+        raise RuntimeError(data.get("errorMessage") or "Не удалось создать оплату в Альфа-Банке")
+
+    form_url = data.get("formUrl")
+    if not form_url:
+        raise RuntimeError("Альфа-Банк не вернул ссылку на оплату")
+    return form_url
+
+
+def _get_contract_payment_qr_data_uri() -> str:
+    image_path = _get_documents_dir() / "2026-04-03 16.29.44.jpg"
+    if not image_path.exists():
+        return ""
+
+    mime_type, _ = mimetypes.guess_type(image_path.name)
+    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    return f"data:{mime_type or 'image/jpeg'};base64,{encoded}"
+
+
+def _get_contract_payment_requisites() -> list[tuple[str, str]]:
+    requisites = [
+        ("Получатель", getattr(settings, "CONTRACT_PAYMENT_RECIPIENT", "").strip()),
+        ("ИНН", getattr(settings, "CONTRACT_PAYMENT_INN", "").strip()),
+        ("КПП", getattr(settings, "CONTRACT_PAYMENT_KPP", "").strip()),
+        ("Банк", getattr(settings, "CONTRACT_PAYMENT_BANK", "").strip()),
+        ("БИК", getattr(settings, "CONTRACT_PAYMENT_BIK", "").strip()),
+        ("Расчетный счет", getattr(settings, "CONTRACT_PAYMENT_ACCOUNT", "").strip()),
+        ("Корреспондентский счет", getattr(settings, "CONTRACT_PAYMENT_CORR_ACCOUNT", "").strip()),
+    ]
+    return [(label, value) for label, value in requisites if value]
+
+
+def _build_contract_payment_context(request, deal_id: str | int, token: str, deal_data: dict) -> dict:
+    first_payment_amount = _extract_decimal_amount(deal_data.get(CONTRACT_FIRST_PAYMENT_FIELD))
+    return {
+        "contract_payment_url": _build_contract_payment_url(request, deal_id, token),
+        "first_payment_amount": _format_amount_rub(first_payment_amount),
+        "payment_purpose": _get_contract_payment_purpose(deal_data),
+        "payment_requisites": _get_contract_payment_requisites(),
+        "payment_qr_data_uri": _get_contract_payment_qr_data_uri(),
+    }
 
 
 def _update_contract_confirmation(deal_id: str, accepted: bool = True) -> dict:
@@ -415,7 +532,7 @@ def contract_confirmation_page(request, deal_id: int):
         else:
             try:
                 _update_contract_confirmation(str(deal_id), accepted=True)
-                success_message = "Согласие сохранено. Спасибо, договор подтвержден."
+                success_message = "Договор подтвержден."
                 deal_data[CONTRACT_ACCEPTED_FIELD] = 1
             except Exception as exc:
                 logger.exception("Failed to confirm contract for deal %s", deal_id)
@@ -431,6 +548,9 @@ def contract_confirmation_page(request, deal_id: int):
         error_message = "Не удалось получить прямую ссылку на файл договора. Подтверждение остается доступным."
     contract_preview_url = _build_office_preview_url(contract_download_url)
     is_confirmed = str(deal_data.get(CONTRACT_ACCEPTED_FIELD)).upper() in {"1", "Y", "TRUE"}
+    payment_state = (request.GET.get("payment_state") or "").strip().lower()
+    payment_error = (request.GET.get("payment_error") or "").strip()
+    payment_context = _build_contract_payment_context(request, deal_id, token, deal_data)
 
     return render(
         request,
@@ -443,8 +563,11 @@ def contract_confirmation_page(request, deal_id: int):
             "contract_download_url": contract_download_url,
             "contract_preview_url": contract_preview_url,
             "is_confirmed": is_confirmed,
-            "contract_number": deal_data.get("UF_CRM_1745892727271", ""),
+            "contract_number": deal_data.get(CONTRACT_NUMBER_FIELD, ""),
             "client_name": deal_data.get("TITLE", ""),
+            "payment_state": payment_state,
+            "payment_error": payment_error,
+            **payment_context,
         },
     )
 
@@ -464,6 +587,28 @@ def contract_document_file(request, deal_id: int):
         as_attachment=False,
         filename=contract_path.name,
     )
+
+
+def contract_payment_redirect(request, deal_id: int):
+    token = request.GET.get("token")
+    if not _validate_contract_token(str(deal_id), token):
+        raise Http404("Страница оплаты не найдена")
+
+    try:
+        deal_data = _get_deal_data(str(deal_id))
+        form_url = _register_contract_payment(request, str(deal_id), token, deal_data)
+    except Exception as exc:
+        logger.exception("Failed to create contract payment for deal %s", deal_id)
+        error_query = urlencode(
+            {
+                "token": token,
+                "payment_state": "error",
+                "payment_error": str(exc),
+            }
+        )
+        return redirect(f"{reverse('contract_confirmation_page', args=[deal_id])}?{error_query}")
+
+    return redirect(form_url)
 
 
 

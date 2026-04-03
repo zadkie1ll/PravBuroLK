@@ -9,7 +9,7 @@ from payments.views import client_admin_view, create_other_payments, delete_othe
 from bitrix.views import referral_landing, referral_submit, application_success, referral_stats, build_consultation, sync_regions_from_bitrix, calc_km_for_deal, test
 from administration.views import casino_page, spin_view
 from leadreport.views import lead_admin_dashboard, lead_admin_manager_detail, lead_my_stats_page
-from documents.views import contract_confirmation_page, contract_document_file, document_form, generate_document, dogovor, parse_legenda
+from documents.views import contract_confirmation_page, contract_document_file, contract_payment_redirect, document_form, generate_document, dogovor, parse_legenda
 from lead_control.views import deal_webhook_handler
 from communications.views import bitrix_call_webhook, download_call_to_server, manual_analyze_last_call
 from education_platform.views import (
@@ -97,6 +97,7 @@ urlpatterns = [
     path("dogovor/", dogovor, name="dogovor"),
     path("dogovor/<int:deal_id>/", contract_confirmation_page, name="contract_confirmation_page"),
     path("dogovor/<int:deal_id>/document/", contract_document_file, name="contract_document_file"),
+    path("dogovor/<int:deal_id>/pay/", contract_payment_redirect, name="contract_payment_redirect"),
     path("education/auth/", auth_page, name="education_auth"),
     path("api/education/auth/", auth_api_login, name="education_auth_api"),
     path("api/education/reg/", auth_api_register, name="education_register_api"),

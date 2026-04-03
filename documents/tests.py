@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.test.utils import override_settings
 from requests import HTTPError
 
-from documents.views import CONTRACT_ACCEPTED_FIELD, _build_contract_token, contract_document_file, dogovor
+from documents.views import CONTRACT_ACCEPTED_FIELD, _build_contract_token, contract_document_file, contract_payment_redirect, dogovor
 from documents.views import _resolve_contract_download_url
 
 
@@ -56,6 +56,7 @@ class ContractConfirmationPageTests(TestCase):
                         "TITLE": "Петров Петр Петрович",
                         "UF_CRM_1745892727271": "77/2026",
                         "UF_CRM_1745892619372": 777,
+                        "UF_CRM_1742468532579": "20000|RUB",
                         CONTRACT_ACCEPTED_FIELD: 0,
                     }
                 }
@@ -72,12 +73,50 @@ class ContractConfirmationPageTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Согласие сохранено")
+        self.assertContains(response, "Оплатить из Альфы")
+        self.assertContains(response, "Показать реквизиты для оплаты")
         mock_post.assert_called_once()
         self.assertEqual(
             mock_post.call_args.kwargs["json"]["fields"][CONTRACT_ACCEPTED_FIELD],
             1,
         )
+
+    @override_settings(
+        CONTRACT_PAYMENT_RECIPIENT="ИП Свириденко С. В.",
+        CONTRACT_PAYMENT_BANK="АО Альфа-Банк",
+        CONTRACT_PAYMENT_ACCOUNT="40702810900000000000",
+        CONTRACT_PAYMENT_BIK="044525593",
+    )
+    @patch("documents.views.requests.get")
+    def test_contract_page_shows_payment_block_for_confirmed_deal(self, mock_get):
+        mock_get.side_effect = [
+            self._response(
+                {
+                    "result": {
+                        "TITLE": "Петров Петр Петрович",
+                        "UF_CRM_1745892727271": "77/2026",
+                        "UF_CRM_1745892619372": 777,
+                        "UF_CRM_1742468532579": "20000|RUB",
+                        CONTRACT_ACCEPTED_FIELD: 1,
+                    }
+                }
+            ),
+            self._response({"result": {"DOWNLOAD_URL": "https://cdn.example.com/petrov.docx"}}),
+        ]
+
+        deal_id = 654
+        token = _build_contract_token(str(deal_id))
+        response = self.client.get(
+            reverse("contract_confirmation_page", args=[deal_id]),
+            {"token": token},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Оплатить из Альфы")
+        self.assertContains(response, "20 000 ₽")
+        self.assertContains(response, "Оплата юридических услуг Петров Петр Петрович по договору №77/2026")
+        self.assertContains(response, "АО Альфа-Банк")
+        self.assertContains(response, "40702810900000000000")
 
     def test_contract_page_with_invalid_token_returns_404(self):
         response = self.client.get(
@@ -190,6 +229,46 @@ class ContractDocumentFileTests(TestCase):
         self.assertEqual(
             response["Content-Type"],
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+
+
+class ContractPaymentRedirectTests(TestCase):
+    def _response(self, payload):
+        response = Mock()
+        response.json.return_value = payload
+        response.raise_for_status.return_value = None
+        return response
+
+    @patch("documents.views.requests.post")
+    @patch("documents.views.requests.get")
+    def test_contract_payment_redirect_redirects_to_alfa_form(self, mock_get, mock_post):
+        mock_get.return_value = self._response(
+            {
+                "result": {
+                    "TITLE": "Иванов Иван Иванович",
+                    "UF_CRM_1745892727271": "42/2026",
+                    "UF_CRM_1742468532579": "20000|RUB",
+                    CONTRACT_ACCEPTED_FIELD: 1,
+                }
+            }
+        )
+        mock_post.return_value = self._response(
+            {"errorCode": "0", "formUrl": "https://pay.example.com/form"}
+        )
+
+        deal_id = 321
+        token = _build_contract_token(str(deal_id))
+        response = self.client.get(
+            reverse("contract_payment_redirect", args=[deal_id]),
+            {"token": token},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://pay.example.com/form")
+        self.assertEqual(mock_post.call_args.kwargs["data"]["amount"], 2000000)
+        self.assertEqual(
+            mock_post.call_args.kwargs["data"]["description"],
+            "Оплата юридических услуг Иванов Иван Иванович по договору №42/2026",
         )
 
 
