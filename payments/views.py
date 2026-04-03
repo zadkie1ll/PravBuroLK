@@ -1179,6 +1179,27 @@ def payment_callback(request):
             "reason": f"operation={operation}, status={status}"
         }, status=200)
 
+    # Оплата по договору с лендинга подтверждения
+    contract_deal_id = _extract_contract_deal_id_from_order(order_number)
+    if contract_deal_id:
+        try:
+            # Парсим сумму до записи комментария в таймлайн
+            try:
+                amount = Decimal(amount_str) / Decimal("100")
+            except Exception:
+                amount = Decimal("0.00")
+
+            return _handle_contract_payment_callback(order_number, amount)
+        except Exception as exc:
+            return JsonResponse(
+                {
+                    "error": f"Failed to process contract payment callback: {exc}",
+                    "orderNumber": order_number,
+                    "deal_id": contract_deal_id,
+                },
+                status=500,
+            )
+
     payment = InstallmentPayment.objects.filter(order_id=order_number).first()
     if not payment:
         return JsonResponse({"error": f"InstallmentPayment not found for {order_number}"}, status=404)
@@ -1192,20 +1213,6 @@ def payment_callback(request):
         amount = Decimal(amount_str) / Decimal("100")
     except Exception:
         amount = Decimal("0.00")
-
-    contract_deal_id = _extract_contract_deal_id_from_order(order_number)
-    if contract_deal_id:
-        try:
-            return _handle_contract_payment_callback(order_number, amount)
-        except Exception as exc:
-            return JsonResponse(
-                {
-                    "error": f"Failed to process contract payment callback: {exc}",
-                    "orderNumber": order_number,
-                    "deal_id": contract_deal_id,
-                },
-                status=500,
-            )
 
     # Создаем фактический платёж
     actual_payment = ActualPayment.objects.create(

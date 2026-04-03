@@ -73,13 +73,48 @@ class ContractConfirmationPageTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Оплатить из Альфы")
+        self.assertContains(response, "Оплатить")
         self.assertContains(response, "Показать реквизиты для оплаты")
         mock_post.assert_called_once()
         self.assertEqual(
             mock_post.call_args.kwargs["json"]["fields"][CONTRACT_ACCEPTED_FIELD],
             1,
         )
+
+    @patch("documents.views.requests.post")
+    @patch("documents.views.requests.get")
+    def test_contract_page_hides_payment_block_after_success_redirect(self, mock_get, mock_post):
+        mock_get.side_effect = [
+            self._response(
+                {
+                    "result": {
+                        "TITLE": "Петров Петр Петрович",
+                        "UF_CRM_1745892727271": "77/2026",
+                        "UF_CRM_1745892619372": 777,
+                        "UF_CRM_1742468532579": "20000|RUB",
+                        CONTRACT_ACCEPTED_FIELD: 1,
+                    }
+                }
+            ),
+            self._response({"result": {"DOWNLOAD_URL": "https://cdn.example.com/petrov.docx"}}),
+        ]
+        mock_post.return_value = self._response({"result": 1})
+
+        deal_id = 654
+        token = _build_contract_token(str(deal_id))
+        response = self.client.get(
+            reverse("contract_confirmation_page", args=[deal_id]),
+            {
+                "token": token,
+                "payment_state": "success",
+                "orderNumber": "contract-654-1715000000",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Все оплачено, ожидайте назначения сопровождающего юриста.")
+        self.assertNotContains(response, "Сумма первого платежа")
+        self.assertNotContains(response, "Показать реквизиты для оплаты")
 
     @override_settings(
         CONTRACT_PAYMENT_RECIPIENT="СВИРИДЕНКО СТАНИСЛАВ ВАЛЕРЬЕВИЧ (ИП)",
@@ -115,7 +150,7 @@ class ContractConfirmationPageTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Оплатить из Альфы")
+        self.assertContains(response, "Оплатить")
         self.assertContains(response, "20 000 ₽")
         self.assertContains(response, "Оплата юридических услуг Петров Петр Петрович по договору №77/2026")
         self.assertContains(response, "СВИРИДЕНКО СТАНИСЛАВ ВАЛЕРЬЕВИЧ (ИП)")

@@ -416,15 +416,16 @@ def _register_contract_payment(request, deal_id: str, token: str, deal_data: dic
     amount = _extract_decimal_amount(deal_data.get(CONTRACT_FIRST_PAYMENT_FIELD))
     if amount <= 0:
         raise RuntimeError("Сумма первого платежа не заполнена")
+    order_number = f"contract-{deal_id}-{int(time.time())}"
 
     payload = {
         "userName": _get_alfa_username(),
         "password": _get_alfa_password(),
-        "orderNumber": f"contract-{deal_id}-{int(time.time())}",
+        "orderNumber": order_number,
         "amount": int((amount * 100).quantize(Decimal("1"))),
         "description": _get_contract_payment_purpose(deal_data),
-        "returnUrl": _build_contract_page_return_url(request, deal_id, token, "success"),
-        "failUrl": _build_contract_page_return_url(request, deal_id, token, "failed"),
+        "returnUrl": f"{_build_contract_page_return_url(request, deal_id, token, 'success')}&orderNumber={quote(order_number)}",
+        "failUrl": f"{_build_contract_page_return_url(request, deal_id, token, 'failed')}&orderNumber={quote(order_number)}",
     }
 
     response = requests.post(_get_alfa_register_url(), data=payload, timeout=15)
@@ -474,6 +475,26 @@ def _build_contract_payment_context(request, deal_id: str | int, token: str, dea
         "payment_requisites": _get_contract_payment_requisites(),
         "payment_qr_data_uri": _get_contract_payment_qr_data_uri(),
     }
+
+
+def _add_contract_payment_timeline_comment(deal_id: str | int, order_number: str, amount: Decimal) -> None:
+    response = requests.post(
+        f"{WEBHOOK_URL.rstrip('/')}/crm.timeline.comment.add",
+        data={
+            "fields[ENTITY_ID]": str(deal_id),
+            "fields[ENTITY_TYPE]": "deal",
+            "fields[COMMENT]": (
+                "Поступила успешная оплата по договору\n"
+                f"Сумма: {_format_amount_rub(amount)} ₽\n"
+                f"Номер платежа: {order_number}"
+            ),
+        },
+        timeout=15,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("error"):
+        raise RuntimeError(payload.get("error_description") or payload["error"])
 
 
 def _update_contract_confirmation(deal_id: str, accepted: bool = True) -> dict:
@@ -552,6 +573,28 @@ def contract_confirmation_page(request, deal_id: int):
     is_confirmed = str(deal_data.get(CONTRACT_ACCEPTED_FIELD)).upper() in {"1", "Y", "TRUE"}
     payment_state = (request.GET.get("payment_state") or "").strip().lower()
     payment_error = (request.GET.get("payment_error") or "").strip()
+    payment_order_number = (request.GET.get("orderNumber") or "").strip()
+    session_payment_key = f"contract_payment_success_{deal_id}"
+    is_payment_completed = bool(request.session.get(session_payment_key))
+
+    if payment_state == "success":
+        is_payment_completed = True
+        request.session[session_payment_key] = True
+
+        session_log_key = f"contract_payment_logged_{payment_order_number or deal_id}"
+        if payment_order_number and not request.session.get(session_log_key):
+            try:
+                _add_contract_payment_timeline_comment(
+                    deal_id=deal_id,
+                    order_number=payment_order_number,
+                    amount=_extract_decimal_amount(deal_data.get(CONTRACT_FIRST_PAYMENT_FIELD)),
+                )
+                request.session[session_log_key] = True
+            except Exception as exc:
+                logger.exception("Failed to add contract payment timeline comment for deal %s", deal_id)
+                if not payment_error:
+                    payment_error = f"Не удалось записать оплату в журнал: {exc}"
+
     payment_context = _build_contract_payment_context(request, deal_id, token, deal_data)
 
     return render(
@@ -569,6 +612,7 @@ def contract_confirmation_page(request, deal_id: int):
             "client_name": deal_data.get("TITLE", ""),
             "payment_state": payment_state,
             "payment_error": payment_error,
+            "is_payment_completed": is_payment_completed,
             **payment_context,
         },
     )
