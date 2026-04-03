@@ -63,9 +63,8 @@
         <aside class="flex flex-col gap-4">
           <div class="rounded-[24px] bg-slate-950 p-6 text-white">
             <p class="text-sm text-cyan-200">Клиент</p>
-            <h2 class="mt-2 text-2xl">{{ client_name|default:"Без названия сделки" }}</h2>
+            <h2 class="mt-2 text-2xl">{{ client_name|default:"Клиент" }}</h2>
             <p class="mt-3 text-sm text-slate-300">Договор № {{ contract_number|default:"не указан" }}</p>
-            <p class="mt-2 text-sm text-slate-300">Сделка #{{ deal_id }}</p>
           </div>
 
           {% if error_message %}
@@ -94,7 +93,7 @@
                 <div>
                   <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Договор подтвержден</p>
                   <p class="mt-2 text-sm text-emerald-900">
-                    {{ success_message|default:"Подтверждение получено и сохранено в Bitrix." }}
+                    {{ success_message|default:"Подтверждение получено и сохранено." }}
                   </p>
                 </div>
 
