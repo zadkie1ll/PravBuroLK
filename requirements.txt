@@ -54,8 +54,8 @@ openai==2.26.0
 openpyxl==3.1.5
 packaging==26.0
 pdfkit==1.0.0
+phonenumbers==9.0.27
 pillow==12.1.0
-pip==26.0.1
 prompt_toolkit==3.0.52
 proto-plus==1.26.1
 protobuf==6.33.2
@@ -90,8 +90,8 @@ TelegramBotAPI==0.3.2
 tinycss2==1.5.1
 tinyhtml5==2.0.0
 tqdm==4.67.3
-typing_extensions==4.15.0
 typing-inspection==0.4.2
+typing_extensions==4.15.0
 tzdata==2025.2
 tzlocal==5.3.1
 uritemplate==4.2.0

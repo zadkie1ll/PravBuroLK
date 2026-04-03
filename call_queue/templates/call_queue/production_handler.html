@@ -107,7 +107,7 @@
       </div>
     {% endif %}
 
-    <div class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+    <div class="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
       <section class="rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
         <h2 class="text-xl font-semibold">Формирование очереди</h2>
         <form method="post" class="mt-6 space-y-5">
@@ -148,7 +148,7 @@
         <h2 class="text-xl font-semibold">Статус очереди</h2>
         <div class="mt-5 grid gap-4 sm:grid-cols-3">
           <div class="rounded-2xl bg-slate-50 p-4">
-            <div class="text-sm text-slate-500">Всего сделок</div>
+            <div class="text-sm text-slate-500">Всего элементов</div>
             <div class="mt-1 text-2xl font-semibold">{{ queue_size }}</div>
           </div>
           <div class="rounded-2xl bg-slate-50 p-4">
@@ -187,11 +187,36 @@
           <div class="mt-5 rounded-2xl border border-slate-200 p-4">
             <div class="text-sm text-slate-500">Текущий элемент</div>
             <div class="mt-2 text-lg font-semibold">{{ current_item.client_name|default:"Без имени" }}</div>
-            <div class="mt-2 text-sm text-slate-600">Телефон из Bitrix: {{ current_item.raw_phone|default:current_item.phone }}</div>
-            <div class="mt-1 text-sm font-medium text-emerald-700">Телефон для МегаФона: {{ current_item.phone }}</div>
-            <div class="mt-1 text-sm text-slate-600">
-              Bitrix {% if current_entity_type == 'lead' %}Lead{% else %}Deal{% endif %} ID:
-              {% firstof current_item.entity_id current_item.deal_id current_item.lead_id "—" %}
+            <div class="mt-3 grid gap-3 md:grid-cols-2">
+              <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Контакты</div>
+                <div class="mt-2">Телефон из Bitrix: {{ current_item.raw_phone|default:current_item.phone }}</div>
+                <div class="mt-1 font-medium text-emerald-700">Телефон для МегаФона: {{ current_item.phone }}</div>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Bitrix</div>
+                <div class="mt-2">
+                  {% if current_entity_type == 'lead' %}Lead{% else %}Deal{% endif %} ID:
+                  {% firstof current_item.entity_id current_item.deal_id current_item.lead_id "—" %}
+                </div>
+                <div class="mt-1">
+                  {% if current_entity_type == 'lead' %}Статус{% else %}Стадия{% endif %}: {{ current_item.stage_id|default:"—" }}
+                </div>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Регион по номеру</div>
+                <div class="mt-2">{{ current_item.phone_insights.region_label|default:"—" }}</div>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Локальное время</div>
+                <div class="mt-2">
+                  {% if current_item.phone_insights.local_time %}
+                    {{ current_item.phone_insights.local_time }} {{ current_item.phone_insights.timezone_label|default:"" }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+              </div>
             </div>
             {% if current_item.comments %}
               <div class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
@@ -205,7 +230,24 @@
                   Открыть в Bitrix
                 </a>
               {% endif %}
+              {% if current_whatsapp_url %}
+                <a href="{{ current_whatsapp_url }}" target="_blank" rel="noopener" class="rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
+                  WhatsApp
+                </a>
+              {% endif %}
+              <button
+                type="button"
+                data-open-max
+                data-max-url="{{ current_max_url }}"
+                data-phone="{{ current_item.phone }}"
+                class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-700"
+              >
+                MAX
+              </button>
             </div>
+            <p class="mt-3 text-xs text-slate-500">
+              Кнопка MAX откроет web MAX и скопирует номер клиента в буфер для быстрого поиска.
+            </p>
           </div>
         {% else %}
           <div class="mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
@@ -213,59 +255,114 @@
           </div>
         {% endif %}
 
-        {% if queue %}
-          <div class="mt-6">
-            <h3 class="text-lg font-semibold">{% if current_entity_type == 'lead' %}Лиды{% else %}Сделки{% endif %} в очереди</h3>
-            <div class="mt-4 max-h-[32rem] space-y-2 overflow-y-auto pr-1">
-              {% for item in queue %}
-                <div class="rounded-2xl border px-4 py-3 {% if forloop.counter0 == current_index %}border-emerald-300 bg-emerald-50{% else %}border-slate-200 bg-white{% endif %}">
-                  <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div class="text-xs uppercase tracking-[0.15em] text-slate-500">#{{ forloop.counter }}</div>
-                      <div class="mt-1 font-medium text-slate-900">{{ item.client_name|default:"Без названия" }}</div>
-                      <div class="mt-1 text-sm text-slate-600">Bitrix: {{ item.raw_phone|default:item.phone }}</div>
-                      <div class="mt-1 text-sm font-medium text-emerald-700">МегаФон: {{ item.phone }}</div>
-                      <div class="mt-1 text-xs text-slate-500">
-                        {% if item.entity_type == 'lead' %}Lead{% else %}Deal{% endif %} ID:
-                        {% firstof item.entity_id item.deal_id item.lead_id "—" %}
-                      </div>
-                      <div class="mt-1 text-xs text-slate-500">
-                        {% if item.entity_type == 'lead' %}Статус{% else %}Стадия{% endif %}: {{ item.stage_id|default:"—" }}
-                      </div>
-                    </div>
-                    <span class="rounded-full px-3 py-1 text-xs font-medium
-                      {% if item.manual_decision == 'answered' %}bg-emerald-100 text-emerald-800
-                      {% elif item.status == 'calling' %}bg-amber-100 text-amber-800
-                      {% elif item.manual_decision == 'failed' or item.status == 'failed' %}bg-rose-100 text-rose-800
-                      {% else %}bg-slate-100 text-slate-700{% endif %}">
-                      {% if item.manual_decision == 'answered' %}
-                        Клиент ответил
-                      {% elif item.status == 'calling' %}
-                        В звонке
-                      {% elif item.manual_decision == 'failed' or item.status == 'failed' %}
-                        Недозвон
-                      {% else %}
-                        Ожидает
-                      {% endif %}
-                    </span>
-                  </div>
-                  <div class="mt-3">
-                    <form method="post">
-                      {% csrf_token %}
-                      <input type="hidden" name="action" value="remove_item">
-                      <input type="hidden" name="item_index" value="{{ forloop.counter0 }}">
-                      <button type="submit" class="rounded-full bg-white px-3 py-2 text-xs font-medium text-rose-700 shadow-sm ring-1 ring-rose-200 transition hover:bg-rose-50">
-                        Удалить из очереди
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-        {% endif %}
       </aside>
     </div>
+
+    {% if queue %}
+      <section class="mt-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h3 class="text-xl font-semibold">{% if current_entity_type == 'lead' %}Лиды{% else %}Сделки{% endif %} в очереди</h3>
+          <div class="text-sm text-slate-500">Полный список очереди с комментариями и подсказками по номеру</div>
+        </div>
+        <div class="mt-5 space-y-4">
+          {% for item in queue %}
+            <div class="rounded-3xl border p-5 {% if forloop.counter0 == current_index %}border-emerald-300 bg-emerald-50/60{% else %}border-slate-200 bg-white{% endif %}">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div class="text-xs uppercase tracking-[0.15em] text-slate-500">#{{ forloop.counter }}</div>
+                  <div class="mt-1 text-lg font-semibold text-slate-900">{{ item.client_name|default:"Без названия" }}</div>
+                </div>
+                <span class="rounded-full px-3 py-1 text-xs font-medium
+                  {% if item.manual_decision == 'answered' %}bg-emerald-100 text-emerald-800
+                  {% elif item.status == 'calling' %}bg-amber-100 text-amber-800
+                  {% elif item.manual_decision == 'failed' or item.status == 'failed' %}bg-rose-100 text-rose-800
+                  {% else %}bg-slate-100 text-slate-700{% endif %}">
+                  {% if item.manual_decision == 'answered' %}
+                    Клиент ответил
+                  {% elif item.status == 'calling' %}
+                    В звонке
+                  {% elif item.manual_decision == 'failed' or item.status == 'failed' %}
+                    Недозвон
+                  {% else %}
+                    Ожидает
+                  {% endif %}
+                </span>
+              </div>
+
+              <div class="mt-4 grid gap-4 lg:grid-cols-4">
+                <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                  <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Контакты</div>
+                  <div class="mt-2">Bitrix: {{ item.raw_phone|default:item.phone }}</div>
+                  <div class="mt-1 font-medium text-emerald-700">МегаФон: {{ item.phone }}</div>
+                </div>
+                <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                  <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Bitrix</div>
+                  <div class="mt-2">
+                    {% if item.entity_type == 'lead' %}Lead{% else %}Deal{% endif %} ID:
+                    {% firstof item.entity_id item.deal_id item.lead_id "—" %}
+                  </div>
+                  <div class="mt-1">
+                    {% if item.entity_type == 'lead' %}Статус{% else %}Стадия{% endif %}: {{ item.stage_id|default:"—" }}
+                  </div>
+                </div>
+                <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                  <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Регион по номеру</div>
+                  <div class="mt-2">{{ item.phone_insights.region_label|default:"—" }}</div>
+                </div>
+                <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                  <div class="text-xs uppercase tracking-[0.15em] text-slate-500">Локальное время</div>
+                  <div class="mt-2">
+                    {% if item.phone_insights.local_time %}
+                      {{ item.phone_insights.local_time }} {{ item.phone_insights.timezone_label|default:"" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 grid gap-4 lg:grid-cols-[1fr_auto]">
+                <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
+                  <div class="mb-2 text-xs uppercase tracking-[0.15em] text-slate-500">COMMENTS</div>
+                  {% if item.comments %}
+                    <pre class="whitespace-pre-wrap font-sans">{{ item.comments }}</pre>
+                  {% else %}
+                    <div class="text-slate-400">Поле COMMENTS пока пустое.</div>
+                  {% endif %}
+                </div>
+                <div class="flex flex-wrap items-start gap-3">
+                  {% if item.bitrix_url %}
+                    <a href="{{ item.bitrix_url }}" target="_blank" rel="noopener" class="rounded-full bg-white px-4 py-2 text-sm font-medium text-slate-900 shadow-sm ring-1 ring-slate-300 transition hover:bg-slate-100">
+                      Открыть в Bitrix
+                    </a>
+                  {% endif %}
+                  <a href="https://wa.me/{{ item.phone }}" target="_blank" rel="noopener" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500">
+                    WhatsApp
+                  </a>
+                  <button
+                    type="button"
+                    data-open-max
+                    data-max-url="{{ max_web_url }}"
+                    data-phone="{{ item.phone }}"
+                    class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+                  >
+                    MAX
+                  </button>
+                  <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="remove_item">
+                    <input type="hidden" name="item_index" value="{{ forloop.counter0 }}">
+                    <button type="submit" class="rounded-full bg-white px-4 py-2 text-sm font-medium text-rose-700 shadow-sm ring-1 ring-rose-200 transition hover:bg-rose-50">
+                      Удалить из очереди
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
 
   </div>
 
@@ -480,6 +577,22 @@
         }
         params.delete("stage_id");
         window.location.href = `${window.location.pathname}?${params.toString()}`;
+      });
+    })();
+
+    (function () {
+      const maxButton = document.querySelector("[data-open-max]");
+      if (!maxButton) return;
+      maxButton.addEventListener("click", async function () {
+        const maxUrl = maxButton.dataset.maxUrl || "https://web.max.ru/";
+        const phone = maxButton.dataset.phone || "";
+        window.open(maxUrl, "_blank", "noopener");
+        if (!phone || !navigator.clipboard || !navigator.clipboard.writeText) return;
+        try {
+          await navigator.clipboard.writeText(phone);
+        } catch (_error) {
+          // ignore clipboard issues in unsupported browsers
+        }
       });
     })();
   </script>

@@ -373,6 +373,13 @@ def build_prod_handler_url(call_id: str = "", auto_dial: bool = False) -> str:
     return url
 
 
+def build_whatsapp_chat_url(phone: str) -> str:
+    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    if len(digits) == 11 and digits.startswith("8"):
+        digits = f"7{digits[1:]}"
+    return f"https://wa.me/{digits}" if digits else ""
+
+
 def get_production_form_initial(config: dict, today):
     return {
         "entity_type": config.get("entity_type") or CallEntityType.DEAL,
@@ -399,8 +406,8 @@ def reset_prod_queue_state(request, *, clear_queue: bool = False):
 def get_manager_short_name(manager_profile: SalesManager) -> str:
     raw_name = (manager_profile.name or "").strip()
     if not raw_name:
-        return "менеджер"
-    return raw_name.split()[0].lower()
+        return "Менеджер"
+    return raw_name.split()[0]
 
 
 def format_unanswered_comment(manager_profile: SalesManager) -> str:
@@ -962,6 +969,9 @@ def production_handler(request):
             "current_snapshot": current_snapshot,
             "auto_dial_enabled": bool(config.get("auto_dial", True)),
             "current_entity_type": config.get("entity_type") or CallEntityType.DEAL,
+            "current_whatsapp_url": build_whatsapp_chat_url(current_item.get("phone", "")) if current_item else "",
+            "current_max_url": "https://web.max.ru/" if current_item else "",
+            "max_web_url": "https://web.max.ru/",
         },
     )
 

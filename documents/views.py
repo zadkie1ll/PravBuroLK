@@ -1,37 +1,41 @@
-import os
+import base64
+import json
 import logging
-from django.http import HttpResponse, Http404, JsonResponse
-from django.shortcuts import render
-from django.conf import settings
-from .services.document_pipeline import DocumentPipeline
+import os
+import re
+import time
+import traceback
+from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
-from django.shortcuts import render,get_object_or_404
-from django.http import JsonResponse, HttpResponse
+from urllib.parse import quote
+
+import requests
+import telebot
+from dateutil.relativedelta import relativedelta
+from django.conf import settings
+from django.core import signing
+from django.db.models import Sum
+from django.forms.models import model_to_dict
+from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import render
+from django.urls import reverse
+from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from django.http import Http404
-from decimal import Decimal
-import requests
-from django.forms.models import model_to_dict
 from docx import Document
-from docx.shared import Pt, Inches
 from docx.oxml.ns import qn
-from datetime import datetime, date
-from dateutil.relativedelta import relativedelta
-import json
-import time
-import re
-import base64
-import telebot
-import os
-from django.conf import settings
-from django.db.models import Sum
-import traceback
-from django.utils.timezone import now
+from docx.shared import Inches, Pt
+
+from .services.document_pipeline import DocumentPipeline
 
 USE_PROXIES = True
 
 WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/"
+CONTRACT_FILE_FIELD = "UF_CRM_1745892619372"
+CONTRACT_ACCEPTED_FIELD = "UF_CRM_1775216196958"
+CONTRACT_LINK_FIELD = "UF_CRM_1775217002"
+CONTRACT_PAGE_SIGN_SALT = "documents.contract.confirmation"
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +106,215 @@ def document_form(request):
     return render(request, "document_form.html")
 
 
+def _get_documents_dir() -> Path:
+    return Path(settings.BASE_DIR) / "documents"
+
+
+def _extract_deal_id(post_data) -> str | None:
+    document_id_2 = post_data.get("document_id[2]")
+    if not document_id_2:
+        return None
+
+    match = re.search(r"DEAL_(\d+)", document_id_2)
+    if not match:
+        return None
+
+    return match.group(1)
+
+
+def _bitrix_get(method: str, params: dict | None = None, timeout: int = 10) -> dict:
+    response = requests.get(
+        f"{WEBHOOK_URL.rstrip('/')}/{method}.json",
+        params=params or {},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("error"):
+        raise RuntimeError(payload.get("error_description") or payload["error"])
+    return payload
+
+
+def _bitrix_post(method: str, payload: dict, timeout: int = 10) -> dict:
+    response = requests.post(
+        f"{WEBHOOK_URL.rstrip('/')}/{method}.json",
+        json=payload,
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    data = response.json()
+    if data.get("error"):
+        raise RuntimeError(data.get("error_description") or data["error"])
+    return data
+
+
+def _get_deal_data(deal_id: str) -> dict:
+    payload = _bitrix_get("crm.deal.get", {"ID": deal_id})
+    deal_data = payload.get("result")
+    if not deal_data:
+        raise RuntimeError("Deal not found")
+    return deal_data
+
+
+def _build_contract_token(deal_id: str) -> str:
+    signer = signing.Signer(salt=CONTRACT_PAGE_SIGN_SALT)
+    return signer.sign(deal_id)
+
+
+def _validate_contract_token(deal_id: str, token: str | None) -> bool:
+    if not token:
+        return False
+
+    signer = signing.Signer(salt=CONTRACT_PAGE_SIGN_SALT)
+    try:
+        return signer.unsign(token) == str(deal_id)
+    except signing.BadSignature:
+        return False
+
+
+def _extract_file_id(file_value):
+    if not file_value:
+        return None
+
+    if isinstance(file_value, dict):
+        for key in ("id", "ID", "fileId", "FILE_ID"):
+            if file_value.get(key):
+                return _extract_file_id(file_value.get(key))
+        return None
+
+    if isinstance(file_value, (list, tuple)):
+        for item in file_value:
+            file_id = _extract_file_id(item)
+            if file_id is not None:
+                return file_id
+        return None
+
+    if isinstance(file_value, str):
+        if file_value.startswith(("http://", "https://")):
+            return file_value
+        if file_value.isdigit():
+            return int(file_value)
+        return None
+
+    if isinstance(file_value, int):
+        return file_value
+
+    return None
+
+
+def _resolve_contract_download_url(file_value) -> str | None:
+    if isinstance(file_value, str) and file_value.startswith(("http://", "https://")):
+        return file_value
+
+    file_id = _extract_file_id(file_value)
+    if not file_id:
+        return None
+
+    if isinstance(file_id, str) and file_id.startswith(("http://", "https://")):
+        return file_id
+
+    payload = _bitrix_get("disk.file.get", {"id": file_id})
+    file_data = payload.get("result") or {}
+    return file_data.get("DOWNLOAD_URL") or file_data.get("DETAIL_URL") or file_data.get("SRC")
+
+
+def _build_contract_page_url(request, deal_id: str) -> str:
+    token = _build_contract_token(deal_id)
+    base_url = request.build_absolute_uri(reverse("contract_confirmation_page", args=[deal_id]))
+    return f"{base_url}?token={quote(token)}"
+
+
+def _build_office_preview_url(download_url: str | None) -> str | None:
+    if not download_url:
+        return None
+    return f"https://view.officeapps.live.com/op/embed.aspx?src={quote(download_url, safe='')}"
+
+
+def _update_contract_confirmation(deal_id: str, accepted: bool = True) -> dict:
+    return _bitrix_post(
+        "crm.deal.update",
+        {
+            "id": deal_id,
+            "fields": {
+                CONTRACT_ACCEPTED_FIELD: 1 if accepted else 0,
+            },
+        },
+    )
+
+
+def _update_contract_link(deal_id: str, contract_url: str) -> dict:
+    return _bitrix_post(
+        "crm.deal.update",
+        {
+            "id": deal_id,
+            "fields": {
+                CONTRACT_LINK_FIELD: contract_url,
+            },
+        },
+    )
+
+
+def contract_confirmation_page(request, deal_id: int):
+    token = request.GET.get("token") or request.POST.get("token")
+    if not _validate_contract_token(str(deal_id), token):
+        raise Http404("Страница договора не найдена")
+
+    error_message = ""
+    success_message = ""
+
+    try:
+        deal_data = _get_deal_data(str(deal_id))
+    except Exception as exc:
+        logger.exception("Failed to load contract page for deal %s", deal_id)
+        return render(
+            request,
+            "documents/contract_confirmation.html",
+            {
+                "deal_id": deal_id,
+                "token": token,
+                "error_message": f"Не удалось загрузить договор: {exc}",
+                "contract_download_url": None,
+                "contract_preview_url": None,
+                "is_confirmed": False,
+                "contract_number": "",
+                "client_name": "",
+            },
+            status=502,
+        )
+
+    if request.method == "POST":
+        if request.POST.get("agree") != "on":
+            error_message = "Для подтверждения нужно отметить согласие с договором."
+        else:
+            try:
+                _update_contract_confirmation(str(deal_id), accepted=True)
+                success_message = "Согласие сохранено. Спасибо, договор подтвержден."
+                deal_data[CONTRACT_ACCEPTED_FIELD] = 1
+            except Exception as exc:
+                logger.exception("Failed to confirm contract for deal %s", deal_id)
+                error_message = f"Не удалось сохранить подтверждение: {exc}"
+
+    contract_download_url = _resolve_contract_download_url(deal_data.get(CONTRACT_FILE_FIELD))
+    contract_preview_url = _build_office_preview_url(contract_download_url)
+    is_confirmed = str(deal_data.get(CONTRACT_ACCEPTED_FIELD)).upper() in {"1", "Y", "TRUE"}
+
+    return render(
+        request,
+        "documents/contract_confirmation.html",
+        {
+            "deal_id": deal_id,
+            "token": token,
+            "error_message": error_message,
+            "success_message": success_message,
+            "contract_download_url": contract_download_url,
+            "contract_preview_url": contract_preview_url,
+            "is_confirmed": is_confirmed,
+            "contract_number": deal_data.get("UF_CRM_1745892727271", ""),
+            "client_name": deal_data.get("TITLE", ""),
+        },
+    )
+
+
 
 
 @csrf_exempt
@@ -112,25 +325,12 @@ def dogovor(request):
     logger.error(f"INCOMING POST: {request.POST}")
 
     # --- Получение ID сделки ---
-    document_id_2 = request.POST.get('document_id[2]')
-    if not document_id_2:
-        return JsonResponse({'status': 'error', 'message': 'document_id[2] missing'}, status=400)
-
-    m = re.search(r"DEAL_(\d+)", document_id_2)
-    if not m:
+    deal_id = _extract_deal_id(request.POST)
+    if not deal_id:
         return JsonResponse({'status': 'error', 'message': 'Invalid deal ID'}, status=400)
 
-    deal_id = m.group(1)
-    deal_url = f"{WEBHOOK_URL}crm.deal.get.json?ID={deal_id}"
-
     try:
-        deal_resp = requests.get(deal_url, timeout=10)
-        logger.error(f"DEAL RESPONSE: {deal_resp.text}")
-
-        deal_data = deal_resp.json().get("result")
-        if not deal_data:
-            return JsonResponse({'status': 'error', 'message': 'Deal not found'}, status=404)
-
+        deal_data = _get_deal_data(deal_id)
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'Deal fetch error: {e}'}, status=500)
 
@@ -191,10 +391,7 @@ def dogovor(request):
         return JsonResponse({'status': 'error', 'message': f'Payment calc error: {e}'}, status=500)
 
     # --- KРОССПЛАТФОРМЕННЫЕ ПУТИ ---
-    if os.name == "nt":
-        BASE = Path(r"C:\Apps\lkNewGen\pravburo\documents")
-    else:
-        BASE = Path("/home/zadkiel/projects/PravBuroLK/documents")
+    BASE = _get_documents_dir()
 
     template = BASE / "templates_src" / "template_2.docx"
     output = BASE / "generated_docs" / f"dogovor_{deal_id}.docx"
@@ -222,7 +419,7 @@ def dogovor(request):
         result = upload_to_bitrix(
             deal_id,
             str(output),
-            'UF_CRM_1745892619372',
+            CONTRACT_FILE_FIELD,
             payments
         )
         logger.error(f"BITRIX UPLOAD RESULT: {result}")
@@ -230,7 +427,28 @@ def dogovor(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'Upload error: {e}'}, status=500)
 
-    return JsonResponse({'status': 'success', 'message': 'Document generated & uploaded'})
+    confirmation_url = _build_contract_page_url(request, deal_id)
+    contract_download_url = None
+    contract_preview_url = None
+
+    try:
+        _update_contract_link(deal_id, confirmation_url)
+        refreshed_deal = _get_deal_data(deal_id)
+        contract_download_url = _resolve_contract_download_url(refreshed_deal.get(CONTRACT_FILE_FIELD))
+        contract_preview_url = _build_office_preview_url(contract_download_url)
+    except Exception:
+        logger.exception("Failed to save or resolve contract URL for deal %s", deal_id)
+
+    return JsonResponse(
+        {
+            'status': 'success',
+            'message': 'Document generated & uploaded',
+            'deal_id': deal_id,
+            'confirmation_url': confirmation_url,
+            'contract_download_url': contract_download_url,
+            'contract_preview_url': contract_preview_url,
+        }
+    )
 
 def calculate_payments(num_payments, total_amount, discount, start_date, first_payment, second_payment_day):
     if num_payments == 1 and first_payment >= (total_amount - discount):

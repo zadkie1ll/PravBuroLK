@@ -412,6 +412,65 @@ class BitrixDealServiceFilterTests(TestCase):
         self.assertEqual(items[0]["lead_id"], 901)
         self.assertEqual(items[0]["contact_id"], None)
         self.assertEqual(items[0]["phone"], "79990000001")
+        self.assertEqual(items[0]["phone_insights"]["region_label"], "г. Москва и Московская область")
+
+    def test_fetch_production_recall_deals_adds_phone_insights_for_known_region(self):
+        client = Mock()
+        client.paginated_call.return_value = [
+            {
+                "ID": "701",
+                "TITLE": "Сделка Москва",
+                "CONTACT_ID": "801",
+                "STAGE_ID": "PREPARATION",
+                "DATE_CREATE": "2026-04-01T10:00:00+03:00",
+                "COMMENTS": "",
+            }
+        ]
+        client.call.return_value = {
+            "NAME": "Иван",
+            "PHONE": [{"VALUE": "+7 (495) 000-00-01", "VALUE_TYPE": "WORK"}],
+        }
+        service = BitrixDealService(client=client)
+
+        items = service.fetch_production_recall_deals(
+            entity_type=CallEntityType.DEAL,
+            date_from=timezone.localdate(),
+            date_to=timezone.localdate(),
+            stage_id="PREPARATION",
+        )
+
+        self.assertEqual(len(items), 1)
+        self.assertIn("Москов", items[0]["phone_insights"]["region_label"])
+        self.assertEqual(items[0]["phone_insights"]["timezone_label"], "МСК")
+
+    def test_fetch_production_recall_deals_uses_local_def_json_for_mobile_region(self):
+        client = Mock()
+        client.paginated_call.return_value = [
+            {
+                "ID": "702",
+                "TITLE": "Сделка Ростов",
+                "CONTACT_ID": "802",
+                "STAGE_ID": "PREPARATION",
+                "DATE_CREATE": "2026-04-01T10:00:00+03:00",
+                "COMMENTS": "",
+            }
+        ]
+        client.call.return_value = {
+            "NAME": "Павел",
+            "PHONE": [{"VALUE": "+7 900 120-00-00", "VALUE_TYPE": "MOBILE"}],
+        }
+        service = BitrixDealService(client=client)
+
+        items = service.fetch_production_recall_deals(
+            entity_type=CallEntityType.DEAL,
+            date_from=timezone.localdate(),
+            date_to=timezone.localdate(),
+            stage_id="PREPARATION",
+        )
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["phone_insights"]["region_label"], "Ростовская обл.")
+        self.assertEqual(items[0]["phone_insights"]["timezone_label"], "МСК")
 
 
 class MegafonTelephonyTests(TestCase):
@@ -1233,7 +1292,7 @@ class CallQueueMegafonViewTests(TestCase):
             response_payload={"accepted": True},
             success=True,
         )
-        append_mock.return_value = "31.03 (менеджер) номер недоступен"
+        append_mock.return_value = "31.03 (Менеджер) номер недоступен"
         start_call_mock.return_value = ("PROD-CALL-3", {"callid": "PROD-CALL-3"})
         self.client.force_login(self.user)
 
@@ -1247,4 +1306,7 @@ class CallQueueMegafonViewTests(TestCase):
         payload = response.json()
         self.assertTrue(payload["started"])
         append_mock.assert_called_once()
-        self.assertEqual(append_mock.call_args.args[1], "02.04 (менеджер) номер недоступен")
+        self.assertEqual(
+            append_mock.call_args.args[1],
+            f"{timezone.localdate():%d.%m} (Менеджер) номер недоступен",
+        )

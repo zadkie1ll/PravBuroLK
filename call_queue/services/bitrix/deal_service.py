@@ -9,6 +9,7 @@ from django.utils import timezone
 from call_queue.models import CallEntityType
 
 from .client import BitrixClient
+from ..phone_insights import build_phone_insights
 
 
 def _safe_int(value):
@@ -220,6 +221,7 @@ class BitrixDealService:
                     "comments": (entity.get("COMMENTS") or "").strip(),
                     "stage_id": str(entity.get(stage_field) or ""),
                     "created_at": entity.get("DATE_CREATE") or "",
+                    "phone_insights": build_phone_insights(phones[0]),
                 }
             )
         return items
