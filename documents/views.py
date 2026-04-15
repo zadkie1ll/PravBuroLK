@@ -385,8 +385,11 @@ def _format_amount_rub(amount: Decimal) -> str:
 def _get_contract_payment_purpose(deal_data: dict) -> str:
     client_name = (deal_data.get("TITLE") or "").strip()
     contract_number = (deal_data.get(CONTRACT_NUMBER_FIELD) or "").strip()
-    contract_suffix = f" по договору №{contract_number}" if contract_number else ""
-    return f"Оплата юридических услуг {client_name}{contract_suffix}".strip()
+    if contract_number and client_name:
+        return f"Оплата по договору {contract_number} {client_name}"
+    if contract_number:
+        return f"Оплата по договору {contract_number}"
+    return f"Оплата по договору {client_name}".strip()
 
 
 def _get_alfa_register_url() -> str:

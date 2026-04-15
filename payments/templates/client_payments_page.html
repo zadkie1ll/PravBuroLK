@@ -105,6 +105,44 @@
                 >
             </div>
 
+            <!-- Первый платеж -->
+            <div>
+                <p class="text-slate-500 mb-1">Первый платеж</p>
+                <input
+                    type="number"
+                    step="0.01"
+                    name="first_payment"
+                    value="{{ contract.first_payment }}"
+                    class="w-full border rounded-lg p-2 focus:ring focus:ring-blue-300"
+                    required
+                >
+            </div>
+
+            <!-- Дата первого платежа -->
+            <div>
+                <p class="text-slate-500 mb-1">Дата первого платежа</p>
+                <input
+                    type="date"
+                    name="first_payment_date"
+                    value="{{ contract.first_payment_date|date:'Y-m-d' }}"
+                    class="w-full border rounded-lg p-2 focus:ring focus:ring-blue-300"
+                    required
+                >
+            </div>
+
+            <!-- Количество платежей -->
+            <div>
+                <p class="text-slate-500 mb-1">Количество платежей</p>
+                <input
+                    type="number"
+                    min="1"
+                    name="number_of_payments"
+                    value="{{ contract.number_of_payments }}"
+                    class="w-full border rounded-lg p-2 focus:ring focus:ring-blue-300"
+                    required
+                >
+            </div>
+
         </div>
 
         <button

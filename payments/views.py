@@ -49,13 +49,18 @@ def _extract_contract_deal_id_from_order(order_number: str) -> int | None:
     return int(match.group(1))
 
 
-def _add_bitrix_timeline_comment_for_deal(deal_id: int, comment: str) -> None:
+def _get_bitrix_webhook_url() -> str:
     bitrix_webhook = (
         getattr(settings, "BITRIX_WEBHOOK_URL", "")
         or getattr(settings, "BITRIX_WEBHOOK", "")
     ).rstrip("/")
     if not bitrix_webhook:
         raise RuntimeError("BITRIX_WEBHOOK_URL is not configured")
+    return bitrix_webhook
+
+
+def _add_bitrix_timeline_comment_for_deal(deal_id: int, comment: str) -> None:
+    bitrix_webhook = _get_bitrix_webhook_url()
 
     response = requests.post(
         f"{bitrix_webhook}/crm.timeline.comment.add",
@@ -72,6 +77,51 @@ def _add_bitrix_timeline_comment_for_deal(deal_id: int, comment: str) -> None:
         raise RuntimeError(payload.get("error_description") or payload["error"])
 
 
+def _get_bitrix_deal(deal_id: int) -> dict:
+    bitrix_webhook = _get_bitrix_webhook_url()
+    response = requests.get(
+        f"{bitrix_webhook}/crm.deal.get",
+        params={"ID": str(deal_id)},
+        timeout=15,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("error"):
+        raise RuntimeError(payload.get("error_description") or payload["error"])
+    return payload.get("result") or {}
+
+
+def _add_contract_payment_task_for_deal(deal_id: int) -> int | None:
+    deal = _get_bitrix_deal(deal_id)
+    responsible_id = str(deal.get("ASSIGNED_BY_ID") or "").strip()
+    if not responsible_id:
+        raise RuntimeError(f"Deal {deal_id} has no ASSIGNED_BY_ID")
+
+    deadline = (timezone.now() + timedelta(days=1)).isoformat()
+    bitrix_webhook = _get_bitrix_webhook_url()
+    response = requests.post(
+        f"{bitrix_webhook}/tasks.task.add",
+        data={
+            "fields[TITLE]": "Клиент внес оплату",
+            "fields[DESCRIPTION]": "Клиент внес оплату, необходимо перевести его в отдел сопровождения",
+            "fields[RESPONSIBLE_ID]": responsible_id,
+            "fields[DEADLINE]": deadline,
+        },
+        timeout=15,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if payload.get("error"):
+        raise RuntimeError(payload.get("error_description") or payload["error"])
+    result = payload.get("result") or {}
+    task = result.get("task") if isinstance(result, dict) else None
+    task_id = (task or {}).get("id") if isinstance(task, dict) else result
+    try:
+        return int(task_id)
+    except (TypeError, ValueError):
+        return None
+
+
 def _handle_contract_payment_callback(order_number: str, amount: Decimal) -> JsonResponse:
     deal_id = _extract_contract_deal_id_from_order(order_number)
     if not deal_id:
@@ -83,6 +133,7 @@ def _handle_contract_payment_callback(order_number: str, amount: Decimal) -> Jso
         f"Номер платежа: {order_number}"
     )
     _add_bitrix_timeline_comment_for_deal(deal_id, comment)
+    task_id = _add_contract_payment_task_for_deal(deal_id)
 
     return JsonResponse(
         {
@@ -91,6 +142,8 @@ def _handle_contract_payment_callback(order_number: str, amount: Decimal) -> Jso
             "orderNumber": order_number,
             "amount": str(amount),
             "comment_added": True,
+            "task_created": True,
+            "task_id": task_id,
         },
         status=200,
     )
@@ -269,12 +322,21 @@ def update_contract_info(request, contract_id):
     contract = get_object_or_404(Contract, id=contract_id)
 
     if request.method == "POST":
-        total_amount = request.POST.get("total_amount")
-        discount = request.POST.get("discount")
-
         try:
+            total_amount = Decimal(request.POST.get("total_amount", "0"))
+            discount = Decimal(request.POST.get("discount", "0"))
+            first_payment = Decimal(request.POST.get("first_payment", "0"))
+            first_payment_date = datetime.strptime(request.POST.get("first_payment_date", ""), "%Y-%m-%d").date()
+            number_of_payments = int(request.POST.get("number_of_payments", "1"))
+
+            if number_of_payments < 1:
+                raise ValueError("Количество платежей должно быть больше нуля")
+
             contract.total_amount = total_amount
             contract.discount = discount
+            contract.first_payment = first_payment
+            contract.first_payment_date = first_payment_date
+            contract.number_of_payments = number_of_payments
             contract.save()
 
             messages.success(request, "Изменения сохранены.")

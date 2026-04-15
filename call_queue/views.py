@@ -26,6 +26,7 @@ from .forms import (
 from .models import BitrixSyncLog, CallEntityType, CallQueueItem, CallSession, CallSessionStatus
 from .selectors import get_active_item_for_manager, get_recent_sessions, get_session_with_stats
 from .services.bitrix.deal_service import BitrixDealService
+from .services.phone_insights import normalize_russian_phone_digits
 from .services.telephony.megafon import MegafonAPIError, MegafonTelephonyService
 from .services.queue_service import QueueService
 
@@ -332,6 +333,7 @@ def get_prod_queue(request) -> list[dict]:
         if not isinstance(item, dict):
             continue
         normalized = dict(item)
+        normalized = with_social_desktop_links(normalized)
         entity_type = normalized.get("entity_type") or CallEntityType.DEAL
         normalized.setdefault("entity_type", entity_type)
         if not normalized.get("entity_id"):
@@ -387,10 +389,32 @@ def build_prod_handler_url(call_id: str = "", auto_dial: bool = False) -> str:
 
 
 def build_whatsapp_chat_url(phone: str) -> str:
-    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
-    if len(digits) == 11 and digits.startswith("8"):
-        digits = f"7{digits[1:]}"
+    digits = normalize_russian_phone_digits(phone)
     return f"https://wa.me/{digits}" if digits else ""
+
+
+def build_whatsapp_desktop_url(phone: str) -> str:
+    digits = normalize_russian_phone_digits(phone)
+    return f"whatsapp://send?phone={digits}" if digits else ""
+
+
+def build_telegram_desktop_url(phone: str) -> str:
+    digits = normalize_russian_phone_digits(phone)
+    return f"tg://resolve?phone={digits}" if digits else ""
+
+
+def build_max_desktop_url() -> str:
+    return getattr(settings, "CALL_QUEUE_MAX_DESKTOP_URL", "max://") or "max://"
+
+
+def with_social_desktop_links(item: dict) -> dict:
+    phone = item.get("phone", "")
+    return {
+        **item,
+        "whatsapp_desktop_url": build_whatsapp_desktop_url(phone),
+        "telegram_desktop_url": build_telegram_desktop_url(phone),
+        "max_desktop_url": build_max_desktop_url(),
+    }
 
 
 def get_production_form_initial(config: dict, today):
@@ -893,13 +917,15 @@ def production_handler(request):
                     stage_id=form.cleaned_data["stage_id"],
                 )
                 queue = [
-                    {
-                        **item,
-                        "status": "pending",
-                        "manual_decision": "",
-                        "comment_logged": False,
-                        "call_id": "",
-                    }
+                    with_social_desktop_links(
+                        {
+                            **item,
+                            "status": "pending",
+                            "manual_decision": "",
+                            "comment_logged": False,
+                            "call_id": "",
+                        }
+                    )
                     for item in items
                 ]
                 request.session[MEGAFON_PROD_QUEUE_SESSION_KEY] = queue
@@ -982,9 +1008,10 @@ def production_handler(request):
             "current_snapshot": current_snapshot,
             "auto_dial_enabled": bool(config.get("auto_dial", True)),
             "current_entity_type": config.get("entity_type") or CallEntityType.DEAL,
-            "current_whatsapp_url": build_whatsapp_chat_url(current_item.get("phone", "")) if current_item else "",
-            "current_max_url": "https://web.max.ru/" if current_item else "",
-            "max_web_url": "https://web.max.ru/",
+            "current_whatsapp_url": current_item.get("whatsapp_desktop_url", "") if current_item else "",
+            "current_telegram_url": current_item.get("telegram_desktop_url", "") if current_item else "",
+            "current_max_url": current_item.get("max_desktop_url", build_max_desktop_url()) if current_item else "",
+            "max_desktop_url": build_max_desktop_url(),
         },
     )
 

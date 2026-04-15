@@ -152,7 +152,7 @@ class ContractConfirmationPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Оплатить")
         self.assertContains(response, "20 000 ₽")
-        self.assertContains(response, "Оплата юридических услуг Петров Петр Петрович по договору №77/2026")
+        self.assertContains(response, "Оплата по договору 77/2026 Петров Петр Петрович")
         self.assertContains(response, "СВИРИДЕНКО СТАНИСЛАВ ВАЛЕРЬЕВИЧ (ИП)")
         self.assertContains(response, "проспект 40-летия Победы")
         self.assertContains(response, "RUR")
@@ -310,7 +310,7 @@ class ContractPaymentRedirectTests(TestCase):
         self.assertEqual(mock_post.call_args.kwargs["data"]["amount"], 2000000)
         self.assertEqual(
             mock_post.call_args.kwargs["data"]["description"],
-            "Оплата юридических услуг Иванов Иван Иванович по договору №42/2026",
+            "Оплата по договору 42/2026 Иванов Иван Иванович",
         )
 
 

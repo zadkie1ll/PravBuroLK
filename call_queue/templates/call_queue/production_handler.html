@@ -231,8 +231,13 @@
                 </a>
               {% endif %}
               {% if current_whatsapp_url %}
-                <a href="{{ current_whatsapp_url }}" target="_blank" rel="noopener" class="rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
-                  WhatsApp
+                <a href="{{ current_whatsapp_url }}" class="rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
+                  WhatsApp Desktop
+                </a>
+              {% endif %}
+              {% if current_telegram_url %}
+                <a href="{{ current_telegram_url }}" class="rounded-full bg-sky-600 px-5 py-3 text-sm font-medium text-white transition hover:bg-sky-500">
+                  Telegram Desktop
                 </a>
               {% endif %}
               <button
@@ -242,11 +247,11 @@
                 data-phone="{{ current_item.phone }}"
                 class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-700"
               >
-                MAX
+                MAX Desktop
               </button>
             </div>
             <p class="mt-3 text-xs text-slate-500">
-              Кнопка MAX откроет web MAX и скопирует номер клиента в буфер для быстрого поиска.
+              MAX откроет десктоп-приложение и скопирует номер клиента в буфер для быстрого поиска.
             </p>
           </div>
         {% else %}
@@ -336,17 +341,24 @@
                       Открыть в Bitrix
                     </a>
                   {% endif %}
-                  <a href="https://wa.me/{{ item.phone }}" target="_blank" rel="noopener" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500">
-                    WhatsApp
-                  </a>
+                  {% if item.whatsapp_desktop_url %}
+                    <a href="{{ item.whatsapp_desktop_url }}" class="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500">
+                      WhatsApp Desktop
+                    </a>
+                  {% endif %}
+                  {% if item.telegram_desktop_url %}
+                    <a href="{{ item.telegram_desktop_url }}" class="rounded-full bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-500">
+                      Telegram Desktop
+                    </a>
+                  {% endif %}
                   <button
                     type="button"
                     data-open-max
-                    data-max-url="{{ max_web_url }}"
+                    data-max-url="{{ item.max_desktop_url|default:max_desktop_url }}"
                     data-phone="{{ item.phone }}"
                     class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
                   >
-                    MAX
+                    MAX Desktop
                   </button>
                   <form method="post">
                     {% csrf_token %}
@@ -581,20 +593,22 @@
     })();
 
     (function () {
-      const maxButton = document.querySelector("[data-open-max]");
-      if (!maxButton) return;
-      maxButton.addEventListener("click", async function () {
-        const maxUrl = maxButton.dataset.maxUrl || "https://web.max.ru/";
-        const phone = maxButton.dataset.phone || "";
-        window.open(maxUrl, "_blank", "noopener");
-        if (!phone || !navigator.clipboard || !navigator.clipboard.writeText) return;
-        try {
-          await navigator.clipboard.writeText(phone);
-        } catch (_error) {
-          // ignore clipboard issues in unsupported browsers
-        }
+      const maxButtons = document.querySelectorAll("[data-open-max]");
+      if (!maxButtons.length) return;
+      maxButtons.forEach((maxButton) => {
+        maxButton.addEventListener("click", async function () {
+          const maxUrl = maxButton.dataset.maxUrl || "max://";
+          const phone = maxButton.dataset.phone || "";
+          window.location.href = maxUrl;
+          if (!phone || !navigator.clipboard || !navigator.clipboard.writeText) return;
+          try {
+            await navigator.clipboard.writeText(phone);
+          } catch (_error) {
+            // ignore clipboard issues in unsupported browsers
+          }
+        });
       });
     })();
-  </script>
+</script>
 </body>
 </html>
