@@ -20,7 +20,7 @@ from call_queue.models import (
     CallSessionStatus,
 )
 from call_queue.services.bitrix.deal_service import BitrixDealService
-from call_queue.services.phone_insights import build_phone_insights
+from call_queue.services.phone_insights import build_phone_insights, get_timezone_label, infer_timezone_by_region
 from call_queue.services.queue_service import QueueService
 from call_queue.services.telephony.megafon import MegafonAPIError, MegafonTelephonyService
 from call_queue.views import (
@@ -354,6 +354,27 @@ class BitrixDealServiceFilterTests(TestCase):
 
         self.assertEqual(insights["region_label"], "Ростовская обл.")
         self.assertEqual(insights["timezone_label"], "МСК")
+
+    def test_region_timezone_inference_handles_non_moscow_mobile_regions(self):
+        cases = {
+            "Кемеровская обл.": "Asia/Novokuznetsk",
+            "Ханты - Мансийский - Югра АО": "Asia/Yekaterinburg",
+            "Ямало-Ненецкий АО": "Asia/Yekaterinburg",
+            "Удмуртская Республика": "Europe/Samara",
+            "Республика Тыва": "Asia/Krasnoyarsk",
+            "Республика Хакасия": "Asia/Krasnoyarsk",
+        }
+
+        for region, expected_timezone in cases.items():
+            with self.subTest(region=region):
+                self.assertEqual(infer_timezone_by_region(region), expected_timezone)
+
+    def test_timezone_label_is_relative_to_moscow(self):
+        self.assertEqual(get_timezone_label("Europe/Moscow"), "МСК")
+        self.assertEqual(get_timezone_label("Europe/Samara"), "МСК+1")
+        self.assertEqual(get_timezone_label("Asia/Yekaterinburg"), "МСК+2")
+        self.assertEqual(get_timezone_label("Asia/Novokuznetsk"), "МСК+4")
+        self.assertEqual(get_timezone_label("Europe/Kaliningrad"), "МСК-1")
 
     def test_fetch_deals_uses_moscow_day_boundaries_for_bitrix_date_filter(self):
         client = Mock()

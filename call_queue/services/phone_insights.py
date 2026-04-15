@@ -58,11 +58,17 @@ REGION_TIMEZONE_KEYWORDS = [
     ("санкт-петербург", "Europe/Moscow"),
     ("ленинград", "Europe/Moscow"),
     ("калининград", "Europe/Kaliningrad"),
+    ("удмурт", "Europe/Samara"),
     ("самар", "Europe/Samara"),
     ("астрахан", "Europe/Astrakhan"),
     ("саратов", "Europe/Saratov"),
     ("ульянов", "Europe/Ulyanovsk"),
     ("волгоград", "Europe/Volgograd"),
+    ("ханты", "Asia/Yekaterinburg"),
+    ("сургут", "Asia/Yekaterinburg"),
+    ("ямало", "Asia/Yekaterinburg"),
+    ("абзелил", "Asia/Yekaterinburg"),
+    ("белорец", "Asia/Yekaterinburg"),
     ("свердлов", "Asia/Yekaterinburg"),
     ("челябин", "Asia/Yekaterinburg"),
     ("тюмен", "Asia/Yekaterinburg"),
@@ -71,9 +77,13 @@ REGION_TIMEZONE_KEYWORDS = [
     ("оренбург", "Asia/Yekaterinburg"),
     ("курган", "Asia/Yekaterinburg"),
     ("омск", "Asia/Omsk"),
+    ("кемеров", "Asia/Novokuznetsk"),
     ("новосибир", "Asia/Novosibirsk"),
     ("томск", "Asia/Tomsk"),
     ("алтай", "Asia/Barnaul"),
+    ("тыва", "Asia/Krasnoyarsk"),
+    ("тува", "Asia/Krasnoyarsk"),
+    ("хакас", "Asia/Krasnoyarsk"),
     ("краснояр", "Asia/Krasnoyarsk"),
     ("иркут", "Asia/Irkutsk"),
     ("бурят", "Asia/Irkutsk"),
@@ -133,6 +143,21 @@ def infer_timezone_by_region(region_label: str) -> str:
     return "Europe/Moscow"
 
 
+def get_timezone_label(timezone_name: str) -> str:
+    if not timezone_name:
+        return ""
+    current_dt = timezone.now()
+    local_offset = current_dt.astimezone(ZoneInfo(timezone_name)).utcoffset()
+    moscow_offset = current_dt.astimezone(ZoneInfo("Europe/Moscow")).utcoffset()
+    if local_offset is None or moscow_offset is None:
+        return timezone_name
+    diff_hours = int((local_offset - moscow_offset).total_seconds() // 3600)
+    if diff_hours == 0:
+        return "МСК"
+    sign = "+" if diff_hours > 0 else ""
+    return f"МСК{sign}{diff_hours}"
+
+
 def lookup_mobile_region_by_json(digits: str) -> tuple[str, str]:
     if len(digits) != 11 or not digits.startswith("79"):
         return "", ""
@@ -166,7 +191,7 @@ def build_phone_insights(phone: str) -> dict[str, str | bool]:
             result.update(
                 {
                     "region_label": region_label,
-                    "timezone_label": TIMEZONE_LABELS.get(timezone_name, timezone_name),
+                    "timezone_label": get_timezone_label(timezone_name),
                     "local_time": local_dt.strftime("%H:%M"),
                     "is_estimated": False,
                 }
@@ -186,7 +211,7 @@ def build_phone_insights(phone: str) -> dict[str, str | bool]:
                     if timezone_name:
                         local_dt = timezone.now().astimezone(ZoneInfo(timezone_name))
                         local_time = local_dt.strftime("%H:%M")
-                        timezone_label = TIMEZONE_LABELS.get(timezone_name, timezone_name)
+                        timezone_label = get_timezone_label(timezone_name)
                     result.update(
                         {
                             "region_label": region_label or "Россия",
@@ -204,7 +229,7 @@ def build_phone_insights(phone: str) -> dict[str, str | bool]:
                 result.update(
                     {
                         "region_label": f"{rule.region_label} (ориентировочно)",
-                        "timezone_label": TIMEZONE_LABELS.get(rule.timezone_name, rule.timezone_name),
+                        "timezone_label": get_timezone_label(rule.timezone_name),
                         "local_time": local_dt.strftime("%H:%M"),
                         "is_estimated": True,
                     }
