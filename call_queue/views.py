@@ -1,6 +1,7 @@
 from functools import wraps
 import json
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -46,6 +47,18 @@ MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY = "megafon_prod_queue_index"
 MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY = "megafon_prod_queue_config"
 MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY = "megafon_prod_active_call_id"
 MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY = "megafon_prod_last_completed_call_id"
+
+
+def get_call_queue_timezone() -> ZoneInfo:
+    timezone_name = getattr(settings, "CALL_QUEUE_BITRIX_TIME_ZONE", "Europe/Moscow")
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("Europe/Moscow")
+
+
+def get_call_queue_localdate():
+    return timezone.now().astimezone(get_call_queue_timezone()).date()
 
 
 def append_megafon_log(event_type: str, payload: dict):
@@ -411,11 +424,11 @@ def get_manager_short_name(manager_profile: SalesManager) -> str:
 
 
 def format_unanswered_comment(manager_profile: SalesManager) -> str:
-    return f"{timezone.localdate():%d.%m} ({get_manager_short_name(manager_profile)}) недозвон"
+    return f"{get_call_queue_localdate():%d.%m} ({get_manager_short_name(manager_profile)}) недозвон"
 
 
 def format_unavailable_comment(manager_profile: SalesManager) -> str:
-    return f"{timezone.localdate():%d.%m} ({get_manager_short_name(manager_profile)}) номер недоступен"
+    return f"{get_call_queue_localdate():%d.%m} ({get_manager_short_name(manager_profile)}) номер недоступен"
 
 
 def mark_prod_item(request, index: int, **updates) -> dict | None:
@@ -842,7 +855,7 @@ def megafon_auto_next_call(request):
 @require_http_methods(["GET", "POST"])
 def production_handler(request):
     bitrix_service = BitrixDealService()
-    today = timezone.localdate()
+    today = get_call_queue_localdate()
     queue, current_index, current_item = get_prod_current_item(request)
     config = request.session.get(MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY, {}) or {}
 
@@ -1017,7 +1030,7 @@ def production_handler_resolve(request):
     )
     if decision == "failed" and not item.get("comment_logged"):
         comment_line = format_unanswered_comment(request.sales_manager_profile)
-        updated_comments = BitrixDealService().append_entity_comment(
+        updated_comments = bitrix_service.append_entity_comment(
             item.get("entity_type") or CallEntityType.DEAL,
             item.get("entity_id") or item.get("deal_id"),
             comment_line,

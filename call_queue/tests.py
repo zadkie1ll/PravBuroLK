@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 from pathlib import Path
 import tempfile
+from datetime import date
 
 import requests
 from django.contrib.auth import get_user_model
@@ -19,6 +20,7 @@ from call_queue.models import (
     CallSessionStatus,
 )
 from call_queue.services.bitrix.deal_service import BitrixDealService
+from call_queue.services.phone_insights import build_phone_insights
 from call_queue.services.queue_service import QueueService
 from call_queue.services.telephony.megafon import MegafonAPIError, MegafonTelephonyService
 from call_queue.views import (
@@ -341,6 +343,56 @@ class MegafonWebhookTests(TestCase):
 
 
 class BitrixDealServiceFilterTests(TestCase):
+    def test_phone_insights_detects_region_for_ten_digit_mobile(self):
+        insights = build_phone_insights("9001200000")
+
+        self.assertEqual(insights["region_label"], "Ростовская обл.")
+        self.assertEqual(insights["timezone_label"], "МСК")
+
+    def test_phone_insights_ignores_extension_digits(self):
+        insights = build_phone_insights("+7 (900) 120-00-00 доб. 123")
+
+        self.assertEqual(insights["region_label"], "Ростовская обл.")
+        self.assertEqual(insights["timezone_label"], "МСК")
+
+    def test_fetch_deals_uses_moscow_day_boundaries_for_bitrix_date_filter(self):
+        client = Mock()
+        client.paginated_call.return_value = []
+        service = BitrixDealService(client=client)
+
+        service.fetch_deals(
+            {
+                "entity_type": CallEntityType.DEAL,
+                "date_from": "2026-04-01",
+                "date_to": "2026-04-01",
+                "stage_id": "",
+                "source_id": "",
+                "responsible_id": "",
+                "only_unanswered": False,
+                "only_without_repeat": False,
+            }
+        )
+
+        params = client.paginated_call.call_args.args[1]
+        self.assertEqual(params["filter"][">=DATE_CREATE"], "2026-04-01T00:00:00+03:00")
+        self.assertEqual(params["filter"]["<=DATE_CREATE"], "2026-04-01T23:59:59.999999+03:00")
+
+    def test_fetch_production_recall_deals_uses_moscow_day_boundaries(self):
+        client = Mock()
+        client.paginated_call.return_value = []
+        service = BitrixDealService(client=client)
+
+        service.fetch_production_recall_deals(
+            entity_type=CallEntityType.LEAD,
+            date_from=date(2026, 4, 1),
+            date_to=date(2026, 4, 2),
+            stage_id="IN_PROCESS",
+        )
+
+        params = client.paginated_call.call_args.args[1]
+        self.assertEqual(params["filter"][">=DATE_CREATE"], "2026-04-01T00:00:00+03:00")
+        self.assertEqual(params["filter"]["<=DATE_CREATE"], "2026-04-02T23:59:59.999999+03:00")
+
     def test_only_unanswered_uses_deal_preparation_stage(self):
         client = Mock()
         client.paginated_call.return_value = []
@@ -471,6 +523,34 @@ class BitrixDealServiceFilterTests(TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["phone_insights"]["region_label"], "Ростовская обл.")
         self.assertEqual(items[0]["phone_insights"]["timezone_label"], "МСК")
+
+    def test_fetch_production_recall_deals_strips_phone_extension_before_region_lookup(self):
+        client = Mock()
+        client.paginated_call.return_value = [
+            {
+                "ID": "703",
+                "TITLE": "Сделка с добавочным",
+                "CONTACT_ID": "803",
+                "STAGE_ID": "PREPARATION",
+                "DATE_CREATE": "2026-04-01T10:00:00+03:00",
+                "COMMENTS": "",
+            }
+        ]
+        client.call.return_value = {
+            "NAME": "Павел",
+            "PHONE": [{"VALUE": "+7 (900) 120-00-00 доб. 123", "VALUE_TYPE": "MOBILE"}],
+        }
+        service = BitrixDealService(client=client)
+
+        items = service.fetch_production_recall_deals(
+            entity_type=CallEntityType.DEAL,
+            date_from=timezone.localdate(),
+            date_to=timezone.localdate(),
+            stage_id="PREPARATION",
+        )
+
+        self.assertEqual(items[0]["phone"], "79001200000")
+        self.assertEqual(items[0]["phone_insights"]["region_label"], "Ростовская обл.")
 
 
 class MegafonTelephonyTests(TestCase):

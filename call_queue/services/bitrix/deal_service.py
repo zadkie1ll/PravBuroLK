@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime, time
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
-from django.utils import timezone
 
 from call_queue.models import CallEntityType
 
 from .client import BitrixClient
-from ..phone_insights import build_phone_insights
+from ..phone_insights import build_phone_insights, normalize_russian_phone_digits
 
 
 def _safe_int(value):
@@ -22,15 +22,23 @@ def _safe_int(value):
 
 
 def _normalize_phone(value: Any) -> str:
-    raw = str(value or "").strip()
-    if not raw:
-        return ""
-    digits = "".join(ch for ch in raw if ch.isdigit())
-    if len(digits) == 11 and digits.startswith("8") and not digits.startswith("8800"):
-        return f"7{digits[1:]}"
-    if len(digits) == 10:
-        return f"7{digits}"
-    return digits
+    return normalize_russian_phone_digits(str(value or ""), preserve_toll_free_8=True)
+
+
+def _get_bitrix_timezone() -> ZoneInfo:
+    timezone_name = getattr(settings, "CALL_QUEUE_BITRIX_TIME_ZONE", "Europe/Moscow")
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        return ZoneInfo("Europe/Moscow")
+
+
+def _build_bitrix_date_range(date_from, date_to) -> tuple[datetime, datetime]:
+    bitrix_timezone = _get_bitrix_timezone()
+    return (
+        datetime.combine(date_from, time.min, tzinfo=bitrix_timezone),
+        datetime.combine(date_to, time.max, tzinfo=bitrix_timezone),
+    )
 
 
 class BitrixDealService:
@@ -120,8 +128,7 @@ class BitrixDealService:
         entity_type = filters.get("entity_type", CallEntityType.DEAL)
         date_from = datetime.fromisoformat(filters["date_from"]).date()
         date_to = datetime.fromisoformat(filters["date_to"]).date()
-        from_dt = timezone.make_aware(datetime.combine(date_from, time.min))
-        to_dt = timezone.make_aware(datetime.combine(date_to, time.max))
+        from_dt, to_dt = _build_bitrix_date_range(date_from, date_to)
 
         bitrix_filter: dict[str, Any] = {
             ">=DATE_CREATE": from_dt.isoformat(),
@@ -166,8 +173,7 @@ class BitrixDealService:
         date_to,
         stage_id: str = "PREPARATION",
     ) -> list[dict[str, Any]]:
-        from_dt = timezone.make_aware(datetime.combine(date_from, time.min))
-        to_dt = timezone.make_aware(datetime.combine(date_to, time.max))
+        from_dt, to_dt = _build_bitrix_date_range(date_from, date_to)
         method = "crm.deal.list" if entity_type == CallEntityType.DEAL else "crm.lead.list"
         stage_field = "STAGE_ID" if entity_type == CallEntityType.DEAL else "STATUS_ID"
         select_fields = (

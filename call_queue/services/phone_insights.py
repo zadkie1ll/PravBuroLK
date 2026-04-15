@@ -98,6 +98,33 @@ def load_def_9xx_ranges() -> dict[str, list[dict[str, int | str]]]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def normalize_russian_phone_digits(phone: str, *, preserve_toll_free_8: bool = False) -> str:
+    raw = str(phone or "").strip()
+    if not raw:
+        return ""
+
+    fallback_digits = "".join(ch for ch in raw if ch.isdigit())
+    if preserve_toll_free_8 and fallback_digits.startswith("8800") and len(fallback_digits) >= 11:
+        return fallback_digits[:11]
+
+    try:
+        parsed = phonenumbers.parse(raw, "RU")
+        if parsed.country_code == 7 and phonenumbers.is_possible_number(parsed):
+            return f"7{str(parsed.national_number).zfill(10)}"
+    except phonenumbers.NumberParseException:
+        pass
+
+    if len(fallback_digits) >= 11 and fallback_digits.startswith("8"):
+        return f"7{fallback_digits[1:11]}"
+    if len(fallback_digits) >= 11 and fallback_digits.startswith("7"):
+        return fallback_digits[:11]
+    if len(fallback_digits) >= 10 and fallback_digits.startswith("9"):
+        return f"7{fallback_digits[:10]}"
+    if len(fallback_digits) == 10:
+        return f"7{fallback_digits}"
+    return fallback_digits
+
+
 def infer_timezone_by_region(region_label: str) -> str:
     normalized = str(region_label or "").strip().lower()
     for keyword, timezone_name in REGION_TIMEZONE_KEYWORDS:
@@ -123,9 +150,7 @@ def lookup_mobile_region_by_json(digits: str) -> tuple[str, str]:
 
 
 def build_phone_insights(phone: str) -> dict[str, str | bool]:
-    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
-    if len(digits) == 11 and digits.startswith("8"):
-        digits = f"7{digits[1:]}"
+    digits = normalize_russian_phone_digits(phone)
     result = {
         "region_label": "",
         "timezone_label": "",
