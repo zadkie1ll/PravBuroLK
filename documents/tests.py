@@ -6,11 +6,9 @@ from pathlib import Path
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.test.utils import override_settings
-from docx import Document
 from requests import HTTPError
 
 from documents.views import CONTRACT_ACCEPTED_FIELD, _build_contract_token, contract_document_file, contract_payment_redirect, dogovor
-from documents.views import apply_table_grid_style
 from documents.views import _resolve_contract_download_url
 
 
@@ -333,19 +331,6 @@ class DogovorWebhookTests(TestCase):
         response.json.return_value = payload
         response.raise_for_status.return_value = None
         return response
-
-    def test_payment_table_uses_manual_grid_when_template_style_is_missing(self):
-        doc = Document()
-        table = doc.add_table(rows=1, cols=1)
-        table_style = type(table).style
-
-        def missing_style_setter(self, value):
-            raise KeyError("no style with name 'Table Grid'")
-
-        with patch.object(type(table), "style", new=property(table_style.fget, missing_style_setter)):
-            apply_table_grid_style(table)
-
-        self.assertIsNotNone(table._tbl.tblPr.first_child_found_in("w:tblBorders"))
 
     @patch("documents.views.generate_contract")
     @patch("documents.views._get_documents_dir")

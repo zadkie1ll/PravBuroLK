@@ -25,7 +25,6 @@ from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from docx import Document
-from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt
 
@@ -927,32 +926,6 @@ def apply_style_to_table_cells(doc):
                         apply_montserrat_to_run(run)
 
 
-def apply_table_grid_style(table):
-    """Применяет сетку таблицы, даже если в шаблоне нет стиля Table Grid."""
-    try:
-        table.style = "Table Grid"
-        return
-    except KeyError:
-        logger.warning("Table Grid style is missing in docx template; applying table borders manually")
-
-    tbl_pr = table._tbl.tblPr
-    tbl_borders = tbl_pr.first_child_found_in("w:tblBorders")
-    if tbl_borders is None:
-        tbl_borders = OxmlElement("w:tblBorders")
-        tbl_pr.append(tbl_borders)
-
-    for border_name in ("top", "left", "bottom", "right", "insideH", "insideV"):
-        tag = f"w:{border_name}"
-        border = tbl_borders.find(qn(tag))
-        if border is None:
-            border = OxmlElement(tag)
-            tbl_borders.append(border)
-        border.set(qn("w:val"), "single")
-        border.set(qn("w:sz"), "4")
-        border.set(qn("w:space"), "0")
-        border.set(qn("w:color"), "auto")
-
-
 def insert_table_after_heading(doc, table_data):
     """Вставляет таблицу после заголовка `ГРАФИК ПЛАТЕЖЕЙ`."""
     heading_text = "ГРАФИК ПЛАТЕЖЕЙ"
@@ -960,7 +933,7 @@ def insert_table_after_heading(doc, table_data):
     for paragraph in doc.paragraphs:
         if heading_text in paragraph.text:
             table = doc.add_table(rows=len(table_data) + 1, cols=3)
-            apply_table_grid_style(table)
+            table.style = "Table Grid"
 
             headers = ["П/П", "Дата платежа", "Сумма платежа"]
             for col_idx, header in enumerate(headers):
