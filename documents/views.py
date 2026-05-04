@@ -6,6 +6,7 @@ import os
 import re
 import time
 import traceback
+from copy import deepcopy
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -890,11 +891,20 @@ def set_run_font(run, font_name='Montserrat', font_size=10):
 def replace_text_in_paragraphs(doc, data):
     """Заменяет плейсхолдеры вида {{ключ}} на значения из data во всём документе."""
     def process_paragraph(paragraph):
+        full_text = paragraph.text
         for key, value in data.items():
             placeholder = f"{{{{{key}}}}}"
             if value is None:
                 value = ""
-            replace_placeholder_in_paragraph(paragraph, placeholder, str(value))
+            full_text = full_text.replace(placeholder, str(value))
+
+        if full_text != paragraph.text:
+            for _ in range(len(paragraph.runs)):
+                paragraph.runs[0].clear()
+                paragraph.runs[0]._element.getparent().remove(paragraph.runs[0]._element)
+
+            run = paragraph.add_run(full_text)
+            set_run_font(run)
 
     # Параграфы вне таблиц
     for paragraph in doc.paragraphs:
@@ -908,41 +918,6 @@ def replace_text_in_paragraphs(doc, data):
                     process_paragraph(paragraph)
 
 
-def replace_placeholder_in_paragraph(paragraph, placeholder, value):
-    """Заменяет плейсхолдер, сохраняя существующие runs и форматирование шаблона."""
-    while placeholder in paragraph.text:
-        char_pos = 0
-        start_run_idx = None
-        end_run_idx = None
-        start_offset = 0
-        end_offset = 0
-        placeholder_start = paragraph.text.find(placeholder)
-        placeholder_end = placeholder_start + len(placeholder)
-
-        for run_idx, run in enumerate(paragraph.runs):
-            run_end = char_pos + len(run.text)
-            if start_run_idx is None and char_pos <= placeholder_start < run_end:
-                start_run_idx = run_idx
-                start_offset = placeholder_start - char_pos
-            if start_run_idx is not None and char_pos < placeholder_end <= run_end:
-                end_run_idx = run_idx
-                end_offset = placeholder_end - char_pos
-                break
-            char_pos = run_end
-
-        if start_run_idx is None or end_run_idx is None:
-            break
-
-        start_run = paragraph.runs[start_run_idx]
-        end_run = paragraph.runs[end_run_idx]
-        prefix = start_run.text[:start_offset]
-        suffix = end_run.text[end_offset:]
-        start_run.text = f"{prefix}{value}{suffix}"
-
-        for run_idx in range(start_run_idx + 1, end_run_idx + 1):
-            paragraph.runs[run_idx].text = ""
-
-
 def apply_style_to_table_cells(doc):
     """Применяет шрифт Montserrat 10pt ко всем runs в таблицах документа."""
     for table in doc.tables:
@@ -953,14 +928,32 @@ def apply_style_to_table_cells(doc):
                         apply_montserrat_to_run(run)
 
 
-def apply_table_grid_style(table):
-    """Применяет сетку таблицы, даже если в шаблоне нет стиля Table Grid."""
+def ensure_table_grid_style(doc):
+    """Добавляет стандартный стиль Table Grid, если его нет в docx-шаблоне."""
+    try:
+        doc.styles["Table Grid"]
+        return
+    except KeyError:
+        pass
+
+    default_doc = Document()
+    try:
+        default_table_grid = default_doc.styles["Table Grid"]
+    except KeyError:
+        logger.warning("Default docx styles do not contain Table Grid")
+        return
+
+    doc.styles.element.append(deepcopy(default_table_grid.element))
+
+
+def apply_table_grid_style(doc, table):
+    """Применяет сетку таблицы как в прежней генерации договора."""
+    ensure_table_grid_style(doc)
     try:
         table.style = "Table Grid"
     except KeyError:
         logger.warning("Table Grid style is missing in docx template; applying table borders manually")
-
-    apply_table_borders(table)
+        apply_table_borders(table)
 
 
 def apply_table_borders(table):
@@ -1005,7 +998,7 @@ def insert_table_after_heading(doc, table_data):
     for paragraph in doc.paragraphs:
         if heading_text in paragraph.text:
             table = doc.add_table(rows=len(table_data) + 1, cols=3)
-            apply_table_grid_style(table)
+            apply_table_grid_style(doc, table)
 
             headers = ["П/П", "Дата платежа", "Сумма платежа"]
             for col_idx, header in enumerate(headers):
@@ -1028,7 +1021,6 @@ def insert_table_after_heading(doc, table_data):
                     cell.text = str(cell_data)
                     cell.paragraphs[0].alignment = 1 
 
-            apply_table_borders(table)
             paragraph._element.addnext(table._element)
             break
 
