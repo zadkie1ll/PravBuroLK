@@ -957,10 +957,14 @@ def apply_table_grid_style(table):
     """Применяет сетку таблицы, даже если в шаблоне нет стиля Table Grid."""
     try:
         table.style = "Table Grid"
-        return
     except KeyError:
         logger.warning("Table Grid style is missing in docx template; applying table borders manually")
 
+    apply_table_borders(table)
+
+
+def apply_table_borders(table):
+    """Проставляет видимые границы таблицы на уровне таблицы и каждой ячейки."""
     tbl_pr = table._tbl.tblPr
     tbl_borders = tbl_pr.first_child_found_in("w:tblBorders")
     if tbl_borders is None:
@@ -968,15 +972,30 @@ def apply_table_grid_style(table):
         tbl_pr.append(tbl_borders)
 
     for border_name in ("top", "left", "bottom", "right", "insideH", "insideV"):
-        tag = f"w:{border_name}"
-        border = tbl_borders.find(qn(tag))
-        if border is None:
-            border = OxmlElement(tag)
-            tbl_borders.append(border)
-        border.set(qn("w:val"), "single")
-        border.set(qn("w:sz"), "4")
-        border.set(qn("w:space"), "0")
-        border.set(qn("w:color"), "auto")
+        ensure_border(tbl_borders, border_name)
+
+    for row in table.rows:
+        for cell in row.cells:
+            tc_pr = cell._tc.get_or_add_tcPr()
+            tc_borders = tc_pr.first_child_found_in("w:tcBorders")
+            if tc_borders is None:
+                tc_borders = OxmlElement("w:tcBorders")
+                tc_pr.append(tc_borders)
+
+            for border_name in ("top", "left", "bottom", "right"):
+                ensure_border(tc_borders, border_name)
+
+
+def ensure_border(parent, border_name):
+    tag = f"w:{border_name}"
+    border = parent.find(qn(tag))
+    if border is None:
+        border = OxmlElement(tag)
+        parent.append(border)
+    border.set(qn("w:val"), "single")
+    border.set(qn("w:sz"), "4")
+    border.set(qn("w:space"), "0")
+    border.set(qn("w:color"), "auto")
 
 
 def insert_table_after_heading(doc, table_data):
@@ -1009,6 +1028,7 @@ def insert_table_after_heading(doc, table_data):
                     cell.text = str(cell_data)
                     cell.paragraphs[0].alignment = 1 
 
+            apply_table_borders(table)
             paragraph._element.addnext(table._element)
             break
 
