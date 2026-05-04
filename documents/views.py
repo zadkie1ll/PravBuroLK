@@ -953,37 +953,12 @@ def apply_table_grid_style(doc, table):
         table.style = "Table Grid"
     except KeyError:
         logger.warning("Table Grid style is missing in docx template; applying table borders manually")
-    apply_table_borders(table)
+        apply_table_borders(table)
 
 
 def apply_table_borders(table):
     """Проставляет видимые границы таблицы на уровне таблицы и каждой ячейки."""
     tbl_pr = table._tbl.tblPr
-
-    tbl_w = tbl_pr.first_child_found_in("w:tblW")
-    if tbl_w is None:
-        tbl_w = OxmlElement("w:tblW")
-        tbl_pr.insert(0, tbl_w)
-    tbl_w.set(qn("w:w"), "9360")
-    tbl_w.set(qn("w:type"), "dxa")
-
-    tbl_layout = tbl_pr.first_child_found_in("w:tblLayout")
-    if tbl_layout is None:
-        tbl_layout = OxmlElement("w:tblLayout")
-        tbl_pr.append(tbl_layout)
-    tbl_layout.set(qn("w:type"), "fixed")
-
-    tbl_look = tbl_pr.first_child_found_in("w:tblLook")
-    if tbl_look is None:
-        tbl_look = OxmlElement("w:tblLook")
-        tbl_pr.append(tbl_look)
-    tbl_look.set(qn("w:firstRow"), "1")
-    tbl_look.set(qn("w:lastRow"), "0")
-    tbl_look.set(qn("w:firstColumn"), "0")
-    tbl_look.set(qn("w:lastColumn"), "0")
-    tbl_look.set(qn("w:noHBand"), "0")
-    tbl_look.set(qn("w:noVBand"), "1")
-
     tbl_borders = tbl_pr.first_child_found_in("w:tblBorders")
     if tbl_borders is None:
         tbl_borders = OxmlElement("w:tblBorders")
@@ -992,18 +967,9 @@ def apply_table_borders(table):
     for border_name in ("top", "left", "bottom", "right", "insideH", "insideV"):
         ensure_border(tbl_borders, border_name)
 
-    apply_table_grid_columns(table)
-
     for row in table.rows:
-        for col_idx, cell in enumerate(row.cells):
+        for cell in row.cells:
             tc_pr = cell._tc.get_or_add_tcPr()
-            tc_w = tc_pr.first_child_found_in("w:tcW")
-            if tc_w is None:
-                tc_w = OxmlElement("w:tcW")
-                tc_pr.insert(0, tc_w)
-            tc_w.set(qn("w:w"), str(get_payment_table_col_width(col_idx)))
-            tc_w.set(qn("w:type"), "dxa")
-
             tc_borders = tc_pr.first_child_found_in("w:tcBorders")
             if tc_borders is None:
                 tc_borders = OxmlElement("w:tcBorders")
@@ -1011,30 +977,6 @@ def apply_table_borders(table):
 
             for border_name in ("top", "left", "bottom", "right"):
                 ensure_border(tc_borders, border_name)
-
-
-def apply_table_grid_columns(table):
-    if table._tbl.tr_lst:
-        col_count = len(table._tbl.tr_lst[0].tc_lst)
-    else:
-        col_count = len(table.columns)
-
-    tbl_grid = table._tbl.tblGrid
-    if tbl_grid is None:
-        tbl_grid = OxmlElement("w:tblGrid")
-        table._tbl.insert(1, tbl_grid)
-
-    for child in list(tbl_grid):
-        tbl_grid.remove(child)
-
-    for col_idx in range(col_count):
-        grid_col = OxmlElement("w:gridCol")
-        grid_col.set(qn("w:w"), str(get_payment_table_col_width(col_idx)))
-        tbl_grid.append(grid_col)
-
-
-def get_payment_table_col_width(col_idx):
-    return (1100, 3300, 2600)[col_idx] if col_idx < 3 else 2400
 
 
 def ensure_border(parent, border_name):
@@ -1079,7 +1021,6 @@ def insert_table_after_heading(doc, table_data):
                     cell.text = str(cell_data)
                     cell.paragraphs[0].alignment = 1 
 
-            apply_table_borders(table)
             paragraph._element.addnext(table._element)
             break
 
