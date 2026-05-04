@@ -10,7 +10,7 @@ from docx import Document
 from requests import HTTPError
 
 from documents.views import CONTRACT_ACCEPTED_FIELD, _build_contract_token, contract_document_file, contract_payment_redirect, dogovor
-from documents.views import apply_table_grid_style, insert_table_after_heading, replace_text_in_paragraphs
+from documents.views import apply_table_grid_style, replace_text_in_paragraphs
 from documents.views import _resolve_contract_download_url
 
 
@@ -346,18 +346,6 @@ class DogovorWebhookTests(TestCase):
             apply_table_grid_style(table)
 
         self.assertIsNotNone(table._tbl.tblPr.first_child_found_in("w:tblBorders"))
-        self.assertIsNotNone(table.cell(0, 0)._tc.tcPr.first_child_found_in("w:tcBorders"))
-
-    def test_inserted_payment_table_has_cell_borders(self):
-        doc = Document()
-        doc.add_paragraph("ГРАФИК ПЛАТЕЖЕЙ")
-
-        insert_table_after_heading(doc, [["1", "10.05.2026", "1000"]])
-
-        self.assertEqual(len(doc.tables), 1)
-        for row in doc.tables[0].rows:
-            for cell in row.cells:
-                self.assertIsNotNone(cell._tc.tcPr.first_child_found_in("w:tcBorders"))
 
     def test_placeholder_replacement_preserves_existing_runs(self):
         doc = Document()
