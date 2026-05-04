@@ -10,7 +10,7 @@ from docx import Document
 from requests import HTTPError
 
 from documents.views import CONTRACT_ACCEPTED_FIELD, _build_contract_token, contract_document_file, contract_payment_redirect, dogovor
-from documents.views import apply_table_grid_style
+from documents.views import apply_table_grid_style, replace_text_in_paragraphs
 from documents.views import _resolve_contract_download_url
 
 
@@ -346,6 +346,38 @@ class DogovorWebhookTests(TestCase):
             apply_table_grid_style(table)
 
         self.assertIsNotNone(table._tbl.tblPr.first_child_found_in("w:tblBorders"))
+
+    def test_placeholder_replacement_preserves_existing_runs(self):
+        doc = Document()
+        paragraph = doc.add_paragraph()
+        bold_run = paragraph.add_run("Клиент: ")
+        bold_run.bold = True
+        value_run = paragraph.add_run("{{ФИО}}")
+        value_run.italic = True
+
+        replace_text_in_paragraphs(doc, {"ФИО": "Иванов Иван Иванович"})
+
+        self.assertEqual(paragraph.text, "Клиент: Иванов Иван Иванович")
+        self.assertEqual(len(paragraph.runs), 2)
+        self.assertTrue(paragraph.runs[0].bold)
+        self.assertTrue(paragraph.runs[1].italic)
+
+    def test_placeholder_replacement_handles_split_runs_without_collapsing_paragraph(self):
+        doc = Document()
+        paragraph = doc.add_paragraph()
+        paragraph.add_run("Клиент: ")
+        placeholder_start = paragraph.add_run("{{Ф")
+        placeholder_start.bold = True
+        paragraph.add_run("ИО}}")
+        tail_run = paragraph.add_run(" подписал договор")
+        tail_run.underline = True
+
+        replace_text_in_paragraphs(doc, {"ФИО": "Иванов Иван Иванович"})
+
+        self.assertEqual(paragraph.text, "Клиент: Иванов Иван Иванович подписал договор")
+        self.assertEqual(len(paragraph.runs), 4)
+        self.assertTrue(paragraph.runs[1].bold)
+        self.assertTrue(paragraph.runs[3].underline)
 
     @patch("documents.views.generate_contract")
     @patch("documents.views._get_documents_dir")
