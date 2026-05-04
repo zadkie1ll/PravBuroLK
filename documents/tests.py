@@ -353,6 +353,15 @@ class DogovorWebhookTests(TestCase):
 
         self.assertEqual(len(doc.tables), 1)
         self.assertEqual(doc.tables[0].style.name, "Table Grid")
+        self.assertEqual(doc.tables[0].cell(0, 0).text, "П/П")
+        self.assertEqual(doc.tables[0].cell(1, 0).text, "1")
+        self.assertIsNotNone(doc.tables[0]._tbl.tblPr.first_child_found_in("w:tblBorders"))
+        self.assertIsNotNone(doc.tables[0]._tbl.tblPr.first_child_found_in("w:tblLayout"))
+        self.assertEqual(len(list(doc.tables[0]._tbl.tblGrid)), 3)
+        for row in doc.tables[0].rows:
+            for cell in row.cells:
+                self.assertIsNotNone(cell._tc.tcPr.first_child_found_in("w:tcBorders"))
+                self.assertIsNotNone(cell._tc.tcPr.first_child_found_in("w:tcW"))
 
     @patch("documents.views.generate_contract")
     @patch("documents.views._get_documents_dir")
