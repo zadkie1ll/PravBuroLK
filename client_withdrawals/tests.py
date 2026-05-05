@@ -1,7 +1,10 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.test import Client as DjangoClient
 from django.test import TestCase
+from django.urls import reverse
 
 from clients.models import Client
 
@@ -11,9 +14,9 @@ from .services import build_withdrawals_summary
 
 class ClientWithdrawalRecordTests(TestCase):
     def setUp(self):
-        user = User.objects.create_user(username="tester", password="secret")
+        self.user = User.objects.create_user(username="tester", password="secret")
         self.client_obj = Client.objects.create(
-            user=user,
+            user=self.user,
             name="Иван",
             surname="Иванов",
             middlename="Иванович",
@@ -46,3 +49,52 @@ class ClientWithdrawalRecordTests(TestCase):
         self.assertIn("21.03.2026", summary)
         self.assertIn("1000.00", summary)
 
+    def test_page_contains_edit_form_for_existing_records(self):
+        record = ClientWithdrawalRecord.objects.create(
+            client=self.client_obj,
+            withdrawal_date="2026-03-20",
+            transfer_date="2026-03-21",
+            withdrawal_amount=Decimal("11000.00"),
+            transferred_amount=Decimal("10000.00"),
+            comment="Старый комментарий",
+        )
+        django_client = DjangoClient()
+        django_client.force_login(self.user)
+
+        response = django_client.get(reverse("client_withdrawals_page", args=[self.client_obj.id]))
+
+        self.assertContains(response, reverse("update_withdrawal_record", args=[record.id]))
+        self.assertContains(response, 'data-edit-toggle="')
+        self.assertContains(response, "Старый комментарий")
+
+    @patch("client_withdrawals.views.sync_withdrawals_to_bitrix", return_value=True)
+    def test_update_withdrawal_record_changes_saved_values(self, sync_mock):
+        record = ClientWithdrawalRecord.objects.create(
+            client=self.client_obj,
+            withdrawal_date="2026-03-20",
+            transfer_date="2026-03-21",
+            withdrawal_amount=Decimal("11000.00"),
+            transferred_amount=Decimal("10000.00"),
+            comment="Старый комментарий",
+        )
+        django_client = DjangoClient()
+        django_client.force_login(self.user)
+
+        response = django_client.post(
+            reverse("update_withdrawal_record", args=[record.id]),
+            {
+                "withdrawal_date": "2026-04-01",
+                "transfer_date": "",
+                "withdrawal_amount": "12000.50",
+                "transferred_amount": "2000.25",
+                "comment": "Новый комментарий",
+            },
+        )
+
+        record.refresh_from_db()
+        self.assertRedirects(response, reverse("client_withdrawals_page", args=[self.client_obj.id]))
+        self.assertEqual(record.withdrawal_amount, Decimal("12000.50"))
+        self.assertEqual(record.transferred_amount, Decimal("2000.25"))
+        self.assertEqual(record.tail_amount, Decimal("10000.25"))
+        self.assertEqual(record.comment, "Новый комментарий")
+        sync_mock.assert_called_once_with(self.client_obj)
