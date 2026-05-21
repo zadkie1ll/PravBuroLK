@@ -44,6 +44,18 @@ def auth_page(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"detail": "Use frontend app for auth"}, status=200)
 
 
+def education_login_redirect(request: HttpRequest) -> HttpResponse:
+    return redirect("/auth")
+
+
+def education_dashboard_redirect(request: HttpRequest) -> HttpResponse:
+    return redirect("/dashboard")
+
+
+def education_course_redirect(request: HttpRequest, course_id: int) -> HttpResponse:
+    return redirect(f"/course/{course_id}")
+
+
 def _profile_department(profile: TraineeProfile) -> str:
     return next(iter(_profile_department_codes(profile)), "")
 

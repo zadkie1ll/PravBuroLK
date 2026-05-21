@@ -3,6 +3,9 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("login/", views.education_login_redirect, name="education_login"),
+    path("dashboard/", views.education_dashboard_redirect, name="education_dashboard"),
+    path("course/<int:course_id>/", views.education_course_redirect, name="education_course"),
     path("auth/", views.auth_page, name="education_auth"),
     path("hr/", views.hr_content_dashboard, name="education_hr_dashboard"),
     path("hr/trainees/", views.hr_trainee_dashboard, name="education_hr_trainees"),
