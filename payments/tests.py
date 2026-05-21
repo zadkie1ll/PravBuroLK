@@ -1,11 +1,12 @@
 import json
 from unittest.mock import Mock, patch
 from datetime import datetime
+from types import SimpleNamespace
 
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 
-from payments.views import payment_callback
+from payments.views import BitrixCreateClientFromDealView, payment_callback
 
 class PaymentCallbackTests(TestCase):
     def setUp(self):
@@ -86,3 +87,71 @@ class PaymentCallbackTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = json.loads(response.content)
         self.assertEqual(payload["status"], "ignored")
+
+
+class BitrixCreateClientFromDealViewTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    @override_settings(BITRIX_WEBHOOK_URL="https://example.bitrix24.ru/rest/1/test/")
+    @patch("payments.views.build_withdrawals_bitrix_fields", return_value={})
+    @patch("clients.services.ClientService.create_client_with_contract")
+    @patch("payments.views.requests.post")
+    @patch("payments.views.requests.get")
+    @patch("payments.views.get_deal_data_from_bitrix")
+    def test_falls_back_to_deal_title_when_custom_name_fields_are_empty(
+        self,
+        get_deal_mock,
+        requests_get_mock,
+        requests_post_mock,
+        create_client_mock,
+        build_withdrawals_mock,
+    ):
+        get_deal_mock.return_value = (
+            {
+                "ID": "123",
+                "TITLE": "Иванов Иван Иванович",
+                "CONTACT_ID": "456",
+                "UF_CRM_1754380684375": "",
+                "UF_CRM_1754380678904": "",
+                "UF_CRM_1754380692399": "",
+                "OPPORTUNITY": "100000|RUB",
+            },
+            None,
+        )
+        contact_response = Mock()
+        contact_response.status_code = 200
+        contact_response.json.return_value = {
+            "result": {
+                "PHONE": [{"VALUE": "+79990000000"}],
+                "NAME": "",
+                "LAST_NAME": "",
+                "SECOND_NAME": "",
+            }
+        }
+        requests_get_mock.return_value = contact_response
+
+        bitrix_update_response = Mock()
+        bitrix_update_response.json.return_value = {"result": True}
+        requests_post_mock.return_value = bitrix_update_response
+
+        client = SimpleNamespace(
+            id=10,
+            user=SimpleNamespace(username="+79990000000"),
+        )
+        contract = SimpleNamespace(id=20)
+        plan = SimpleNamespace(id=30)
+        create_client_mock.return_value = (client, contract, plan)
+
+        request = self.factory.post(
+            "/bitrix/webhook/create-client-from-deal/",
+            {"document_id[2]": "DEAL_123"},
+        )
+        response = BitrixCreateClientFromDealView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        create_kwargs = create_client_mock.call_args.kwargs
+        self.assertEqual(create_kwargs["name"], "Иван")
+        self.assertEqual(create_kwargs["surname"], "Иванов")
+        self.assertEqual(create_kwargs["middlename"], "Иванович")
+        self.assertEqual(json.loads(response.content)["message"], "Клиент успешно создан и данные отправлены в Битрикс")

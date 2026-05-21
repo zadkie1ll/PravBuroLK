@@ -12,6 +12,12 @@
         .btn.primary { background: #0f62fe; color: #fff; border-color: #0f62fe; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
         .muted { color: #667085; font-size: 14px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+        .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; background: #eef2ff; color: #344054; font-size: 13px; margin: 2px; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
+        .ok { color: #067647; font-weight: 600; }
+        .bad { color: #b42318; font-weight: 600; }
         ul { margin: 8px 0; padding-left: 20px; }
         form p { margin: 8px 0; }
         label { font-weight: 600; }
@@ -25,7 +31,10 @@
 <div class="wrap">
     <div class="top">
         <h1>{{ title|default:"LMS HR" }}</h1>
-        <a class="btn" href="{% url 'education_hr_dashboard' %}">Каталог LMS</a>
+        <div class="actions">
+            <a class="btn" href="{% url 'education_hr_dashboard' %}">Каталог LMS</a>
+            <a class="btn" href="{% url 'education_hr_trainees' %}">Стажеры</a>
+        </div>
     </div>
     {% if messages %}
         <div class="messages">

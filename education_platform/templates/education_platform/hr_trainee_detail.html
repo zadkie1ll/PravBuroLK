@@ -1,0 +1,100 @@
+{% extends "education_platform/hr_base.html" %}
+
+{% block content %}
+<div class="grid">
+    <div class="card">
+        <h2>{{ profile.user.get_full_name|default:profile.user.username }}</h2>
+        <p class="muted">Логин: {{ profile.user.username }}</p>
+        <p class="muted">Создан: {{ profile.created_at|date:"d.m.Y H:i" }}</p>
+        <p>
+            {% for department in profile.departments.all %}
+                <span class="pill">{{ department.name }}</span>
+            {% empty %}
+                <span class="muted">Отделы не назначены</span>
+            {% endfor %}
+        </p>
+    </div>
+    <div class="card">
+        <h2>Доступы</h2>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <div class="actions">
+                <button class="btn primary" type="submit">Сохранить доступы</button>
+                <a class="btn" href="{% url 'education_hr_trainees' %}">К списку</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% for row in course_rows %}
+    <div class="card">
+        <h2>{{ row.course.name }}</h2>
+        <p class="muted">Завершено модулей: {{ row.completed }} / {{ row.total }}</p>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Модуль</th>
+                    <th>Прогресс</th>
+                    <th>Тест</th>
+                    <th>Последняя попытка</th>
+                    <th>Все попытки</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for module_row in row.modules %}
+                    <tr>
+                        <td>
+                            <strong>#{{ module_row.module.order }} {{ module_row.module.name }}</strong>
+                            <div class="muted">{{ module_row.module.description|default:"" }}</div>
+                        </td>
+                        <td>
+                            {% if module_row.progress %}
+                                {{ module_row.progress.get_status_display }}
+                                {% if module_row.progress.completed_at %}
+                                    <div class="muted">{{ module_row.progress.completed_at|date:"d.m.Y H:i" }}</div>
+                                {% endif %}
+                            {% else %}
+                                <span class="muted">не начат</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if module_row.test %}
+                                {{ module_row.test.name }}
+                                <div class="muted">Проходной: {{ module_row.test.passing_score }} | Попыток: {{ module_row.test.max_attempts }}</div>
+                            {% else %}
+                                <span class="muted">нет теста</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if module_row.latest_attempt %}
+                                {% if module_row.latest_attempt.passed %}<span class="ok">пройден</span>{% else %}<span class="bad">не пройден</span>{% endif %}
+                                <div>{{ module_row.latest_attempt.score|default:"0" }} / {{ module_row.latest_attempt.max_score|default:"0" }}</div>
+                                <div class="muted">{{ module_row.latest_attempt.finished_at|date:"d.m.Y H:i" }}</div>
+                            {% else %}
+                                <span class="muted">попыток нет</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% for attempt in module_row.attempts %}
+                                <div>
+                                    #{{ attempt.attempt_number }}
+                                    {% if attempt.passed %}<span class="ok">OK</span>{% else %}<span class="bad">FAIL</span>{% endif %}
+                                    {{ attempt.score|default:"0" }} / {{ attempt.max_score|default:"0" }}
+                                    <span class="muted">{{ attempt.finished_at|date:"d.m H:i" }}</span>
+                                </div>
+                            {% empty %}
+                                <span class="muted">-</span>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="muted">В курсе нет модулей.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% empty %}
+    <div class="card muted">Для назначенных отделов пока нет курсов.</div>
+{% endfor %}
+{% endblock %}

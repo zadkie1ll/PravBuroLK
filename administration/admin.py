@@ -257,6 +257,7 @@ class TraineeProfileAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user",
+        "departments_list",
         "birthday",
         "started_at",
         "is_active",
@@ -274,6 +275,7 @@ class TraineeProfileAdmin(admin.ModelAdmin):
 
     list_filter = (
         "is_active",
+        "departments",
         "started_at",
         "created_at",
     )
@@ -281,6 +283,11 @@ class TraineeProfileAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
 
     readonly_fields = ("created_at", "updated_at")
+    filter_horizontal = ("departments",)
+
+    def departments_list(self, obj):
+        return ", ".join(department.name for department in obj.departments.all())
+    departments_list.short_description = "Отделы"
     
     
 @admin.register(Region)

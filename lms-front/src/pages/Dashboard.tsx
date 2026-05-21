@@ -6,15 +6,23 @@ import type { Course } from "../lib/types/components"; // Предполагае
 import { LoadCourses } from "../lib/api";
 import { useState, useEffect } from "react"; // Добавляем хуки для асинхронной загрузки
 import {  useNavigate } from "react-router-dom";
+import { GetInfoAboutMe } from "../lib/auth";
 
 const Dashboard = () => {
   const [courses, setCourses] = useState<Course[]>([]); // Состояние для курсов
   const [loading, setLoading] = useState(true); // Для индикации загрузки
   const [error, setError] = useState<string | null>(null); // Для ошибок
 
-  const user_id = localStorage.getItem("user"); // string | null
-  const department = localStorage.getItem("department"); // string | null
-  const username = localStorage.getItem("username"); // string | null
+  const [department, setDepartment] = useState<string | null>(localStorage.getItem("department"));
+  const [username, setUsername] = useState<string | null>(localStorage.getItem("username"));
+  const [departmentNames, setDepartmentNames] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("departments") || "[]") as { name: string }[];
+      return saved.map((item) => item.name).filter(Boolean);
+    } catch {
+      return [];
+    }
+  });
   const navigate = useNavigate();
   const depsName = {
     'sales': "продажи",
@@ -26,22 +34,30 @@ const Dashboard = () => {
   }
   useEffect(() => {
     const fetchCourses = async () => {
-      if (!user_id || !department) {
-        setError("Отсутствует информация о пользователе или отделе");
-        navigate("/auth", { replace: true });
-        setLoading(false);
-        
-        return;
-      }
-
       try {
-        const parsedUserId = parseInt(user_id, 10); // Парсим в number
-        if (isNaN(parsedUserId)) {
-          throw new Error("Неверный ID пользователя");
+        let activeDepartment = department;
+        if (!activeDepartment) {
+          const me = await GetInfoAboutMe();
+          activeDepartment = me.user.department;
+          localStorage.setItem("user", me.user.id.toString());
+          localStorage.setItem("username", me.user.username);
+          localStorage.setItem("department", activeDepartment);
+          localStorage.setItem("departments", JSON.stringify(me.user.departments || []));
+          setUsername(me.user.username);
+          setDepartment(activeDepartment);
+          setDepartmentNames((me.user.departments || []).map((item) => item.name));
         }
-        const loadedCourses = await LoadCourses(parsedUserId, department);
+        if (!activeDepartment) {
+          navigate("/auth", { replace: true });
+          return;
+        }
+        const loadedCourses = await LoadCourses(activeDepartment);
         setCourses(loadedCourses);
       } catch (err) {
+        if ((err as Error).message === "403" || (err as Error).message === "401") {
+          navigate("/auth", { replace: true });
+          return;
+        }
         setError((err as Error).message || "Ошибка загрузки курсов");
       } finally {
         setLoading(false);
@@ -92,7 +108,7 @@ const Dashboard = () => {
           Привет, {username} 👋
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Отдел: {department && department in depsName ? depsName[department as keyof typeof depsName] : "Неизвестный"}
+          Отделы: {departmentNames.length > 0 ? departmentNames.join(", ") : department && department in depsName ? depsName[department as keyof typeof depsName] : "Неизвестный"}
         </Typography>
       </Box>
       <Box sx={{ flexGrow: 1, overflowY: "auto", p: 4 }}>

@@ -2,14 +2,14 @@
 import type { Course } from "./types/components"; // Убедитесь, что тип Course включает user_progress: number | null;
 import { backend } from "./utils";
 import type { Module } from "./types/components";
-export async function LoadCourses(user_id: number, department: string): Promise<Course[]> {
+export async function LoadCourses(department: string): Promise<Course[]> {
   const params = new URLSearchParams({
-    user: user_id.toString(), // Передаём как строку
     department: department,
   });
 
-  const response = await fetch(`${backend}/api/education/get_courses?${params.toString()}`, {
+  const response = await fetch(`${backend}/api/education/courses/?${params.toString()}`, {
     method: 'GET', // GET по умолчанию, но уточняем
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json', // Изменяем на json, так как ответ JSON
     },
@@ -21,14 +21,14 @@ export async function LoadCourses(user_id: number, department: string): Promise<
   }
   return data.courses as Course[]; // Возвращаем массив курсов из {detail: "ok", courses: [...]}
 }
-export async function LoadModules(course_id: number, user_id: number): Promise<Module[]> {
+export async function LoadModules(course_id: number): Promise<Module[]> {
   const params = new URLSearchParams({
     course: course_id.toString(),
-    user: user_id.toString(),
   });
 
-  const response = await fetch(`${backend}/api/education/get_modules?${params.toString()}`, {
+  const response = await fetch(`${backend}/api/education/modules/?${params.toString()}`, {
     method: 'GET',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },

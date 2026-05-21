@@ -1,6 +1,38 @@
+from django.contrib.auth import get_user_model
 from django import forms
 
-from .models import Course, Module, ModuleTest, QuestionOption, TestQuestion
+from .models import Course, Department, Module, ModuleMaterial, ModuleTest, QuestionOption, TestQuestion
+
+
+class TraineeAccountForm(forms.Form):
+    username = forms.CharField(label="Логин", max_length=150)
+    first_name = forms.CharField(label="Имя", max_length=150, required=False)
+    last_name = forms.CharField(label="Фамилия", max_length=150, required=False)
+    email = forms.EmailField(label="Email", required=False)
+    password = forms.CharField(label="Пароль", max_length=128, required=False)
+    departments = forms.ModelMultipleChoiceField(
+        label="Отделы",
+        queryset=Department.objects.filter(is_active=True),
+        widget=forms.CheckboxSelectMultiple,
+    )
+    is_active = forms.BooleanField(label="Активен", required=False, initial=True)
+
+    def clean_username(self):
+        username = self.cleaned_data["username"].strip()
+        User = get_user_model()
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("Пользователь с таким логином уже существует.")
+        return username
+
+
+class TraineeDepartmentsForm(forms.Form):
+    departments = forms.ModelMultipleChoiceField(
+        label="Отделы",
+        queryset=Department.objects.filter(is_active=True),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+    is_active = forms.BooleanField(label="Активен", required=False)
 
 
 class CourseForm(forms.ModelForm):
@@ -16,10 +48,16 @@ class CourseForm(forms.ModelForm):
 class ModuleForm(forms.ModelForm):
     class Meta:
         model = Module
-        fields = ["course", "name", "description", "video_url", "order", "is_active"]
+        fields = ["course", "name", "description", "private_video", "video_url", "order", "is_active"]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 4}),
         }
+
+
+class ModuleMaterialForm(forms.ModelForm):
+    class Meta:
+        model = ModuleMaterial
+        fields = ["title", "material_type", "file", "order", "is_active"]
 
 
 class ModuleTestForm(forms.ModelForm):

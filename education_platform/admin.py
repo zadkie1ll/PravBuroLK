@@ -2,7 +2,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
-    Department, Course, Module, ModuleTest, TestQuestion, QuestionOption,
+    Department, Course, Module, ModuleMaterial, ModuleTest, TestQuestion, QuestionOption,
     TraineeProfile, LearningProgress, TestAttempt, AnswerError, ProgressEvent
 )
 
@@ -37,15 +37,28 @@ class CourseAdmin(admin.ModelAdmin):
 
 @admin.register(Module)
 class ModuleAdmin(admin.ModelAdmin):
-    list_display = ('name', 'course', 'order', 'is_active', 'has_test')
+    list_display = ('name', 'course', 'order', 'is_active', 'has_private_video', 'has_test')
     list_filter = ('is_active', 'course')
     search_fields = ('name', 'description', 'course__name')
     raw_id_fields = ('course',)
+
+    def has_private_video(self, obj):
+        return bool(obj.private_video)
+    has_private_video.boolean = True
+    has_private_video.short_description = "Приватное видео"
 
     def has_test(self, obj):
         return bool(obj.test)
     has_test.boolean = True
     has_test.short_description = "Есть тест"
+
+
+@admin.register(ModuleMaterial)
+class ModuleMaterialAdmin(admin.ModelAdmin):
+    list_display = ('title', 'module', 'material_type', 'order', 'is_active')
+    list_filter = ('is_active', 'material_type', 'module__course')
+    search_fields = ('title', 'module__name', 'module__course__name')
+    raw_id_fields = ('module',)
 
 
 @admin.register(ModuleTest)

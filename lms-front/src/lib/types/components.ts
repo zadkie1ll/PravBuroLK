@@ -12,6 +12,16 @@ export interface Module {
     name: string,
     description: string,
     video_url: string,
+    video_is_private?: boolean,
+    materials?: ModuleMaterial[],
     order: number,
     status: string
+}
+
+export interface ModuleMaterial {
+    id: number,
+    title: string,
+    material_type: string,
+    url: string,
+    order: number
 }

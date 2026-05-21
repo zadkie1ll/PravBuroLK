@@ -1,23 +1,37 @@
 import json
+import mimetypes
+import re
+import secrets
+import string
 from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Prefetch, Q
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from .forms import CourseForm, ModuleForm, ModuleTestForm, QuestionOptionForm, TestQuestionForm
+from .forms import (
+    CourseForm,
+    ModuleForm,
+    ModuleMaterialForm,
+    ModuleTestForm,
+    QuestionOptionForm,
+    TestQuestionForm,
+    TraineeAccountForm,
+    TraineeDepartmentsForm,
+)
 from .models import (
     AnswerError,
     Course,
     Department,
     LearningProgress,
     Module,
+    ModuleMaterial,
     ModuleTest,
     QuestionOption,
     TestAttempt,
@@ -31,7 +45,26 @@ def auth_page(request: HttpRequest) -> JsonResponse:
 
 
 def _profile_department(profile: TraineeProfile) -> str:
-    return str((profile.stats or {}).get("department", "")).strip()
+    return next(iter(_profile_department_codes(profile)), "")
+
+
+def _profile_department_codes(profile: TraineeProfile) -> list[str]:
+    codes = list(profile.departments.filter(is_active=True).values_list("code", flat=True))
+    legacy_code = str((profile.stats or {}).get("department", "")).strip()
+    if legacy_code and legacy_code not in codes:
+        codes.append(legacy_code)
+    return codes
+
+
+def _profile_department_payload(profile: TraineeProfile) -> list[dict]:
+    departments = list(profile.departments.filter(is_active=True).values("code", "name"))
+    department_codes = {department["code"] for department in departments}
+    legacy_code = str((profile.stats or {}).get("department", "")).strip()
+    if legacy_code and legacy_code not in department_codes:
+        legacy_department = Department.objects.filter(code=legacy_code, is_active=True).first()
+        if legacy_department:
+            departments.append({"code": legacy_department.code, "name": legacy_department.name})
+    return departments
 
 
 def _ensure_profile(user, department: str | None = None) -> TraineeProfile:
@@ -41,6 +74,9 @@ def _ensure_profile(user, department: str | None = None) -> TraineeProfile:
         stats["department"] = department
         profile.stats = stats
         profile.save(update_fields=["stats", "updated_at"])
+        department_obj = Department.objects.filter(code=department, is_active=True).first()
+        if department_obj:
+            profile.departments.add(department_obj)
     return profile
 
 
@@ -51,21 +87,87 @@ def _serialize_user(user, profile: TraineeProfile) -> dict:
         "first_name": user.first_name,
         "last_name": user.last_name,
         "department": _profile_department(profile),
+        "departments": _profile_department_payload(profile),
     }
 
 
-def _get_user_and_profile(raw_user_id: str):
-    try:
-        user_id = int(raw_user_id)
-    except (TypeError, ValueError):
-        return None, None
-    User = get_user_model()
-    try:
-        user = User.objects.get(pk=user_id)
-    except User.DoesNotExist:
-        return None, None
-    profile = _ensure_profile(user)
-    return user, profile
+def _user_can_access_course(user, profile: TraineeProfile, course: Course) -> bool:
+    if user.is_staff:
+        return True
+    department_codes = _profile_department_codes(profile)
+    if not department_codes:
+        return False
+    return course.departments.filter(code__in=department_codes, is_active=True).exists()
+
+
+def _get_accessible_module_or_404(user, profile: TraineeProfile, module_id: int) -> Module:
+    module = get_object_or_404(
+        Module.objects.select_related("course").prefetch_related("course__departments"),
+        pk=module_id,
+        is_active=True,
+        course__is_active=True,
+    )
+    if not _user_can_access_course(user, profile, module.course):
+        raise Http404("Модуль не найден")
+    return module
+
+
+def _stream_file_range(file_field, request: HttpRequest, content_type: str, filename: str) -> HttpResponse:
+    file_size = file_field.size
+    range_header = request.headers.get("Range", "")
+    range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)
+
+    if not range_match:
+        response = FileResponse(file_field.open("rb"), content_type=content_type)
+        response["Content-Length"] = str(file_size)
+        response["Accept-Ranges"] = "bytes"
+        response["Content-Disposition"] = f'inline; filename="{filename}"'
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+    start = int(range_match.group(1))
+    end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+    end = min(end, file_size - 1)
+    length = end - start + 1
+
+    source = file_field.open("rb")
+    source.seek(start)
+
+    def iterator():
+        remaining = length
+        try:
+            while remaining > 0:
+                chunk = source.read(min(8192, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                yield chunk
+        finally:
+            source.close()
+
+    response = StreamingHttpResponse(iterator(), status=206, content_type=content_type)
+    response["Content-Length"] = str(length)
+    response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+    response["Accept-Ranges"] = "bytes"
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
+def _generate_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _sync_legacy_department(profile: TraineeProfile) -> None:
+    first_department = profile.departments.filter(is_active=True).order_by("name").first()
+    stats = profile.stats or {}
+    if first_department:
+        stats["department"] = first_department.code
+    else:
+        stats.pop("department", None)
+    profile.stats = stats
+    profile.save(update_fields=["stats", "updated_at"])
 
 
 @require_POST
@@ -96,6 +198,7 @@ def auth_api_register(request: HttpRequest) -> JsonResponse:
 def auth_api_login(request: HttpRequest) -> JsonResponse:
     username = (request.POST.get("username") or "").strip()
     password = request.POST.get("password") or ""
+    department = (request.POST.get("department") or "").strip()
 
     if not username or not password:
         return JsonResponse({"detail": "username and password required"}, status=400)
@@ -107,24 +210,38 @@ def auth_api_login(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"detail": "Пользователь деактивирован"}, status=403)
 
     profile = _ensure_profile(user)
+    if not _profile_department_codes(profile):
+        if not department:
+            return JsonResponse({"detail": "Укажите отдел", "needs_department": True}, status=400)
+        if not Department.objects.filter(code=department, is_active=True).exists():
+            return JsonResponse({"detail": "Неизвестный отдел"}, status=400)
+        profile = _ensure_profile(user, department=department)
+
     login(request, user)
     return JsonResponse({"detail": "ok", "user": _serialize_user(user, profile)})
 
 
 @require_GET
-def get_courses(request: HttpRequest) -> JsonResponse:
-    _, profile = _get_user_and_profile(request.GET.get("user"))
-    department = (request.GET.get("department") or "").strip()
-    if profile is None:
-        return JsonResponse({"detail": "Пользователь не найден"}, status=404)
+@login_required
+def auth_api_me(request: HttpRequest) -> JsonResponse:
+    profile = _ensure_profile(request.user)
+    return JsonResponse({"detail": "ok", "user": _serialize_user(request.user, profile)})
 
-    if not Department.objects.filter(code=department, is_active=True).exists():
-        department = _profile_department(profile)
-    if not Department.objects.filter(code=department, is_active=True).exists():
+
+@require_GET
+@login_required
+def get_courses(request: HttpRequest) -> JsonResponse:
+    profile = _ensure_profile(request.user)
+    department = (request.GET.get("department") or "").strip()
+    department_codes = _profile_department_codes(profile)
+
+    if request.user.is_staff and Department.objects.filter(code=department, is_active=True).exists():
+        department_codes = [department]
+    if not department_codes:
         return JsonResponse({"detail": "Отдел не указан"}, status=400)
 
     courses_qs = (
-        Course.objects.filter(is_active=True, departments__code=department, departments__is_active=True)
+        Course.objects.filter(is_active=True, departments__code__in=department_codes, departments__is_active=True)
         .distinct()
         .annotate(modules_count=Count("modules", filter=Q(modules__is_active=True)))
     )
@@ -161,16 +278,17 @@ def get_courses(request: HttpRequest) -> JsonResponse:
 
 
 @require_GET
+@login_required
 def get_modules(request: HttpRequest) -> JsonResponse:
-    _, profile = _get_user_and_profile(request.GET.get("user"))
+    profile = _ensure_profile(request.user)
     try:
         course_id = int(request.GET.get("course"))
     except (TypeError, ValueError):
         return JsonResponse({"detail": "Неверный course id"}, status=400)
-    if profile is None:
-        return JsonResponse({"detail": "Пользователь не найден"}, status=404)
 
     course = get_object_or_404(Course, pk=course_id, is_active=True)
+    if not _user_can_access_course(request.user, profile, course):
+        return JsonResponse({"detail": "Курс не найден"}, status=404)
     modules_qs = course.modules.filter(is_active=True).order_by("order", "id")
     progress_map = {
         row["block_id"]: row["status"]
@@ -182,12 +300,24 @@ def get_modules(request: HttpRequest) -> JsonResponse:
 
     modules = []
     for module in modules_qs:
+        materials = [
+            {
+                "id": material.id,
+                "title": material.title,
+                "material_type": material.material_type,
+                "url": f"/api/education/materials/{material.id}/file/",
+                "order": material.order,
+            }
+            for material in module.materials.filter(is_active=True).order_by("order", "id")
+        ]
         modules.append(
             {
                 "id": module.id,
                 "name": module.name,
                 "description": module.description,
-                "video_url": module.video_url,
+                "video_url": f"/api/education/modules/{module.id}/video/" if module.private_video else module.video_url,
+                "video_is_private": bool(module.private_video),
+                "materials": materials,
                 "order": module.order,
                 "status": progress_map.get(module.id, LearningProgress.Status.NOT_STARTED),
             }
@@ -224,20 +354,16 @@ def _serialize_test(test: ModuleTest) -> dict:
 
 
 @require_GET
+@login_required
 def get_test(request: HttpRequest) -> JsonResponse:
-    _, profile = _get_user_and_profile(request.GET.get("user"))
+    profile = _ensure_profile(request.user)
     try:
         module_id = int(request.GET.get("module"))
     except (TypeError, ValueError):
         return JsonResponse({"detail": "Неверный module id"}, status=400)
-    if profile is None:
-        return JsonResponse({"detail": "Пользователь не найден"}, status=404)
 
-    module = get_object_or_404(
-        Module.objects.select_related("test").prefetch_related("test__questions__options"),
-        pk=module_id,
-        is_active=True,
-    )
+    module = _get_accessible_module_or_404(request.user, profile, module_id)
+    module = Module.objects.select_related("test").prefetch_related("test__questions__options").get(pk=module.pk)
     if not hasattr(module, "test") or not module.test.is_active:
         return JsonResponse({"detail": "Тест не найден"}, status=404)
 
@@ -253,13 +379,14 @@ def get_test(request: HttpRequest) -> JsonResponse:
 
 @require_POST
 @csrf_exempt
+@login_required
 def update_module_progress(request: HttpRequest) -> JsonResponse:
     try:
         payload = json.loads(request.body or "{}")
     except json.JSONDecodeError:
         return JsonResponse({"detail": "Некорректный JSON"}, status=400)
 
-    _, profile = _get_user_and_profile(payload.get("user_id"))
+    profile = _ensure_profile(request.user)
     try:
         module_id = int(payload.get("module_id"))
     except (TypeError, ValueError):
@@ -268,10 +395,16 @@ def update_module_progress(request: HttpRequest) -> JsonResponse:
     allowed_status = {item[0] for item in LearningProgress.Status.choices}
     if status not in allowed_status:
         return JsonResponse({"detail": "Некорректный статус"}, status=400)
-    if profile is None:
-        return JsonResponse({"detail": "Пользователь не найден"}, status=404)
-    if not Module.objects.filter(pk=module_id, is_active=True).exists():
-        return JsonResponse({"detail": "Модуль не найден"}, status=404)
+    module = _get_accessible_module_or_404(request.user, profile, module_id)
+    if status == LearningProgress.Status.COMPLETED and hasattr(module, "test") and module.test.is_active and module.test.questions.exists():
+        passed = TestAttempt.objects.filter(
+            trainee=profile,
+            test_id=module.test.id,
+            status=TestAttempt.Status.COMPLETED,
+            passed=True,
+        ).exists()
+        if not passed:
+            return JsonResponse({"detail": "Сначала нужно пройти тест"}, status=400)
 
     now = timezone.now()
     progress, _ = LearningProgress.objects.get_or_create(
@@ -323,21 +456,20 @@ def _evaluate_question(question: TestQuestion, answer_payload: dict) -> tuple[bo
 
 @require_POST
 @csrf_exempt
+@login_required
 def submit_test(request: HttpRequest) -> JsonResponse:
     try:
         payload = json.loads(request.body or "{}")
     except json.JSONDecodeError:
         return JsonResponse({"detail": "Некорректный JSON"}, status=400)
 
-    _, profile = _get_user_and_profile(payload.get("user_id"))
+    profile = _ensure_profile(request.user)
     try:
         module_id = int(payload.get("module_id"))
     except (TypeError, ValueError):
         return JsonResponse({"detail": "Неверный module_id"}, status=400)
     answers = payload.get("answers") or {}
-    if profile is None:
-        return JsonResponse({"detail": "Пользователь не найден"}, status=404)
-
+    _get_accessible_module_or_404(request.user, profile, module_id)
     module = get_object_or_404(
         Module.objects.select_related("test").prefetch_related(Prefetch("test__questions", queryset=TestQuestion.objects.prefetch_related("options"))),
         pk=module_id,
@@ -347,6 +479,8 @@ def submit_test(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"detail": "Тест не найден"}, status=404)
 
     test = module.test
+    if not test.questions.exists():
+        return JsonResponse({"detail": "В тесте нет вопросов"}, status=400)
     attempts_total = TestAttempt.objects.filter(trainee=profile, test_id=test.id).count()
     if attempts_total >= test.max_attempts:
         return JsonResponse({"detail": "Попытки закончились", "attempts_left": 0, "passed": False, "score": 0}, status=400)
@@ -381,7 +515,7 @@ def submit_test(request: HttpRequest) -> JsonResponse:
             )
 
     max_score = test.max_score if test.max_score > 0 else dynamic_max
-    passing_score = test.passing_score if test.passing_score > 0 else 0
+    passing_score = test.passing_score if test.passing_score > 0 else max_score
     passed = score >= passing_score
     attempt.status = TestAttempt.Status.COMPLETED if passed else TestAttempt.Status.FAILED
     attempt.score = score
@@ -403,6 +537,40 @@ def submit_test(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"detail": "ok", "score": score, "passed": passed, "attempts_left": attempts_left})
 
 
+@require_GET
+@login_required
+def module_video_file(request: HttpRequest, module_id: int) -> FileResponse:
+    profile = _ensure_profile(request.user)
+    module = _get_accessible_module_or_404(request.user, profile, module_id)
+    if not module.private_video:
+        raise Http404("Видео не найдено")
+
+    content_type = mimetypes.guess_type(module.private_video.name)[0] or "application/octet-stream"
+    filename = module.private_video.name.rsplit("/", 1)[-1]
+    return _stream_file_range(module.private_video, request, content_type, filename)
+
+
+@require_GET
+@login_required
+def module_material_file(request: HttpRequest, material_id: int) -> FileResponse:
+    profile = _ensure_profile(request.user)
+    material = get_object_or_404(
+        ModuleMaterial.objects.select_related("module", "module__course"),
+        pk=material_id,
+        is_active=True,
+        module__is_active=True,
+        module__course__is_active=True,
+    )
+    if not _user_can_access_course(request.user, profile, material.module.course):
+        raise Http404("Материал не найден")
+
+    content_type = mimetypes.guess_type(material.file.name)[0] or "application/pdf"
+    response = FileResponse(material.file.open("rb"), content_type=content_type)
+    response["Content-Disposition"] = f'inline; filename="{material.file.name.rsplit("/", 1)[-1]}"'
+    response["Cache-Control"] = "private, no-store"
+    return response
+
+
 def staff_required(view_func):
     @wraps(view_func)
     @login_required
@@ -421,12 +589,151 @@ def hr_content_dashboard(request: HttpRequest) -> HttpResponse:
             "departments",
             Prefetch(
                 "modules",
-                queryset=Module.objects.select_related("test").prefetch_related("test__questions"),
+                queryset=Module.objects.select_related("test").prefetch_related("materials", "test__questions"),
             ),
         )
         .order_by("id")
     )
     return render(request, "education_platform/hr_dashboard.html", {"courses": courses})
+
+
+@staff_required
+def hr_trainee_dashboard(request: HttpRequest) -> HttpResponse:
+    profiles = (
+        TraineeProfile.objects.select_related("user")
+        .prefetch_related("departments")
+        .annotate(
+            progress_count=Count("learning_progress", distinct=True),
+            completed_count=Count(
+                "learning_progress",
+                filter=Q(learning_progress__status=LearningProgress.Status.COMPLETED),
+                distinct=True,
+            ),
+            attempts_count=Count("test_attempts", distinct=True),
+            passed_attempts_count=Count(
+                "test_attempts",
+                filter=Q(test_attempts__passed=True),
+                distinct=True,
+            ),
+        )
+        .order_by("user__username")
+    )
+    return render(
+        request,
+        "education_platform/hr_trainees.html",
+        {"profiles": profiles, "title": "Стажеры LMS"},
+    )
+
+
+@staff_required
+def hr_trainee_create(request: HttpRequest) -> HttpResponse:
+    generated_password = _generate_password()
+    initial = {"password": generated_password, "is_active": True}
+    form = TraineeAccountForm(request.POST or None, initial=initial)
+    credentials = None
+
+    if request.method == "POST" and form.is_valid():
+        User = get_user_model()
+        password = form.cleaned_data["password"] or _generate_password()
+        user = User.objects.create_user(
+            username=form.cleaned_data["username"],
+            password=password,
+            email=form.cleaned_data["email"],
+            first_name=form.cleaned_data["first_name"],
+            last_name=form.cleaned_data["last_name"],
+            is_active=form.cleaned_data["is_active"],
+        )
+        profile = _ensure_profile(user)
+        profile.departments.set(form.cleaned_data["departments"])
+        profile.is_active = form.cleaned_data["is_active"]
+        profile.save(update_fields=["is_active", "updated_at"])
+        _sync_legacy_department(profile)
+        credentials = {"username": user.username, "password": password}
+        messages.success(request, f"Аккаунт создан. Логин: {user.username} Пароль: {password}")
+        form = TraineeAccountForm(initial={"password": _generate_password(), "is_active": True})
+
+    return render(
+        request,
+        "education_platform/hr_trainee_create.html",
+        {"form": form, "credentials": credentials, "title": "Новый стажер"},
+    )
+
+
+@staff_required
+def hr_trainee_detail(request: HttpRequest, profile_id: int) -> HttpResponse:
+    profile = get_object_or_404(
+        TraineeProfile.objects.select_related("user").prefetch_related("departments"),
+        pk=profile_id,
+    )
+    form = TraineeDepartmentsForm(
+        request.POST or None,
+        initial={"departments": profile.departments.all(), "is_active": profile.is_active},
+    )
+    if request.method == "POST" and form.is_valid():
+        profile.departments.set(form.cleaned_data["departments"])
+        profile.is_active = form.cleaned_data["is_active"]
+        profile.user.is_active = form.cleaned_data["is_active"]
+        profile.save(update_fields=["is_active", "updated_at"])
+        profile.user.save(update_fields=["is_active"])
+        _sync_legacy_department(profile)
+        messages.success(request, "Доступы стажера обновлены.")
+        return redirect("education_hr_trainee_detail", profile_id=profile.id)
+
+    accessible_courses = (
+        Course.objects.filter(is_active=True, departments__in=profile.departments.all())
+        .distinct()
+        .prefetch_related(Prefetch("modules", queryset=Module.objects.select_related("test").order_by("order", "id")))
+        .order_by("id")
+    )
+    module_ids = []
+    test_ids = []
+    for course in accessible_courses:
+        for module in course.modules.all():
+            module_ids.append(module.id)
+            if hasattr(module, "test"):
+                test_ids.append(module.test.id)
+
+    progress_map = {
+        row.block_id: row
+        for row in LearningProgress.objects.filter(trainee=profile, block_id__in=module_ids)
+    }
+    attempts_by_test = {}
+    for attempt in TestAttempt.objects.filter(trainee=profile, test_id__in=test_ids).order_by("-created_at"):
+        attempts_by_test.setdefault(attempt.test_id, []).append(attempt)
+
+    course_rows = []
+    for course in accessible_courses:
+        module_rows = []
+        for module in course.modules.all():
+            test = getattr(module, "test", None)
+            attempts = attempts_by_test.get(test.id, []) if test else []
+            module_rows.append(
+                {
+                    "module": module,
+                    "progress": progress_map.get(module.id),
+                    "test": test,
+                    "attempts": attempts,
+                    "latest_attempt": attempts[0] if attempts else None,
+                }
+            )
+        total = len(module_rows)
+        completed = sum(
+            1
+            for row in module_rows
+            if row["progress"] and row["progress"].status == LearningProgress.Status.COMPLETED
+        )
+        course_rows.append({"course": course, "modules": module_rows, "total": total, "completed": completed})
+
+    return render(
+        request,
+        "education_platform/hr_trainee_detail.html",
+        {
+            "profile": profile,
+            "form": form,
+            "course_rows": course_rows,
+            "title": f"Стажер: {profile.user.username}",
+        },
+    )
 
 
 @staff_required
@@ -455,7 +762,7 @@ def hr_module_create(request: HttpRequest) -> HttpResponse:
     initial = {}
     if request.GET.get("course"):
         initial["course"] = request.GET.get("course")
-    form = ModuleForm(request.POST or None, initial=initial)
+    form = ModuleForm(request.POST or None, request.FILES or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         module = form.save()
         ModuleTest.objects.get_or_create(
@@ -477,12 +784,45 @@ def hr_module_create(request: HttpRequest) -> HttpResponse:
 @staff_required
 def hr_module_edit(request: HttpRequest, module_id: int) -> HttpResponse:
     module = get_object_or_404(Module, pk=module_id)
-    form = ModuleForm(request.POST or None, instance=module)
+    form = ModuleForm(request.POST or None, request.FILES or None, instance=module)
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Модуль обновлен.")
         return redirect("education_hr_dashboard")
     return render(request, "education_platform/hr_form.html", {"form": form, "title": f"Редактировать модуль: {module.name}"})
+
+
+@staff_required
+def hr_material_create(request: HttpRequest, module_id: int) -> HttpResponse:
+    module = get_object_or_404(Module, pk=module_id)
+    form = ModuleMaterialForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        material = form.save(commit=False)
+        material.module = module
+        material.save()
+        messages.success(request, "Материал добавлен.")
+        return redirect("education_hr_dashboard")
+    return render(request, "education_platform/hr_form.html", {"form": form, "title": f"Новый материал: {module.name}"})
+
+
+@staff_required
+def hr_material_edit(request: HttpRequest, material_id: int) -> HttpResponse:
+    material = get_object_or_404(ModuleMaterial, pk=material_id)
+    form = ModuleMaterialForm(request.POST or None, request.FILES or None, instance=material)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Материал обновлен.")
+        return redirect("education_hr_dashboard")
+    return render(request, "education_platform/hr_form.html", {"form": form, "title": f"Редактировать материал: {material.title}"})
+
+
+@staff_required
+@require_POST
+def hr_material_delete(request: HttpRequest, material_id: int) -> HttpResponse:
+    material = get_object_or_404(ModuleMaterial, pk=material_id)
+    material.delete()
+    messages.success(request, "Материал удален.")
+    return redirect("education_hr_dashboard")
 
 
 @staff_required

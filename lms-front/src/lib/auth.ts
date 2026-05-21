@@ -9,6 +9,7 @@ const postData = {
 }
 const response = await fetch(`${backend}/api/education/reg/`, {
     method:"POST",
+    credentials: "include",
     headers:{
         'Content-Type':'application/x-www-form-urlencoded'
     },
@@ -20,27 +21,32 @@ if(!response.ok){
 }
 return data as RegistrationResponse;
 }
-export async function GetInfoAboutMe(session_id:number):Promise<MeResponse>{
-    const response = await fetch(`${backend}/api/auth/me=${session_id}`)
+export async function GetInfoAboutMe():Promise<MeResponse>{
+    const response = await fetch(`${backend}/api/education/auth/me/`, {
+        credentials: "include",
+    })
     if (!response.ok){
         throw new Error(String(response.status))
     }
     return response.json() as Promise<MeResponse>;
 }
-export async function LoginUser(login:string, password: string){
+export async function LoginUser(login:string, password: string, department?: string){
     const postData = {
         username: login,
-        password: password
+        password: password,
+        ...(department ? { department } : {})
     }
     const response = await fetch(`${backend}/api/education/auth/`, {
     method:"POST",
+    credentials: "include",
     headers:{
         'Content-Type':'application/x-www-form-urlencoded'
     },
     body: new URLSearchParams(postData)
 })
+const data = await response.json()
 if(!response.ok){
-    throw new Error(String(response.status))
+    throw new Error(data.detail || "Ошибка входа")
 }
-return response.json() as Promise<LoginResponse>;
+return data as LoginResponse;
 }

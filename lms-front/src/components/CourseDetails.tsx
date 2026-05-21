@@ -20,14 +20,17 @@ import {
   TextField,
   Alert,
 } from "@mui/material";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import TimelapseIcon from "@mui/icons-material/Timelapse";
 import { LoadModules } from "../lib/api";
 
 // API-функции
-async function LoadTest(moduleId: number, userId: number) {
-  const response = await fetch(`${backend}/api/get_test?module=${moduleId}&user=${userId}`);
+async function LoadTest(moduleId: number) {
+  const response = await fetch(`${backend}/api/education/tests/?module=${moduleId}`, {
+    credentials: "include",
+  });
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error("Ошибка загрузки теста");
@@ -35,21 +38,23 @@ async function LoadTest(moduleId: number, userId: number) {
   return await response.json();
 }
 
-async function SubmitTest(moduleId: number, userId: number, answers: Record<number, any>) {
-  const response = await fetch(`${backend}/api/submit_test/`, {
+async function SubmitTest(moduleId: number, answers: Record<number, any>) {
+  const response = await fetch(`${backend}/api/education/tests/submit/`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, module_id: moduleId, answers }),
+    body: JSON.stringify({ module_id: moduleId, answers }),
   });
   if (!response.ok) throw new Error("Ошибка отправки теста");
   return await response.json();
 }
 
-async function UpdateModuleStatus(moduleId: number, userId: number, status: string) {
-  const response = await fetch(`${backend}/api/update_module_progress/`, {
+async function UpdateModuleStatus(moduleId: number, status: string) {
+  const response = await fetch(`${backend}/api/education/progress/`, {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, module_id: moduleId, status }),
+    body: JSON.stringify({ module_id: moduleId, status }),
   });
   if (!response.ok) throw new Error("Ошибка обновления статуса");
   return await response.json();
@@ -60,8 +65,18 @@ interface Module {
   name: string;
   description: string;
   video_url: string;
+  video_is_private?: boolean;
+  materials?: ModuleMaterial[];
   order: number;
   status: string; // "not_started", "in_progress", "completed"
+}
+
+interface ModuleMaterial {
+  id: number;
+  title: string;
+  material_type: string;
+  url: string;
+  order: number;
 }
 
 interface Question {
@@ -87,7 +102,6 @@ interface Test {
 const CourseDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const user_id = parseInt(localStorage.getItem("user") || "0", 10);
 
   const [modules, setModules] = useState<Module[]>([]);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
@@ -103,17 +117,18 @@ const CourseDetails = () => {
   // Прогресс
   const completedModules = modules.filter((m) => m.status === "completed").length;
   const progress = modules.length > 0 ? (completedModules / modules.length) * 100 : 0;
+  const resolveUrl = (url: string) => (url.startsWith("http") ? url : `${backend}${url}`);
 
   useEffect(() => {
     const fetchModules = async () => {
-      if (!id || isNaN(user_id)) {
-        setError("Неверный ID курса или пользователя");
+      if (!id) {
+        setError("Неверный ID курса");
         setLoading(false);
         return;
       }
 
       try {
-        let loadedModules = await LoadModules(parseInt(id, 10), user_id);
+        let loadedModules = await LoadModules(parseInt(id, 10));
         loadedModules = loadedModules.sort((a, b) => a.order - b.order);
         setModules(loadedModules);
 
@@ -140,7 +155,7 @@ const CourseDetails = () => {
 
     // Если модуль только начали — отмечаем "in_progress"
     if (selectedModule.status === "not_started") {
-      UpdateModuleStatus(selectedModule.id, user_id, "in_progress").catch(console.error);
+      UpdateModuleStatus(selectedModule.id, "in_progress").catch(console.error);
       updateLocalStatus(selectedModule.id, "in_progress");
     }
 
@@ -148,7 +163,7 @@ const CourseDetails = () => {
     const load = async () => {
       setTestLoading(true);
       try {
-        const data = await LoadTest(selectedModule.id, user_id);
+        const data = await LoadTest(selectedModule.id);
         setTest(data?.test || null);
       } catch (err) {
         setTestError((err as Error).message || "Не удалось загрузить тест");
@@ -183,7 +198,7 @@ const CourseDetails = () => {
     } else {
       // Нет теста или пустой → сразу завершаем
       try {
-        await UpdateModuleStatus(selectedModule.id, user_id, "completed");
+        await UpdateModuleStatus(selectedModule.id, "completed");
         updateLocalStatus(selectedModule.id, "completed");
         goToNextModule();
       } catch (err) {
@@ -200,7 +215,7 @@ const CourseDetails = () => {
     if (!selectedModule || !test) return;
 
     try {
-      const result = await SubmitTest(selectedModule.id, user_id, answers);
+      const result = await SubmitTest(selectedModule.id, answers);
       setTestResult(result);
 
       if (result.passed) {
@@ -405,24 +420,68 @@ const CourseDetails = () => {
 
             {step === "video" ? (
               <Box sx={{ width: "100%", maxWidth: 880, mb: 5 }}>
-                <div
-                  style={{
-                    position: "relative",
-                    paddingBottom: "56.25%",
-                    height: 0,
-                    overflow: "hidden",
-                    borderRadius: 12,
-                    background: "#000",
-                  }}
-                >
-                  <iframe
-                    src={selectedModule.video_url}
-                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
+                {selectedModule.video_url ? (
+                  selectedModule.video_is_private ? (
+                    <video
+                      src={resolveUrl(selectedModule.video_url)}
+                      controls
+                      controlsList="nodownload"
+                      style={{
+                        width: "100%",
+                        aspectRatio: "16 / 9",
+                        borderRadius: 12,
+                        background: "#000",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        position: "relative",
+                        paddingBottom: "56.25%",
+                        height: 0,
+                        overflow: "hidden",
+                        borderRadius: 12,
+                        background: "#000",
+                      }}
+                    >
+                      <iframe
+                        src={selectedModule.video_url}
+                        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}
+                        frameBorder="0"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  )
+                ) : (
+                  <Alert severity="warning">Видео для этого модуля еще не загружено</Alert>
+                )}
+
+                {!!selectedModule.materials?.length && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="h6" sx={{ color: "black", mb: 1 }}>
+                      Материалы
+                    </Typography>
+                    <List disablePadding>
+                      {selectedModule.materials.map((material) => (
+                        <ListItem key={material.id} disablePadding sx={{ mb: 1 }}>
+                          <Button
+                            component="a"
+                            href={resolveUrl(material.url)}
+                            target="_blank"
+                            rel="noreferrer"
+                            variant="outlined"
+                            startIcon={<PictureAsPdfIcon />}
+                            fullWidth
+                            sx={{ justifyContent: "flex-start" }}
+                          >
+                            {material.title}
+                          </Button>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
 
                 <Box sx={{ mt: 4, textAlign: "center" }}>
                   <Button

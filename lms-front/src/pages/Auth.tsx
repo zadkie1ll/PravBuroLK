@@ -9,6 +9,7 @@ const Auth = () => {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [department, setDepartment] = useState('');
+  const [needsDepartment, setNeedsDepartment] = useState(false);
   const [alertShown, setAlertShown] = useState(false);
   const [alertText, setAlertText] = useState("");
   const navigate = useNavigate();
@@ -23,16 +24,21 @@ const Auth = () => {
   async function onLoginClick() {
     if (login && password) {
       try {
-        const result = await LoginUser(login, password);
+        const result = await LoginUser(login, password, department);
         if (result.user) {
           localStorage.setItem("user", result.user.id.toString()); // Сохраняем user.id как "user"
           localStorage.setItem("username", result.user.username);
           localStorage.setItem("department", result.user.department);
+          localStorage.setItem("departments", JSON.stringify(result.user.departments || []));
           navigate("/dashboard", { replace: true });
         }
-      } catch {
-        setAlertText("Произошла ошибка");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Произошла ошибка";
+        setAlertText(message);
         setAlertShown(true);
+        if (message.includes("отдел")) {
+          setNeedsDepartment(true);
+        }
       }
     } else {
       setAlertText("Заполните логин и пароль!");
@@ -48,6 +54,7 @@ const Auth = () => {
           localStorage.setItem("user", result.user.id.toString()); // Сохраняем user.id как "user"
           localStorage.setItem("username", result.user.username);
           localStorage.setItem("department", result.user.department);
+          localStorage.setItem("departments", JSON.stringify(result.user.departments || []));
           navigate("/dashboard", { replace: true });
         }
       } catch (error) {
@@ -72,7 +79,7 @@ const Auth = () => {
           <h2>Вход</h2>
           <input value={login} onChange={(e) => setLogin(e.target.value)} type="text" placeholder="Логин" />
           <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Пароль" />
-          <div className={`department-wrapper ${isRegister ? "open" : ""}`}>
+          <div className={`department-wrapper ${isRegister || needsDepartment ? "open" : ""}`}>
             <TextField
               variant="filled"
               value={department}
@@ -98,6 +105,7 @@ const Auth = () => {
               <MenuItem value="moderation">Модерация</MenuItem>
               <MenuItem value="firstline">Первая линия</MenuItem>
               <MenuItem value="support">Отдел сопровождения</MenuItem>
+              <MenuItem value="law">Юридический</MenuItem>
             </TextField>
           </div>
           {!isRegister && <button onClick={onLoginClick}>Войти</button>}
@@ -114,7 +122,10 @@ const Auth = () => {
       {/* ПЕРЕКЛЮЧАТЕЛЬ */}
       <p className="switch">
         {isRegister ? "Уже есть аккаунт?" : "Нет аккаунта?"}
-        <span onClick={() => setIsRegister(!isRegister)}>
+        <span onClick={() => {
+          setIsRegister(!isRegister);
+          setNeedsDepartment(false);
+        }}>
           {isRegister ? " Войти" : " Зарегистрироваться"}
         </span>
       </p>

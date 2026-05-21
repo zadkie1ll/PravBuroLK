@@ -4,9 +4,8 @@ export interface LoginResponse {
 
 }
 export interface MeResponse {
-    fullname: string,
-    role: string,
-    department:string
+    detail: string,
+    user: UserInterface
 }
 export interface RegistrationResponse {
     detail: string,
@@ -17,5 +16,6 @@ interface UserInterface {
     username: string,
     first_name: string,
     last_name: string,
-    department: string
+    department: string,
+    departments: { code: string, name: string }[]
 }

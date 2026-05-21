@@ -1,5 +1,8 @@
 from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 from django.db import models
+
+private_storage = FileSystemStorage(location=settings.PRIVATE_MEDIA_ROOT)
 
 
 class Department(models.Model):
@@ -36,6 +39,11 @@ class Module(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     video_url = models.URLField(max_length=1000, blank=True)
+    private_video = models.FileField(
+        upload_to="education/videos/",
+        storage=private_storage,
+        blank=True,
+    )
     order = models.PositiveIntegerField(default=1)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -46,6 +54,29 @@ class Module(models.Model):
 
     def __str__(self):
         return f"{self.course.name}: {self.name}"
+
+
+class ModuleMaterial(models.Model):
+    class MaterialType(models.TextChoices):
+        PDF = "pdf", "PDF"
+
+    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name="materials")
+    title = models.CharField(max_length=255)
+    material_type = models.CharField(max_length=32, choices=MaterialType.choices, default=MaterialType.PDF)
+    file = models.FileField(
+        upload_to="education/materials/",
+        storage=private_storage,
+    )
+    order = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["module_id", "order", "id"]
+
+    def __str__(self):
+        return f"{self.module.name}: {self.title}"
 
 
 class ModuleTest(models.Model):
@@ -113,6 +144,7 @@ class TraineeProfile(models.Model):
 
     started_at = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    departments = models.ManyToManyField(Department, related_name="trainees", blank=True)
 
     stats = models.JSONField(default=dict, blank=True)
 

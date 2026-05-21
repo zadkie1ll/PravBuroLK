@@ -1,0 +1,23 @@
+{% extends "education_platform/hr_base.html" %}
+
+{% block content %}
+{% if credentials %}
+    <div class="card" style="border-color:#12b76a;">
+        <h2>Аккаунт создан</h2>
+        <p><strong>Логин:</strong> {{ credentials.username }}</p>
+        <p><strong>Пароль:</strong> {{ credentials.password }}</p>
+        <p class="muted">Пароль показан только сейчас. Передайте его стажеру и попросите сменить после первого входа, когда такая возможность появится.</p>
+    </div>
+{% endif %}
+
+<div class="card">
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="actions" style="margin-top:12px;">
+            <button class="btn primary" type="submit">Создать аккаунт</button>
+            <a class="btn" href="{% url 'education_hr_trainees' %}">Назад</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

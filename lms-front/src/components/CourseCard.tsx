@@ -10,9 +10,9 @@ interface CourseCardProps {
 const CourseCard = ({ course }: CourseCardProps) => {
   const completed = course.completed_modules ?? 0;
   const navigate = useNavigate()
-  const percent = Math.round(
+  const percent = course.modules_count > 0 ? Math.round(
     (completed / course.modules_count) * 100
-  );
+  ) : 0;
   const url = `/course/${course.id}`
   return (
     <div className="course-card">

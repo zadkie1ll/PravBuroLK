@@ -1391,10 +1391,21 @@ class BitrixCreateClientFromDealView(View):
                 except:
                     return None
 
+            def clean_text(value):
+                return str(value or "").strip()
+
+            def split_full_name(full_name):
+                parts = [part for part in clean_text(full_name).split() if part]
+                if len(parts) >= 2:
+                    return parts[1], parts[0], " ".join(parts[2:])
+                if len(parts) == 1:
+                    return parts[0], "", ""
+                return "", "", ""
+
             # --- Извлекаем данные клиента ---
-            first_name = (deal_data.get("UF_CRM_1754380684375") or "").strip()
-            last_name = (deal_data.get("UF_CRM_1754380678904") or "").strip()
-            middlename = (deal_data.get("UF_CRM_1754380692399") or "").strip()
+            first_name = clean_text(deal_data.get("UF_CRM_1754380684375"))
+            last_name = clean_text(deal_data.get("UF_CRM_1754380678904"))
+            middlename = clean_text(deal_data.get("UF_CRM_1754380692399"))
 
             total_amount = safe_int(deal_data.get("OPPORTUNITY"))
             discount = safe_int(deal_data.get("UF_CRM_1742457148727"))
@@ -1416,9 +1427,35 @@ class BitrixCreateClientFromDealView(View):
                 return JsonResponse({"error": "Failed to fetch contact"}, status=contact_resp.status_code)
 
             external_data = contact_resp.json()
+            contact_data = external_data.get("result") or {}
             username = external_data.get("result", {}).get("PHONE", [{}])[0].get("VALUE")
             if not username:
                 return JsonResponse({"error": "Phone number not found"}, status=400)
+
+            if not first_name:
+                first_name = clean_text(contact_data.get("NAME"))
+            if not last_name:
+                last_name = clean_text(contact_data.get("LAST_NAME"))
+            if not middlename:
+                middlename = clean_text(contact_data.get("SECOND_NAME"))
+
+            title_first_name, title_last_name, title_middlename = split_full_name(deal_data.get("TITLE"))
+            if not first_name:
+                first_name = title_first_name
+            if not last_name:
+                last_name = title_last_name
+            if not middlename:
+                middlename = title_middlename
+
+            if not (first_name and last_name):
+                return JsonResponse(
+                    {
+                        "error": "Имя и фамилия обязательны",
+                        "details": "Не удалось получить имя и фамилию из полей сделки, контакта или названия сделки",
+                        "deal_id": deal_data.get("ID"),
+                    },
+                    status=400,
+                )
 
             # --- Генерация пароля ---
             new_password = generate_password()
