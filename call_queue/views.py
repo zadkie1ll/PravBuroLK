@@ -409,10 +409,10 @@ def build_whatsapp_followup_url(phone: str) -> str:
 
 
 def build_whatsapp_followup_web_url(phone: str) -> str:
-    base_url = build_whatsapp_chat_url(phone)
-    if not base_url:
+    digits = normalize_russian_phone_digits(phone)
+    if not digits:
         return ""
-    return f"{base_url}?text={quote(WHATSAPP_FOLLOWUP_MESSAGE, safe='')}"
+    return f"https://web.whatsapp.com/send?phone={digits}&text={quote(WHATSAPP_FOLLOWUP_MESSAGE, safe='')}"
 
 
 def build_whatsapp_desktop_url(phone: str) -> str:
