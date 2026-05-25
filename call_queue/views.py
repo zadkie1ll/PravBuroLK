@@ -1,6 +1,7 @@
 from functools import wraps
 import json
 from pathlib import Path
+from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.contrib import messages
@@ -48,6 +49,12 @@ MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY = "megafon_prod_queue_index"
 MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY = "megafon_prod_queue_config"
 MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY = "megafon_prod_active_call_id"
 MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY = "megafon_prod_last_completed_call_id"
+WHATSAPP_FOLLOWUP_MESSAGE = (
+    "Добрый день! Вы хотели получить консультацию по списанию долга, но дозвониться до вас не смогли. "
+    "Прикрепляю видео, в котором наш руководитель, Станислав Свириденко, рассказывает, что вы получите "
+    "из консультации с нами. Посмотрите его и напишите, когда вам удобно созвониться😺 "
+    "https://vk.com/video-211710764_456239939?list=ln-9eixjJMj2MwydO91XY"
+)
 
 
 def get_call_queue_timezone() -> ZoneInfo:
@@ -393,6 +400,13 @@ def build_whatsapp_chat_url(phone: str) -> str:
     return f"https://wa.me/{digits}" if digits else ""
 
 
+def build_whatsapp_followup_url(phone: str) -> str:
+    digits = normalize_russian_phone_digits(phone)
+    if not digits:
+        return ""
+    return f"whatsapp://send?phone={digits}&text={quote(WHATSAPP_FOLLOWUP_MESSAGE, safe='')}"
+
+
 def build_whatsapp_desktop_url(phone: str) -> str:
     digits = normalize_russian_phone_digits(phone)
     return f"whatsapp://send?phone={digits}" if digits else ""
@@ -411,6 +425,7 @@ def with_social_desktop_links(item: dict) -> dict:
     phone = item.get("phone", "")
     return {
         **item,
+        "whatsapp_followup_url": build_whatsapp_followup_url(phone),
         "whatsapp_desktop_url": build_whatsapp_desktop_url(phone),
         "telegram_desktop_url": build_telegram_desktop_url(phone),
         "max_desktop_url": build_max_desktop_url(),
@@ -1009,6 +1024,7 @@ def production_handler(request):
             "auto_dial_enabled": bool(config.get("auto_dial", True)),
             "current_entity_type": config.get("entity_type") or CallEntityType.DEAL,
             "current_whatsapp_url": current_item.get("whatsapp_desktop_url", "") if current_item else "",
+            "current_whatsapp_followup_url": current_item.get("whatsapp_followup_url", "") if current_item else "",
             "current_telegram_url": current_item.get("telegram_desktop_url", "") if current_item else "",
             "current_max_url": current_item.get("max_desktop_url", build_max_desktop_url()) if current_item else "",
             "max_desktop_url": build_max_desktop_url(),

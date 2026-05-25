@@ -33,10 +33,22 @@ from call_queue.views import (
     MEGAFON_TEST_PHONE_INDEX_SESSION_KEY,
     MEGAFON_TEST_PHONE_LIST_SESSION_KEY,
     MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY,
+    WHATSAPP_FOLLOWUP_MESSAGE,
+    build_whatsapp_followup_url,
 )
 from leadreport.models import SalesManager
 
 User = get_user_model()
+
+
+class WhatsappFollowupUrlTests(TestCase):
+    def test_build_whatsapp_followup_url_includes_phone_and_message_text(self):
+        url = build_whatsapp_followup_url("+7 (999) 000-00-01")
+
+        self.assertTrue(url.startswith("whatsapp://send?phone=79990000001&text="))
+        self.assertIn("%D0%94%D0%BE%D0%B1%D1%80%D1%8B%D0%B9", url)
+        self.assertIn("vk.com", url)
+        self.assertNotIn(WHATSAPP_FOLLOWUP_MESSAGE, url)
 
 
 class QueueServiceTests(TestCase):

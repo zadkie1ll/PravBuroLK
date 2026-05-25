@@ -25,7 +25,7 @@
     {% endif %}
 
     {% if current_item and current_call_id %}
-      <section class="mb-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200" data-prod-panel data-callid="{{ current_call_id }}" data-autodial="{% if auto_dial_enabled %}1{% else %}0{% endif %}" data-status-url="{% url 'call_queue:production_handler_status' %}" data-resolve-url="{% url 'call_queue:production_handler_resolve' %}" data-auto-next-url="{% url 'call_queue:production_handler_auto_next' %}" data-csrf-token="{{ csrf_token }}">
+      <section class="mb-6 rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200" data-prod-panel data-callid="{{ current_call_id }}" data-autodial="{% if auto_dial_enabled %}1{% else %}0{% endif %}" data-status-url="{% url 'call_queue:production_handler_status' %}" data-resolve-url="{% url 'call_queue:production_handler_resolve' %}" data-auto-next-url="{% url 'call_queue:production_handler_auto_next' %}" data-whatsapp-url="{{ current_whatsapp_followup_url }}" data-csrf-token="{{ csrf_token }}">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 class="text-xl font-semibold">Текущий звонок</h2>
@@ -95,12 +95,15 @@
           <p class="mt-3 text-sm text-slate-600">
             Подтвердите итог. Если клиент ответил, карточка сделки сразу откроется в новой вкладке.
           </p>
-          <div class="mt-6 grid gap-3 sm:grid-cols-2">
+          <div class="mt-6 grid gap-3 sm:grid-cols-3">
             <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
               Клиент взял трубку
             </button>
             <button type="button" data-decision="failed" class="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-500">
               Недозвон
+            </button>
+            <button type="button" data-decision="failed" data-open-whatsapp="1" class="rounded-2xl bg-green-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-green-500">
+              Недозвон, написать в WhatsApp
             </button>
           </div>
         </div>
@@ -144,9 +147,9 @@
         </form>
       </section>
 
-      <aside class="rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
-        <h2 class="text-xl font-semibold">Статус очереди</h2>
-        <div class="mt-5 grid gap-4 sm:grid-cols-3">
+      <aside class="flex flex-col rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
+        <h2 class="order-1 text-xl font-semibold">Статус очереди</h2>
+        <div class="order-3 mt-5 grid gap-4 sm:grid-cols-3">
           <div class="rounded-2xl bg-slate-50 p-4">
             <div class="text-sm text-slate-500">Всего элементов</div>
             <div class="mt-1 text-2xl font-semibold">{{ queue_size }}</div>
@@ -164,7 +167,7 @@
         </div>
 
         {% if queue %}
-          <div class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <div class="order-4 mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div class="text-sm uppercase tracking-[0.15em] text-emerald-700">Старт обзвона</div>
@@ -184,7 +187,7 @@
         {% endif %}
 
         {% if current_item %}
-          <div class="mt-5 rounded-2xl border border-slate-200 p-4">
+          <div class="order-2 mt-5 rounded-2xl border border-slate-200 p-4">
             <div class="text-sm text-slate-500">Текущий элемент</div>
             <div class="mt-2 text-lg font-semibold">{{ current_item.client_name|default:"Без имени" }}</div>
             <div class="mt-3 grid gap-3 md:grid-cols-2">
@@ -255,7 +258,7 @@
             </p>
           </div>
         {% else %}
-          <div class="mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
+          <div class="order-2 mt-5 rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
             Очередь пока не сформирована.
           </div>
         {% endif %}
@@ -388,6 +391,7 @@
         const statusUrl = panel.dataset.statusUrl;
         const resolveUrl = panel.dataset.resolveUrl;
         const autoNextUrl = panel.dataset.autoNextUrl;
+        const whatsappUrl = panel.dataset.whatsappUrl;
         const csrfToken = panel.dataset.csrfToken;
         const autoDialEnabled = panel.dataset.autodial === "1";
         const markerNode = panel.querySelector("[data-call-marker]");
@@ -436,13 +440,25 @@
           `).join("");
         }
 
-        async function submitDecision(value) {
+        async function submitDecision(value, options = {}) {
           let bitrixWindow = null;
+          let whatsappWindow = null;
           if (value === "answered") {
             bitrixWindow = window.open("about:blank", "_blank");
             if (bitrixWindow && bitrixWindow.document) {
               bitrixWindow.document.write("<title>Открываем сделку Bitrix...</title><p style='font-family: sans-serif; padding: 24px;'>Открываем сделку в Bitrix...</p>");
               bitrixWindow.document.close();
+            }
+          }
+          if (options.openWhatsapp) {
+            paused = true;
+            renderPause();
+            if (whatsappUrl) {
+              whatsappWindow = window.open("about:blank", "_blank");
+              if (whatsappWindow && whatsappWindow.document) {
+                whatsappWindow.document.write("<title>Открываем WhatsApp...</title><p style='font-family: sans-serif; padding: 24px;'>Открываем WhatsApp...</p>");
+                whatsappWindow.document.close();
+              }
             }
           }
           const response = await fetch(resolveUrl, {
@@ -459,10 +475,13 @@
             if (bitrixWindow && !bitrixWindow.closed) {
               bitrixWindow.close();
             }
+            if (whatsappWindow && !whatsappWindow.closed) {
+              whatsappWindow.close();
+            }
             return;
           }
           decision = value;
-          paused = value === "answered";
+          paused = value === "answered" || Boolean(options.openWhatsapp);
           renderPause();
           hideModal();
           if (value === "answered" && data.bitrix_url) {
@@ -473,6 +492,13 @@
             }
           } else if (bitrixWindow && !bitrixWindow.closed) {
             bitrixWindow.close();
+          }
+          if (options.openWhatsapp && whatsappUrl) {
+            if (whatsappWindow && !whatsappWindow.closed) {
+              whatsappWindow.location.href = whatsappUrl;
+            } else {
+              window.open(whatsappUrl, "_blank", "noopener");
+            }
           }
           evaluate(latestSnapshot);
         }
@@ -559,7 +585,9 @@
         });
 
         document.querySelectorAll("[data-decision]").forEach((button) => {
-          button.addEventListener("click", () => submitDecision(button.dataset.decision));
+          button.addEventListener("click", () => submitDecision(button.dataset.decision, {
+            openWhatsapp: button.dataset.openWhatsapp === "1"
+          }));
         });
 
         renderPause();
