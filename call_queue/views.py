@@ -407,6 +407,13 @@ def build_whatsapp_followup_url(phone: str) -> str:
     return f"whatsapp://send?phone={digits}&text={quote(WHATSAPP_FOLLOWUP_MESSAGE, safe='')}"
 
 
+def build_whatsapp_followup_web_url(phone: str) -> str:
+    base_url = build_whatsapp_chat_url(phone)
+    if not base_url:
+        return ""
+    return f"{base_url}?text={quote(WHATSAPP_FOLLOWUP_MESSAGE, safe='')}"
+
+
 def build_whatsapp_desktop_url(phone: str) -> str:
     digits = normalize_russian_phone_digits(phone)
     return f"whatsapp://send?phone={digits}" if digits else ""
@@ -426,6 +433,7 @@ def with_social_desktop_links(item: dict) -> dict:
     return {
         **item,
         "whatsapp_followup_url": build_whatsapp_followup_url(phone),
+        "whatsapp_followup_web_url": build_whatsapp_followup_web_url(phone),
         "whatsapp_desktop_url": build_whatsapp_desktop_url(phone),
         "telegram_desktop_url": build_telegram_desktop_url(phone),
         "max_desktop_url": build_max_desktop_url(),
@@ -1023,8 +1031,9 @@ def production_handler(request):
             "current_snapshot": current_snapshot,
             "auto_dial_enabled": bool(config.get("auto_dial", True)),
             "current_entity_type": config.get("entity_type") or CallEntityType.DEAL,
-            "current_whatsapp_url": current_item.get("whatsapp_desktop_url", "") if current_item else "",
+            "current_whatsapp_url": current_item.get("whatsapp_followup_url", "") if current_item else "",
             "current_whatsapp_followup_url": current_item.get("whatsapp_followup_url", "") if current_item else "",
+            "current_whatsapp_followup_web_url": current_item.get("whatsapp_followup_web_url", "") if current_item else "",
             "current_telegram_url": current_item.get("telegram_desktop_url", "") if current_item else "",
             "current_max_url": current_item.get("max_desktop_url", build_max_desktop_url()) if current_item else "",
             "max_desktop_url": build_max_desktop_url(),
