@@ -9,7 +9,7 @@ from django.urls import reverse
 from clients.models import Client
 
 from .models import ClientWithdrawalRecord
-from .services import build_withdrawals_summary
+from .services import build_withdrawals_summary, get_total_tail_amount
 
 
 class ClientWithdrawalRecordTests(TestCase):
@@ -48,6 +48,20 @@ class ClientWithdrawalRecordTests(TestCase):
         self.assertIn("20.03.2026", summary)
         self.assertIn("21.03.2026", summary)
         self.assertIn("1000.00", summary)
+
+    def test_total_tail_amount_sums_all_client_withdrawals(self):
+        ClientWithdrawalRecord.objects.create(
+            client=self.client_obj,
+            withdrawal_amount=Decimal("11000.00"),
+            transferred_amount=Decimal("10000.00"),
+        )
+        ClientWithdrawalRecord.objects.create(
+            client=self.client_obj,
+            withdrawal_amount=Decimal("5000.00"),
+            transferred_amount=Decimal("1250.00"),
+        )
+
+        self.assertEqual(get_total_tail_amount(self.client_obj), Decimal("4750.00"))
 
     def test_record_can_be_created_without_withdrawal_fields(self):
         record = ClientWithdrawalRecord.objects.create(client=self.client_obj)

@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django.conf import settings
+from django.db.models import Sum
 
 import requests
 
@@ -6,6 +9,10 @@ import requests
 def get_withdrawals_page_url(client) -> str:
     base_url = getattr(settings, "SITE_BASE_URL", "https://prav-buro.ru").rstrip("/")
     return f"{base_url}/client-withdrawals/{client.id}/"
+
+
+def get_total_tail_amount(client) -> Decimal:
+    return client.withdrawal_records.aggregate(total=Sum("tail_amount"))["total"] or Decimal("0.00")
 
 
 def build_withdrawals_summary(client) -> str:

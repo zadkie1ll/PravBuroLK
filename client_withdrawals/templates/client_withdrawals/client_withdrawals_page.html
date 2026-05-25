@@ -161,10 +161,17 @@
             </div>
             
             {% if records %}
-            <div class="text-sm text-slate-500">
-                Итого снято: <span class="font-semibold text-slate-700">
-                    {{ total_withdrawal_amount|floatformat:2 }} ₽
-                </span>
+            <div class="text-sm text-slate-500 text-right space-y-1">
+                <p>
+                    Итого снято: <span class="font-semibold text-slate-700">
+                        {{ total_withdrawal_amount|floatformat:2 }} ₽
+                    </span>
+                </p>
+                <p>
+                    Общий хвост: <span class="font-semibold {% if total_tail_amount > 0 %}text-amber-600{% else %}text-emerald-600{% endif %}">
+                        {{ total_tail_amount|floatformat:2 }} ₽
+                    </span>
+                </p>
             </div>
             {% endif %}
         </div>

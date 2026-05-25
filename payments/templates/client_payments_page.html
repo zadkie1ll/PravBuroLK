@@ -19,6 +19,9 @@
             font-semibold hover:bg-emerald-700 transition">
       Списания клиента
   </a>
+  <div class="px-5 py-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl font-semibold">
+      Общий хвост по снятиям: {{ total_tail_amount|floatformat:2 }} ₽
+  </div>
 </div>
 
 {% if client.isBlocked %}

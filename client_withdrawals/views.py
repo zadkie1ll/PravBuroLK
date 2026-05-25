@@ -8,7 +8,7 @@ from django.views.decorators.http import require_POST
 from clients.models import Client
 
 from .models import ClientWithdrawalRecord
-from .services import sync_withdrawals_to_bitrix
+from .services import get_total_tail_amount, sync_withdrawals_to_bitrix
 
 
 def _parse_money(value: str, *, allow_empty: bool = False):
@@ -28,6 +28,7 @@ def client_withdrawals_page(request, client_id):
         (record.withdrawal_amount or Decimal("0.00") for record in records),
         Decimal("0.00"),
     )
+    total_tail_amount = get_total_tail_amount(client)
 
     return render(
         request,
@@ -36,6 +37,7 @@ def client_withdrawals_page(request, client_id):
             "client": client,
             "records": records,
             "total_withdrawal_amount": total_withdrawal_amount,
+            "total_tail_amount": total_tail_amount,
         },
     )
 

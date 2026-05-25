@@ -35,7 +35,7 @@ from django.db import connection
 import re
 from .utilities import get_deal_data_from_bitrix, russian_to_translit, recreate_actual_payment, delete_actual_payment
 import telebot
-from client_withdrawals.services import build_withdrawals_bitrix_fields
+from client_withdrawals.services import build_withdrawals_bitrix_fields, get_total_tail_amount
 
 
 BOT_TOKEN = "8208949436:AAEIzi6eP5R04crpwpIchWnpqCCFv8TROvY"
@@ -410,6 +410,7 @@ def client_payments_page(request, client_id):
     contract_final_amount = (contract.total_amount or 0) - (contract.discount or 0)
 
     other_payments = OtherPayment.objects.filter(client__id=client_id).order_by("-created_at")
+    total_tail_amount = get_total_tail_amount(client)
 
     return render(request, "client_payments_page.html", {
         "client": client,
@@ -424,6 +425,7 @@ def client_payments_page(request, client_id):
 
         "contract_final_amount": contract_final_amount,
         "other_payments": other_payments,
+        "total_tail_amount": total_tail_amount,
 
         "date_from": date_from,
         "date_to": date_to,
@@ -564,6 +566,7 @@ def client_admin_view(request, client_id):
     actual_payments = ActualPayment.objects.filter(plan__contract=contract) if contract else []
     other_payments = client.other_payments.all()
     expected_total = contract.total_amount - contract.discount if contract else 0
+    total_tail_amount = get_total_tail_amount(client)
 
     payments_data = []
     for p in payments:
@@ -599,6 +602,7 @@ def client_admin_view(request, client_id):
         "paid_sum": paid_sum,
         "expected_total": expected_total,
         "other_payments": other_payments,
+        "total_tail_amount": total_tail_amount,
     })
 
 
