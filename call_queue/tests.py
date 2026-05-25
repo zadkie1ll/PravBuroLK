@@ -33,7 +33,9 @@ from call_queue.views import (
     MEGAFON_TEST_PHONE_INDEX_SESSION_KEY,
     MEGAFON_TEST_PHONE_LIST_SESSION_KEY,
     MEGAFON_TEST_PHONE_RESULTS_SESSION_KEY,
+    MAX_FOLLOWUP_MESSAGE,
     WHATSAPP_FOLLOWUP_MESSAGE,
+    build_max_followup_url,
     build_whatsapp_followup_url,
     build_whatsapp_followup_web_url,
 )
@@ -57,6 +59,14 @@ class WhatsappFollowupUrlTests(TestCase):
         self.assertTrue(url.startswith("https://wa.me/79990000001?text="))
         self.assertIn("%D0%94%D0%BE%D0%B1%D1%80%D1%8B%D0%B9", url)
         self.assertIn("vk.com", url)
+
+    def test_build_max_followup_url_uses_share_deeplink_with_message_text(self):
+        url = build_max_followup_url()
+
+        self.assertTrue(url.startswith("https://max.ru/:share?text="))
+        self.assertIn("%D0%94%D0%BE%D0%B1%D1%80%D1%8B%D0%B9", url)
+        self.assertIn("vk.com", url)
+        self.assertNotIn(MAX_FOLLOWUP_MESSAGE, url)
 
 
 class QueueServiceTests(TestCase):

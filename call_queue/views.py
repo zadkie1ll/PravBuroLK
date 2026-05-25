@@ -55,6 +55,7 @@ WHATSAPP_FOLLOWUP_MESSAGE = (
     "из консультации с нами. Посмотрите его и напишите, когда вам удобно созвониться😺 "
     "https://vk.com/video-211710764_456239939?list=ln-9eixjJMj2MwydO91XY"
 )
+MAX_FOLLOWUP_MESSAGE = WHATSAPP_FOLLOWUP_MESSAGE
 
 
 def get_call_queue_timezone() -> ZoneInfo:
@@ -428,6 +429,10 @@ def build_max_desktop_url() -> str:
     return getattr(settings, "CALL_QUEUE_MAX_DESKTOP_URL", "max://") or "max://"
 
 
+def build_max_followup_url() -> str:
+    return f"https://max.ru/:share?text={quote(MAX_FOLLOWUP_MESSAGE, safe='')}"
+
+
 def with_social_desktop_links(item: dict) -> dict:
     phone = item.get("phone", "")
     return {
@@ -437,6 +442,7 @@ def with_social_desktop_links(item: dict) -> dict:
         "whatsapp_desktop_url": build_whatsapp_desktop_url(phone),
         "telegram_desktop_url": build_telegram_desktop_url(phone),
         "max_desktop_url": build_max_desktop_url(),
+        "max_followup_url": build_max_followup_url(),
     }
 
 
@@ -1035,8 +1041,8 @@ def production_handler(request):
             "current_whatsapp_followup_url": current_item.get("whatsapp_followup_url", "") if current_item else "",
             "current_whatsapp_followup_web_url": current_item.get("whatsapp_followup_web_url", "") if current_item else "",
             "current_telegram_url": current_item.get("telegram_desktop_url", "") if current_item else "",
-            "current_max_url": current_item.get("max_desktop_url", build_max_desktop_url()) if current_item else "",
-            "max_desktop_url": build_max_desktop_url(),
+            "current_max_url": current_item.get("max_followup_url", build_max_followup_url()) if current_item else "",
+            "max_desktop_url": build_max_followup_url(),
         },
     )
 
