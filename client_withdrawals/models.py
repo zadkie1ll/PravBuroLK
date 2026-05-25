@@ -11,11 +11,13 @@ class ClientWithdrawalRecord(models.Model):
         related_name="withdrawal_records",
         verbose_name="Клиент",
     )
-    withdrawal_date = models.DateField(verbose_name="Дата снятия")
+    withdrawal_date = models.DateField(blank=True, null=True, verbose_name="Дата снятия")
     transfer_date = models.DateField(blank=True, null=True, verbose_name="Дата перевода")
     withdrawal_amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
+        blank=True,
+        null=True,
         verbose_name="Сумма снятия",
     )
     transferred_amount = models.DecimalField(

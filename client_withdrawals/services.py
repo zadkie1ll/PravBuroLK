@@ -24,15 +24,16 @@ def build_withdrawals_summary(client) -> str:
     lines = [header, separator]
 
     for record in records:
-        withdrawal_date = record.withdrawal_date.strftime("%d.%m.%Y")
+        withdrawal_date = record.withdrawal_date.strftime("%d.%m.%Y") if record.withdrawal_date else "-"
         transfer_date = record.transfer_date.strftime("%d.%m.%Y") if record.transfer_date else "-"
+        withdrawal_amount = f"{record.withdrawal_amount:.2f}" if record.withdrawal_amount is not None else "-"
         transferred_amount = f"{record.transferred_amount:.2f}" if record.transferred_amount is not None else "-"
         lines.append(
             " | ".join(
                 [
                     withdrawal_date,
                     transfer_date,
-                    f"{record.withdrawal_amount:.2f}",
+                    withdrawal_amount,
                     transferred_amount,
                     f"{record.tail_amount:.2f}",
                 ]

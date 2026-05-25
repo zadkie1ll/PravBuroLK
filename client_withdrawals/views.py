@@ -24,7 +24,10 @@ def _parse_money(value: str, *, allow_empty: bool = False):
 def client_withdrawals_page(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
     records = client.withdrawal_records.all()
-    total_withdrawal_amount = sum((record.withdrawal_amount for record in records), Decimal("0.00"))
+    total_withdrawal_amount = sum(
+        (record.withdrawal_amount or Decimal("0.00") for record in records),
+        Decimal("0.00"),
+    )
 
     return render(
         request,
@@ -43,7 +46,10 @@ def create_withdrawal_record(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
 
     try:
-        withdrawal_amount = _parse_money(request.POST.get("withdrawal_amount"))
+        withdrawal_amount = _parse_money(
+            request.POST.get("withdrawal_amount"),
+            allow_empty=True,
+        )
         transferred_amount = _parse_money(
             request.POST.get("transferred_amount"),
             allow_empty=True,
@@ -55,7 +61,7 @@ def create_withdrawal_record(request, client_id):
     try:
         ClientWithdrawalRecord.objects.create(
             client=client,
-            withdrawal_date=request.POST.get("withdrawal_date"),
+            withdrawal_date=request.POST.get("withdrawal_date") or None,
             transfer_date=request.POST.get("transfer_date") or None,
             withdrawal_amount=withdrawal_amount,
             transferred_amount=transferred_amount,
@@ -79,7 +85,10 @@ def update_withdrawal_record(request, record_id):
     client = record.client
 
     try:
-        withdrawal_amount = _parse_money(request.POST.get("withdrawal_amount"))
+        withdrawal_amount = _parse_money(
+            request.POST.get("withdrawal_amount"),
+            allow_empty=True,
+        )
         transferred_amount = _parse_money(
             request.POST.get("transferred_amount"),
             allow_empty=True,
@@ -89,7 +98,7 @@ def update_withdrawal_record(request, record_id):
         return redirect("client_withdrawals_page", client_id=client.id)
 
     try:
-        record.withdrawal_date = request.POST.get("withdrawal_date")
+        record.withdrawal_date = request.POST.get("withdrawal_date") or None
         record.transfer_date = request.POST.get("transfer_date") or None
         record.withdrawal_amount = withdrawal_amount
         record.transferred_amount = transferred_amount

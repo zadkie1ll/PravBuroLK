@@ -105,14 +105,14 @@
 
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-slate-600">Дата снятия</label>
-                <input type="date" name="withdrawal_date" required 
+                <input type="date" name="withdrawal_date"
                        class="input-focus w-full border border-slate-200 rounded-2xl px-5 py-4 focus:border-emerald-500 bg-white">
             </div>
 
             <div class="space-y-2">
                 <label class="block text-sm font-medium text-slate-600">Сумма снятия</label>
                 <div class="relative">
-                    <input type="number" step="0.01" min="0" name="withdrawal_amount" required 
+                    <input type="number" step="0.01" min="0" name="withdrawal_amount"
                            class="input-focus w-full border border-slate-200 rounded-2xl px-5 py-4 pl-11 focus:border-emerald-500 bg-white">
                     <span class="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-medium">₽</span>
                 </div>
@@ -186,9 +186,19 @@
                 <tbody class="divide-y divide-slate-100">
                     {% for record in records %}
                     <tr class="table-row group" id="record-row-{{ record.id }}">
-                        <td class="py-5 px-8 font-medium">{{ record.withdrawal_date|date:"d.m.Y" }}</td>
+                        <td class="py-5 px-8 font-medium">
+                            {% if record.withdrawal_date %}
+                                {{ record.withdrawal_date|date:"d.m.Y" }}
+                            {% else %}
+                                <span class="text-slate-400">—</span>
+                            {% endif %}
+                        </td>
                         <td class="py-5 px-8 font-semibold text-slate-900">
-                            {{ record.withdrawal_amount|floatformat:2 }} ₽
+                            {% if record.withdrawal_amount != None %}
+                                {{ record.withdrawal_amount|floatformat:2 }} ₽
+                            {% else %}
+                                <span class="text-slate-400">—</span>
+                            {% endif %}
                         </td>
                         <td class="py-5 px-8 text-slate-600">
                             {% if record.transfer_date %}
@@ -241,7 +251,7 @@
 
                                 <div class="space-y-2">
                                     <label class="block text-sm font-medium text-slate-600">Дата снятия</label>
-                                    <input type="date" name="withdrawal_date" required
+                                    <input type="date" name="withdrawal_date"
                                            value="{{ record.withdrawal_date|date:'Y-m-d' }}"
                                            class="input-focus w-full border border-slate-200 rounded-2xl px-4 py-3 focus:border-emerald-500 bg-white">
                                 </div>
@@ -249,8 +259,8 @@
                                 <div class="space-y-2">
                                     <label class="block text-sm font-medium text-slate-600">Сумма снятия</label>
                                     <div class="relative">
-                                        <input type="number" step="0.01" min="0" name="withdrawal_amount" required
-                                               value="{{ record.withdrawal_amount }}"
+                                        <input type="number" step="0.01" min="0" name="withdrawal_amount"
+                                               value="{{ record.withdrawal_amount|default_if_none:'' }}"
                                                class="input-focus w-full border border-slate-200 rounded-2xl px-4 py-3 pl-10 focus:border-emerald-500 bg-white">
                                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">₽</span>
                                     </div>

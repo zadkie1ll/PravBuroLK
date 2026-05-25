@@ -49,6 +49,18 @@ class ClientWithdrawalRecordTests(TestCase):
         self.assertIn("21.03.2026", summary)
         self.assertIn("1000.00", summary)
 
+    def test_record_can_be_created_without_withdrawal_fields(self):
+        record = ClientWithdrawalRecord.objects.create(client=self.client_obj)
+
+        summary = build_withdrawals_summary(self.client_obj)
+
+        self.assertIsNone(record.withdrawal_date)
+        self.assertIsNone(record.transfer_date)
+        self.assertIsNone(record.withdrawal_amount)
+        self.assertIsNone(record.transferred_amount)
+        self.assertEqual(record.tail_amount, Decimal("0.00"))
+        self.assertIn("- | - | - | - | 0.00", summary)
+
     def test_page_contains_edit_form_for_existing_records(self):
         record = ClientWithdrawalRecord.objects.create(
             client=self.client_obj,
@@ -66,6 +78,31 @@ class ClientWithdrawalRecordTests(TestCase):
         self.assertContains(response, reverse("update_withdrawal_record", args=[record.id]))
         self.assertContains(response, 'data-edit-toggle="')
         self.assertContains(response, "Старый комментарий")
+
+    @patch("client_withdrawals.views.sync_withdrawals_to_bitrix", return_value=True)
+    def test_create_withdrawal_record_accepts_empty_withdrawal_fields(self, sync_mock):
+        django_client = DjangoClient()
+        django_client.force_login(self.user)
+
+        response = django_client.post(
+            reverse("create_withdrawal_record", args=[self.client_obj.id]),
+            {
+                "withdrawal_date": "",
+                "transfer_date": "",
+                "withdrawal_amount": "",
+                "transferred_amount": "",
+                "comment": "Заполнить позже",
+            },
+        )
+
+        record = ClientWithdrawalRecord.objects.get(client=self.client_obj)
+        self.assertRedirects(response, reverse("client_withdrawals_page", args=[self.client_obj.id]))
+        self.assertIsNone(record.withdrawal_date)
+        self.assertIsNone(record.transfer_date)
+        self.assertIsNone(record.withdrawal_amount)
+        self.assertIsNone(record.transferred_amount)
+        self.assertEqual(record.tail_amount, Decimal("0.00"))
+        sync_mock.assert_called_once_with(self.client_obj)
 
     @patch("client_withdrawals.views.sync_withdrawals_to_bitrix", return_value=True)
     def test_update_withdrawal_record_changes_saved_values(self, sync_mock):
