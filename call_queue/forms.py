@@ -145,8 +145,19 @@ class ProductionRecallForm(forms.Form):
             }
         ),
     )
+    search_query = forms.CharField(
+        label="Поиск по названию или телефону",
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "Например: Иванов или +7 900 123-45-67",
+                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
+            }
+        ),
+    )
     date_from = forms.DateField(
         label="Дата от",
+        required=False,
         widget=forms.DateInput(
             attrs={
                 "type": "date",
@@ -156,6 +167,7 @@ class ProductionRecallForm(forms.Form):
     )
     date_to = forms.DateField(
         label="Дата до",
+        required=False,
         widget=forms.DateInput(
             attrs={
                 "type": "date",
@@ -201,8 +213,15 @@ class ProductionRecallForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        search_query = (cleaned_data.get("search_query") or "").strip()
         date_from = cleaned_data.get("date_from")
         date_to = cleaned_data.get("date_to")
+        if search_query:
+            return cleaned_data
+        if not date_from:
+            self.add_error("date_from", "Укажите дату или заполните поиск по названию/телефону.")
+        if not date_to:
+            self.add_error("date_to", "Укажите дату или заполните поиск по названию/телефону.")
         if date_from and date_to and date_from > date_to:
             raise forms.ValidationError("Дата начала не может быть позже даты окончания.")
         return cleaned_data

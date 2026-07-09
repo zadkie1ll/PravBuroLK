@@ -195,6 +195,14 @@ class BitrixDealService:
                 "order": {"DATE_CREATE": "ASC", "ID": "ASC"},
             },
         )
+        return self._entities_to_recall_items(entities, entity_type, stage_field)
+
+    def _entities_to_recall_items(
+        self,
+        entities: list[dict[str, Any]],
+        entity_type: str,
+        stage_field: str,
+    ) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         for entity in entities:
             contact_id = _safe_int(entity.get("CONTACT_ID"))
@@ -231,6 +239,56 @@ class BitrixDealService:
                 }
             )
         return items
+
+    def search_production_entities(
+        self,
+        *,
+        entity_type: str = CallEntityType.DEAL,
+        query: str,
+    ) -> list[dict[str, Any]]:
+        query = (query or "").strip()
+        if not query:
+            return []
+        stage_field = "STAGE_ID" if entity_type == CallEntityType.DEAL else "STATUS_ID"
+        select_fields = (
+            self.production_deal_select_fields
+            if entity_type == CallEntityType.DEAL
+            else self.production_lead_select_fields
+        )
+        method = "crm.deal.list" if entity_type == CallEntityType.DEAL else "crm.lead.list"
+        digit_count = sum(char.isdigit() for char in query)
+
+        if digit_count >= 7:
+            normalized_phone = _normalize_phone(query)
+            if not normalized_phone:
+                return []
+            duplicates = self.client.call(
+                "crm.duplicate.findbycomm",
+                {"type": "PHONE", "values": [normalized_phone]},
+            ) or {}
+            key = "DEAL" if entity_type == CallEntityType.DEAL else "LEAD"
+            entity_ids = [_safe_int(entity_id) for entity_id in duplicates.get(key, [])]
+            entity_ids = [entity_id for entity_id in entity_ids if entity_id]
+            if not entity_ids:
+                return []
+            entities = self.client.paginated_call(
+                method,
+                {
+                    "filter": {"ID": entity_ids},
+                    "select": select_fields,
+                    "order": {"DATE_CREATE": "ASC", "ID": "ASC"},
+                },
+            )
+        else:
+            entities = self.client.paginated_call(
+                method,
+                {
+                    "filter": {"%TITLE": query},
+                    "select": select_fields,
+                    "order": {"DATE_CREATE": "ASC", "ID": "ASC"},
+                },
+            )
+        return self._entities_to_recall_items(entities, entity_type, stage_field)
 
     def get_contact(self, contact_id: int) -> dict[str, Any]:
         return self.client.call("crm.contact.get", {"id": int(contact_id)})
