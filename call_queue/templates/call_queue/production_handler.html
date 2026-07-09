@@ -111,12 +111,15 @@
           <p class="mt-3 text-sm text-slate-600">
             Подтвердите итог. Если клиент ответил, карточка сделки сразу откроется в новой вкладке.
           </p>
-          <div class="mt-6 grid gap-3 sm:grid-cols-3">
+          <div class="mt-6 grid gap-3 sm:grid-cols-2">
             <button type="button" data-decision="answered" class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-500">
               Клиент взял трубку
             </button>
             <button type="button" data-decision="failed" class="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-500">
               Недозвон
+            </button>
+            <button type="button" data-decision="voicemail" class="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-amber-400">
+              Автоответчик
             </button>
             <button type="button" data-decision="failed" data-open-whatsapp="1" class="rounded-2xl bg-green-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-green-500">
               Недозвон, написать в WhatsApp
@@ -299,12 +302,15 @@
                 <span class="rounded-full px-3 py-1 text-xs font-medium
                   {% if item.manual_decision == 'answered' %}bg-emerald-100 text-emerald-800
                   {% elif item.status == 'calling' %}bg-amber-100 text-amber-800
+                  {% elif item.manual_decision == 'voicemail' %}bg-orange-100 text-orange-800
                   {% elif item.manual_decision == 'failed' or item.status == 'failed' %}bg-rose-100 text-rose-800
                   {% else %}bg-slate-100 text-slate-700{% endif %}">
                   {% if item.manual_decision == 'answered' %}
                     Клиент ответил
                   {% elif item.status == 'calling' %}
                     В звонке
+                  {% elif item.manual_decision == 'voicemail' %}
+                    Автоответчик
                   {% elif item.manual_decision == 'failed' or item.status == 'failed' %}
                     Недозвон
                   {% else %}
@@ -563,7 +569,7 @@
             renderPause();
             return;
           }
-          if (decision === "failed") {
+          if (decision === "failed" || decision === "voicemail") {
             if (!paused) {
               triggerNext();
             }

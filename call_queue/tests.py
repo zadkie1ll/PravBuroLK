@@ -1383,6 +1383,76 @@ class CallQueueMegafonViewTests(TestCase):
         payload = response.json()
         self.assertEqual(payload["bitrix_url"], "https://example.bitrix24.ru/crm/deal/details/701/")
 
+    @patch("call_queue.views.BitrixDealService.append_entity_comment")
+    def test_production_handler_resolve_voicemail_logs_comment(self, append_mock):
+        append_mock.return_value = "01.04 (Менеджер) автоответчик"
+        session = self.client.session
+        session[MEGAFON_PROD_QUEUE_SESSION_KEY] = [
+            {
+                "entity_type": CallEntityType.DEAL,
+                "entity_id": 701,
+                "deal_id": 701,
+                "contact_id": 801,
+                "client_name": "Ирина",
+                "phone": "79990000001",
+                "bitrix_url": "https://example.bitrix24.ru/crm/deal/details/701/",
+                "manual_decision": "",
+                "comment_logged": False,
+                "comments": "",
+                "call_id": "PROD-CALL-VM",
+                "status": "calling",
+            }
+        ]
+        session.save()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:production_handler_resolve"),
+            {"callid": "PROD-CALL-VM", "decision": "voicemail"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["decision"], "voicemail")
+        self.assertEqual(payload["bitrix_url"], "")
+        append_mock.assert_called_once()
+        comment_line = append_mock.call_args.args[2]
+        self.assertRegex(comment_line, r"^\d{2}\.\d{2} \(Менеджер\) автоответчик$")
+        queue = self.client.session[MEGAFON_PROD_QUEUE_SESSION_KEY]
+        self.assertEqual(queue[0]["manual_decision"], "voicemail")
+        self.assertEqual(queue[0]["status"], "voicemail")
+        self.assertTrue(queue[0]["comment_logged"])
+
+    @patch("call_queue.views.BitrixDealService.append_entity_comment")
+    def test_production_handler_resolve_voicemail_skips_duplicate_comment(self, append_mock):
+        session = self.client.session
+        session[MEGAFON_PROD_QUEUE_SESSION_KEY] = [
+            {
+                "entity_type": CallEntityType.DEAL,
+                "entity_id": 701,
+                "deal_id": 701,
+                "client_name": "Ирина",
+                "phone": "79990000001",
+                "manual_decision": "",
+                "comment_logged": True,
+                "comments": "",
+                "call_id": "PROD-CALL-VM-DUP",
+                "status": "calling",
+            }
+        ]
+        session.save()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("call_queue:production_handler_resolve"),
+            {"callid": "PROD-CALL-VM-DUP", "decision": "voicemail"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        append_mock.assert_not_called()
+
     @patch("call_queue.views.start_megafon_production_call")
     @patch("call_queue.views.BitrixDealService.append_deal_comment")
     def test_production_handler_auto_next_logs_comment_for_not_available(self, append_mock, start_call_mock):

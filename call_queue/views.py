@@ -484,6 +484,10 @@ def format_unavailable_comment(manager_profile: SalesManager) -> str:
     return f"{get_call_queue_localdate():%d.%m} ({get_manager_short_name(manager_profile)}) номер недоступен"
 
 
+def format_voicemail_comment(manager_profile: SalesManager) -> str:
+    return f"{get_call_queue_localdate():%d.%m} ({get_manager_short_name(manager_profile)}) автоответчик"
+
+
 def mark_prod_item(request, index: int, **updates) -> dict | None:
     queue = get_prod_queue(request)
     if not queue or index < 0 or index >= len(queue):
@@ -1073,7 +1077,7 @@ def production_handler_resolve(request):
     decision = request.POST.get("decision", "").strip()
     queue = get_prod_queue(request)
     bitrix_service = BitrixDealService()
-    if decision not in {"answered", "failed"}:
+    if decision not in {"answered", "failed", "voicemail"}:
         return JsonResponse({"ok": False, "error": "invalid decision"}, status=400)
     item_index = next((idx for idx, item in enumerate(queue) if item.get("call_id") == call_id), None)
     if item_index is None:
@@ -1084,10 +1088,13 @@ def production_handler_resolve(request):
         request,
         item_index,
         manual_decision=decision,
-        status="answered" if decision == "answered" else "failed",
+        status=decision,
     )
-    if decision == "failed" and not item.get("comment_logged"):
-        comment_line = format_unanswered_comment(request.sales_manager_profile)
+    if decision in {"failed", "voicemail"} and not item.get("comment_logged"):
+        if decision == "voicemail":
+            comment_line = format_voicemail_comment(request.sales_manager_profile)
+        else:
+            comment_line = format_unanswered_comment(request.sales_manager_profile)
         updated_comments = bitrix_service.append_entity_comment(
             item.get("entity_type") or CallEntityType.DEAL,
             item.get("entity_id") or item.get("deal_id"),
