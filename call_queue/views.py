@@ -106,6 +106,41 @@ def normalize_megafon_payload(request) -> dict:
     return {"payload": parsed}
 
 
+MEGAFON_EVENT_TITLES = {
+    ("OUTGOING", "out"): "Набираем номер клиента",
+    ("OUTGOING", ""): "Исходящий звонок",
+    ("INCOMING", "in"): "Входящий звонок менеджеру",
+    ("INCOMING", ""): "Входящий звонок",
+    ("ACCEPTED", "in"): "Менеджер снял трубку",
+    ("ACCEPTED", "out"): "Клиент снял трубку",
+    ("ACCEPTED", ""): "Трубку сняли",
+    ("COMPLETED", "out"): "Разговор завершён",
+    ("COMPLETED", "in"): "Разговор завершён",
+    ("COMPLETED", ""): "Разговор завершён",
+    ("CANCELLED", "in"): "Сброс на стороне менеджера",
+    ("CANCELLED", "out"): "Клиент сбросил или не дождался",
+    ("CANCELLED", ""): "Звонок отменён",
+}
+
+MEGAFON_HISTORY_TITLES = {
+    "Success": "Итог: разговор состоялся",
+    "Busy": "Итог: занято или сброс",
+    "NotAvailable": "Итог: номер недоступен",
+    "missed": "Итог: не взяли трубку",
+}
+
+
+def humanize_megafon_log(cmd: str, event_type: str, status: str, direction: str) -> str:
+    if cmd == "history":
+        return MEGAFON_HISTORY_TITLES.get(status, f"Итог звонка: {status or 'неизвестно'}")
+    if cmd == "event":
+        title = MEGAFON_EVENT_TITLES.get((event_type, direction))
+        if title:
+            return title
+        return MEGAFON_EVENT_TITLES.get((event_type, ""), f"Событие: {event_type or 'неизвестно'}")
+    return ""
+
+
 def serialize_megafon_log(log: BitrixSyncLog) -> dict:
     payload = log.request_payload.get("payload", {}) if isinstance(log.request_payload, dict) else {}
     cmd = payload.get("cmd", "")
@@ -123,6 +158,7 @@ def serialize_megafon_log(log: BitrixSyncLog) -> dict:
     return {
         "created_at": timezone.localtime(log.created_at).isoformat(),
         "title": title,
+        "title_human": humanize_megafon_log(cmd, event_type, status, direction) or title,
         "cmd": cmd,
         "type": event_type,
         "status": status,
@@ -1015,7 +1051,8 @@ def production_handler(request):
                 bitrix_service=bitrix_service,
             )
     else:
-        if request.GET:
+        production_form_fields = {"entity_type", "date_from", "date_to", "stage_id", "auto_dial"}
+        if production_form_fields & set(request.GET.keys()):
             form = ProductionRecallForm(request.GET, bitrix_service=bitrix_service)
         else:
             form = ProductionRecallForm(
