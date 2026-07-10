@@ -110,6 +110,66 @@ def find_deals_by_contact_and_category(
     return [deal for deal in deals if str(deal.get("ID")) != exclude_id_str]
 
 
+_DEAL_COPY_SKIP_FIELDS = (
+    "ID",
+    "CATEGORY_ID",
+    "STAGE_ID",
+    "STAGE_SEMANTIC_ID",
+    "DATE_CREATE",
+    "DATE_MODIFY",
+    "MOVED_BY_ID",
+    "MOVED_TIME",
+    "LAST_ACTIVITY_BY",
+    "LAST_ACTIVITY_TIME",
+    "ORIGIN_ID",
+    "ORIGINATOR_ID",
+)
+
+
+def create_deal(fields: dict) -> int:
+    data = _post("crm.deal.add", {"fields": fields})
+    deal_id = data.get("result")
+    if not deal_id:
+        raise BitrixAPIError("Failed to create deal")
+    return deal_id
+
+
+def duplicate_deal_to_agents_category(deal_data: dict) -> int | None:
+    """
+    Если сделка перешла в стадию "Сделка успешна" (C2:WON) в категории
+    "Сопровождение", создаёт копию карточки в категории "Агенты" на её
+    первой стадии — если сделки этого контакта там ещё нет.
+    Возвращает ID новой сделки, либо None, если копия не создавалась.
+    """
+    source_category_id = settings.DEAL_DUPLICATION_SOURCE_CATEGORY_ID
+    source_won_stage_id = settings.DEAL_DUPLICATION_SOURCE_WON_STAGE_ID
+    target_category_id = settings.DEAL_DUPLICATION_TARGET_CATEGORY_ID
+    target_first_stage_id = settings.DEAL_DUPLICATION_TARGET_FIRST_STAGE_ID
+
+    if str(deal_data.get("CATEGORY_ID")) != str(source_category_id):
+        return None
+    if deal_data.get("STAGE_ID") != source_won_stage_id:
+        return None
+
+    contact_id = deal_data.get("CONTACT_ID")
+    if not contact_id:
+        return None
+
+    existing = find_deals_by_contact_and_category(contact_id, target_category_id)
+    if existing:
+        return None
+
+    fields = {
+        key: value
+        for key, value in deal_data.items()
+        if key not in _DEAL_COPY_SKIP_FIELDS
+    }
+    fields["CATEGORY_ID"] = target_category_id
+    fields["STAGE_ID"] = target_first_stage_id
+
+    return create_deal(fields)
+
+
 def get_task_by_id(task_id: int) -> dict:
     data = _post("tasks.task.get", {"taskId": task_id})
     result = data.get("result") or {}

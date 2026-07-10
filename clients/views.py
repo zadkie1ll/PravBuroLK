@@ -24,6 +24,7 @@ from .models import Employee
 import logging
 import requests
 from payments.utilities import get_deal_data_from_bitrix
+from lead_control.bitrix_api import duplicate_deal_to_agents_category, BitrixAPIError
 BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
 logger = logging.getLogger(__name__)
 
@@ -291,6 +292,11 @@ def bitrix_deal_webhook(request):
 
         with transaction.atomic():
             client.set_stage(stage)
+
+        try:
+            duplicate_deal_to_agents_category(deal_data)
+        except BitrixAPIError:
+            logger.exception("Failed to duplicate deal %s into Агенты category", bitrix_id)
 
         return JsonResponse({
             "status": "success",

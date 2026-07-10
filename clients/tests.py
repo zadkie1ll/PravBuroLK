@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.test import SimpleTestCase, override_settings
 from django.core.cache import cache
 from django.urls import reverse
-from clients.models import Client
+from clients.models import Client, StageTemplate
 from clients.services import ClientService
 from clients.lawyer_info import get_client_lawyer_info
 from colorama import init, Fore, Style
@@ -275,3 +275,100 @@ class SetIsBlockedTests(TestCase):
 
         self.assertEqual(result.status_code, 200)
         self.assertFalse(client.isBlocked)
+
+
+class DuplicateDealToAgentsCategoryTests(TestCase):
+    """Проверяет дублирование завершённых сделок из 'Сопровождение' в 'Агенты'."""
+
+    def setUp(self):
+        user = User.objects.create_user(username="agent-dup-user", password="pwd")
+        self.client_obj = Client.objects.create(
+            user=user,
+            name="Ivan",
+            surname="Ivanov",
+            bitrix_id="999",
+        )
+        self.won_stage = StageTemplate.objects.create(
+            name="Сделка успешна",
+            slug="deal-won",
+            bitrix_stage_id="C2:WON",
+        )
+        self.other_stage = StageTemplate.objects.create(
+            name="Анализ ситуации",
+            slug="analysis",
+            bitrix_stage_id="C2:PREPARATION",
+        )
+
+    def _deal_response(self, mock_get, stage_id, category_id="2"):
+        response = Mock()
+        response.status_code = 200
+        response.raise_for_status.return_value = None
+        response.json.return_value = {
+            "result": {
+                "ID": "999",
+                "CATEGORY_ID": category_id,
+                "STAGE_ID": stage_id,
+                "CONTACT_ID": "555",
+                "TITLE": "Тестовая сделка",
+            }
+        }
+        mock_get.return_value = response
+
+    @patch("lead_control.bitrix_api.requests.post")
+    @patch("payments.utilities.requests.get")
+    def test_creates_deal_in_agents_when_won_and_not_existing(self, mock_get, mock_post):
+        self._deal_response(mock_get, "C2:WON")
+
+        list_response = Mock()
+        list_response.raise_for_status.return_value = None
+        list_response.json.return_value = {"result": []}
+
+        add_response = Mock()
+        add_response.raise_for_status.return_value = None
+        add_response.json.return_value = {"result": 1001}
+
+        mock_post.side_effect = [list_response, add_response]
+
+        result = self.client.post(
+            reverse("bitrix_deal_webhook"),
+            {"document_id[2]": "DEAL_999"},
+        )
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(mock_post.call_count, 2)
+
+        add_call_payload = mock_post.call_args_list[1].kwargs["json"]
+        self.assertEqual(add_call_payload["fields"]["CATEGORY_ID"], 10)
+        self.assertEqual(add_call_payload["fields"]["STAGE_ID"], "C10:NEW")
+        self.assertNotIn("ID", add_call_payload["fields"])
+
+    @patch("lead_control.bitrix_api.requests.post")
+    @patch("payments.utilities.requests.get")
+    def test_does_not_duplicate_when_already_exists_in_agents(self, mock_get, mock_post):
+        self._deal_response(mock_get, "C2:WON")
+
+        list_response = Mock()
+        list_response.raise_for_status.return_value = None
+        list_response.json.return_value = {"result": [{"ID": "2001"}]}
+        mock_post.return_value = list_response
+
+        result = self.client.post(
+            reverse("bitrix_deal_webhook"),
+            {"document_id[2]": "DEAL_999"},
+        )
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(mock_post.call_count, 1)
+
+    @patch("lead_control.bitrix_api.requests.post")
+    @patch("payments.utilities.requests.get")
+    def test_does_not_duplicate_when_stage_is_not_won(self, mock_get, mock_post):
+        self._deal_response(mock_get, "C2:PREPARATION")
+
+        result = self.client.post(
+            reverse("bitrix_deal_webhook"),
+            {"document_id[2]": "DEAL_999"},
+        )
+
+        self.assertEqual(result.status_code, 200)
+        mock_post.assert_not_called()
