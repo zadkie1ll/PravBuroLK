@@ -92,13 +92,26 @@ class BitrixDealService:
     def __init__(self, client: BitrixClient | None = None):
         self.client = client or BitrixClient()
 
-    def get_stage_choices(self, entity_type: str = CallEntityType.DEAL) -> list[tuple[str, str]]:
+    def get_stage_choices(
+        self,
+        entity_type: str = CallEntityType.DEAL,
+        category_id: str | int | None = None,
+    ) -> list[tuple[str, str]]:
         try:
-            entity_id = "DEAL_STAGE" if entity_type == CallEntityType.DEAL else "STATUS"
+            if entity_type == CallEntityType.DEAL:
+                entity_id = f"DEAL_STAGE_{category_id}" if category_id else "DEAL_STAGE"
+            else:
+                entity_id = "STATUS"
             items = self.client.call("crm.status.list", {"filter": {"ENTITY_ID": entity_id}})
         except Exception:
             return []
         return [(item.get("STATUS_ID", ""), item.get("NAME", item.get("STATUS_ID", ""))) for item in items]
+
+    def get_deal_category_choices(self) -> list[tuple[str, str]]:
+        return [
+            (str(settings.DEAL_DUPLICATION_SOURCE_CATEGORY_ID), "Сопровождение"),
+            (str(settings.DEAL_DUPLICATION_TARGET_CATEGORY_ID), "Агенты"),
+        ]
 
     def get_source_choices(self, entity_type: str = CallEntityType.DEAL) -> list[tuple[str, str]]:
         try:
@@ -172,6 +185,7 @@ class BitrixDealService:
         date_from,
         date_to,
         stage_id: str = "PREPARATION",
+        category_id: str = "",
     ) -> list[dict[str, Any]]:
         from_dt, to_dt = _build_bitrix_date_range(date_from, date_to)
         method = "crm.deal.list" if entity_type == CallEntityType.DEAL else "crm.lead.list"
@@ -187,6 +201,8 @@ class BitrixDealService:
         }
         if stage_id:
             bitrix_filter[stage_field] = stage_id
+        if category_id and entity_type == CallEntityType.DEAL:
+            bitrix_filter["CATEGORY_ID"] = category_id
         entities = self.client.paginated_call(
             method,
             {
@@ -245,6 +261,7 @@ class BitrixDealService:
         *,
         entity_type: str = CallEntityType.DEAL,
         query: str,
+        category_id: str = "",
     ) -> list[dict[str, Any]]:
         query = (query or "").strip()
         if not query:
@@ -257,6 +274,7 @@ class BitrixDealService:
         )
         method = "crm.deal.list" if entity_type == CallEntityType.DEAL else "crm.lead.list"
         digit_count = sum(char.isdigit() for char in query)
+        apply_category = bool(category_id) and entity_type == CallEntityType.DEAL
 
         if digit_count >= 7:
             normalized_phone = _normalize_phone(query)
@@ -271,19 +289,25 @@ class BitrixDealService:
             entity_ids = [entity_id for entity_id in entity_ids if entity_id]
             if not entity_ids:
                 return []
+            id_filter: dict[str, Any] = {"ID": entity_ids}
+            if apply_category:
+                id_filter["CATEGORY_ID"] = category_id
             entities = self.client.paginated_call(
                 method,
                 {
-                    "filter": {"ID": entity_ids},
+                    "filter": id_filter,
                     "select": select_fields,
                     "order": {"DATE_CREATE": "ASC", "ID": "ASC"},
                 },
             )
         else:
+            title_filter: dict[str, Any] = {"%TITLE": query}
+            if apply_category:
+                title_filter["CATEGORY_ID"] = category_id
             entities = self.client.paginated_call(
                 method,
                 {
-                    "filter": {"%TITLE": query},
+                    "filter": title_filter,
                     "select": select_fields,
                     "order": {"DATE_CREATE": "ASC", "ID": "ASC"},
                 },

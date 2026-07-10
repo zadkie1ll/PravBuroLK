@@ -175,6 +175,16 @@ class ProductionRecallForm(forms.Form):
             }
         ),
     )
+    category_id = forms.ChoiceField(
+        label="Канбан",
+        required=False,
+        widget=forms.Select(
+            attrs={
+                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
+                "data-category-field": "1",
+            }
+        ),
+    )
     stage_id = forms.ChoiceField(
         label="Колонка CRM",
         required=False,
@@ -201,13 +211,23 @@ class ProductionRecallForm(forms.Form):
             or self.initial.get("entity_type")
             or CallEntityType.DEAL
         )
-        submitted_stage = (self.data.get("stage_id") if self.is_bound else None) or self.initial.get("stage_id") or ""
+        is_deal = entity_type == CallEntityType.DEAL
+        submitted_category = (
+            (self.data.get("category_id") if self.is_bound else None) or self.initial.get("category_id") or ""
+        )
         blank = [("", "---------")]
-        stage_choices = service.get_stage_choices(entity_type)
+        category_choices = service.get_deal_category_choices() if is_deal else []
+        self.fields["category_id"].choices = [("", "Все канбаны")] + category_choices
+        if not is_deal:
+            submitted_category = ""
+            self.initial["category_id"] = ""
+
+        submitted_stage = (self.data.get("stage_id") if self.is_bound else None) or self.initial.get("stage_id") or ""
+        stage_choices = service.get_stage_choices(entity_type, category_id=submitted_category if is_deal else None)
         if submitted_stage and submitted_stage not in {value for value, _label in stage_choices}:
             stage_choices = stage_choices + [(submitted_stage, submitted_stage)]
         self.fields["stage_id"].choices = blank + stage_choices
-        self.fields["stage_id"].label = "Стадия сделки" if entity_type == CallEntityType.DEAL else "Статус лида"
+        self.fields["stage_id"].label = "Стадия сделки" if is_deal else "Статус лида"
         if not self.initial.get("stage_id") and stage_choices:
             self.initial["stage_id"] = stage_choices[0][0]
 

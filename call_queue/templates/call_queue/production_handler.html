@@ -142,7 +142,7 @@
           {% csrf_token %}
           <input type="hidden" name="action" value="build_queue">
           {% for field in form %}
-            <div>
+            <div{% if field.name == 'category_id' %} data-category-row{% endif %}>
               {% if field.field.widget.input_type == 'checkbox' %}
                 <label class="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
                   {{ field }}
@@ -600,8 +600,17 @@
 
     (function () {
       const entityField = document.getElementById("id_entity_type");
+      const categoryField = document.getElementById("id_category_id");
+      const categoryRow = document.querySelector("[data-category-row]");
       if (!entityField) return;
-      entityField.addEventListener("change", function () {
+
+      function toggleCategoryRow() {
+        if (!categoryRow) return;
+        categoryRow.classList.toggle("hidden", entityField.value !== "deal");
+      }
+      toggleCategoryRow();
+
+      function reloadWithParams() {
         const params = new URLSearchParams(window.location.search);
         const dateFrom = document.getElementById("id_date_from");
         const dateTo = document.getElementById("id_date_to");
@@ -616,9 +625,25 @@
             params.delete("auto_dial");
           }
         }
+        if (categoryField && entityField.value === "deal" && categoryField.value) {
+          params.set("category_id", categoryField.value);
+        } else {
+          params.delete("category_id");
+        }
         params.delete("stage_id");
         window.location.href = `${window.location.pathname}?${params.toString()}`;
+      }
+
+      entityField.addEventListener("change", function () {
+        toggleCategoryRow();
+        reloadWithParams();
       });
+
+      if (categoryField) {
+        categoryField.addEventListener("change", function () {
+          reloadWithParams();
+        });
+      }
     })();
 
     (function () {

@@ -489,6 +489,7 @@ def get_production_form_initial(config: dict, today):
         "date_from": config.get("date_from") or today,
         "date_to": config.get("date_to") or today,
         "stage_id": config.get("stage_id") or "",
+        "category_id": config.get("category_id") or "",
         "auto_dial": bool(config.get("auto_dial", True)),
     }
 
@@ -981,10 +982,16 @@ def production_handler(request):
             form = ProductionRecallForm(request.POST, bitrix_service=bitrix_service)
             if form.is_valid():
                 search_query = (form.cleaned_data.get("search_query") or "").strip()
+                category_id = (
+                    form.cleaned_data.get("category_id") or ""
+                    if form.cleaned_data["entity_type"] == CallEntityType.DEAL
+                    else ""
+                )
                 if search_query:
                     items = bitrix_service.search_production_entities(
                         entity_type=form.cleaned_data["entity_type"],
                         query=search_query,
+                        category_id=category_id,
                     )
                 else:
                     items = bitrix_service.fetch_production_recall_deals(
@@ -992,6 +999,7 @@ def production_handler(request):
                         date_from=form.cleaned_data["date_from"],
                         date_to=form.cleaned_data["date_to"],
                         stage_id=form.cleaned_data["stage_id"],
+                        category_id=category_id,
                     )
                 queue = [
                     with_social_desktop_links(
@@ -1013,6 +1021,7 @@ def production_handler(request):
                     "date_from": form.cleaned_data["date_from"].isoformat() if form.cleaned_data.get("date_from") else "",
                     "date_to": form.cleaned_data["date_to"].isoformat() if form.cleaned_data.get("date_to") else "",
                     "stage_id": form.cleaned_data["stage_id"],
+                    "category_id": category_id,
                     "auto_dial": bool(form.cleaned_data.get("auto_dial")),
                 }
                 request.session.pop(MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY, None)
@@ -1060,7 +1069,15 @@ def production_handler(request):
                 bitrix_service=bitrix_service,
             )
     else:
-        production_form_fields = {"entity_type", "search_query", "date_from", "date_to", "stage_id", "auto_dial"}
+        production_form_fields = {
+            "entity_type",
+            "search_query",
+            "date_from",
+            "date_to",
+            "stage_id",
+            "category_id",
+            "auto_dial",
+        }
         if production_form_fields & set(request.GET.keys()):
             form = ProductionRecallForm(request.GET, bitrix_service=bitrix_service)
         else:
