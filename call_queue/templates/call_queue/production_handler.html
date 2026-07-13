@@ -149,7 +149,7 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="build_queue">
             {% for field in form %}
-              <div{% if field.name == 'category_id' %} data-category-row{% endif %}>
+              <div>
                 {% if field.field.widget.input_type == 'checkbox' %}
                   <label class="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
                     {{ field }}
@@ -180,7 +180,7 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="add_custom_item">
             {% for field in custom_add_form %}
-              <div>
+              <div{% if field.name == 'category_id' %} data-custom-category-row{% endif %}>
                 <label for="{{ field.id_for_label }}" class="mb-2 block text-sm font-medium text-slate-700">{{ field.label }}</label>
                 {{ field }}
                 {% if field.errors %}
@@ -664,15 +664,7 @@
 
     (function () {
       const entityField = document.getElementById("id_entity_type");
-      const categoryField = document.getElementById("id_category_id");
-      const categoryRow = document.querySelector("[data-category-row]");
       if (!entityField) return;
-
-      function toggleCategoryRow() {
-        if (!categoryRow) return;
-        categoryRow.classList.toggle("hidden", entityField.value !== "deal");
-      }
-      toggleCategoryRow();
 
       function reloadWithParams() {
         const params = new URLSearchParams(window.location.search);
@@ -689,25 +681,27 @@
             params.delete("auto_dial");
           }
         }
-        if (categoryField && entityField.value === "deal" && categoryField.value) {
-          params.set("category_id", categoryField.value);
-        } else {
-          params.delete("category_id");
-        }
         params.delete("stage_id");
         window.location.href = `${window.location.pathname}?${params.toString()}`;
       }
 
       entityField.addEventListener("change", function () {
-        toggleCategoryRow();
         reloadWithParams();
       });
+    })();
 
-      if (categoryField) {
-        categoryField.addEventListener("change", function () {
-          reloadWithParams();
-        });
+    (function () {
+      const customPanel = document.querySelector('[data-mode-panel="custom"]');
+      if (!customPanel) return;
+      const entityField = customPanel.querySelector('select[name="entity_type"]');
+      const categoryRow = customPanel.querySelector("[data-custom-category-row]");
+      if (!entityField || !categoryRow) return;
+
+      function toggleCategoryRow() {
+        categoryRow.classList.toggle("hidden", entityField.value !== "deal");
       }
+      toggleCategoryRow();
+      entityField.addEventListener("change", toggleCategoryRow);
     })();
 
     (function () {

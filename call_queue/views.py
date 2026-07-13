@@ -520,7 +520,6 @@ def get_production_form_initial(config: dict, today):
         "date_from": config.get("date_from") or today,
         "date_to": config.get("date_to") or today,
         "stage_id": config.get("stage_id") or "",
-        "category_id": config.get("category_id") or "",
         "auto_dial": bool(config.get("auto_dial", True)),
     }
 
@@ -1010,15 +1009,21 @@ def production_handler(request):
             return redirect("call_queue:production_handler")
 
         if action == "add_custom_item":
-            custom_add_form = CustomQueueAddForm(request.POST)
+            custom_add_form = CustomQueueAddForm(request.POST, bitrix_service=bitrix_service)
             request.session[MEGAFON_PROD_CUSTOM_ENTITY_TYPE_SESSION_KEY] = (
                 request.POST.get("entity_type") or CallEntityType.DEAL
             )
             request.session.modified = True
             if custom_add_form.is_valid():
+                category_id = (
+                    custom_add_form.cleaned_data.get("category_id") or ""
+                    if custom_add_form.cleaned_data["entity_type"] == CallEntityType.DEAL
+                    else ""
+                )
                 found_items = bitrix_service.search_production_entities(
                     entity_type=custom_add_form.cleaned_data["entity_type"],
                     query=custom_add_form.cleaned_data["query"],
+                    category_id=category_id,
                 )
                 if not found_items:
                     messages.warning(request, "По этому запросу ничего не найдено в Bitrix24.")
@@ -1035,17 +1040,11 @@ def production_handler(request):
         if action == "build_queue":
             form = ProductionRecallForm(request.POST, bitrix_service=bitrix_service)
             if form.is_valid():
-                category_id = (
-                    form.cleaned_data.get("category_id") or ""
-                    if form.cleaned_data["entity_type"] == CallEntityType.DEAL
-                    else ""
-                )
                 items = bitrix_service.fetch_production_recall_deals(
                     entity_type=form.cleaned_data["entity_type"],
                     date_from=form.cleaned_data["date_from"],
                     date_to=form.cleaned_data["date_to"],
                     stage_id=form.cleaned_data["stage_id"],
-                    category_id=category_id,
                 )
                 kept_custom_items = [
                     item for item in get_prod_queue(request) if item.get("source") == "custom"
@@ -1074,7 +1073,6 @@ def production_handler(request):
                     "date_from": form.cleaned_data["date_from"].isoformat() if form.cleaned_data.get("date_from") else "",
                     "date_to": form.cleaned_data["date_to"].isoformat() if form.cleaned_data.get("date_to") else "",
                     "stage_id": form.cleaned_data["stage_id"],
-                    "category_id": category_id,
                     "auto_dial": bool(form.cleaned_data.get("auto_dial")),
                 }
                 request.session.pop(MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY, None)
@@ -1127,7 +1125,6 @@ def production_handler(request):
             "date_from",
             "date_to",
             "stage_id",
-            "category_id",
             "auto_dial",
         }
         if production_form_fields & set(request.GET.keys()):
@@ -1145,7 +1142,8 @@ def production_handler(request):
         initial={
             "entity_type": request.session.get(MEGAFON_PROD_CUSTOM_ENTITY_TYPE_SESSION_KEY)
             or CallEntityType.DEAL,
-        }
+        },
+        bitrix_service=bitrix_service,
     )
 
     return render(

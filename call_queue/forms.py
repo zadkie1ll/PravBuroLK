@@ -154,6 +154,30 @@ class CustomQueueAddForm(forms.Form):
             }
         ),
     )
+    category_id = forms.ChoiceField(
+        label="Канбан",
+        required=False,
+        widget=forms.Select(
+            attrs={
+                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
+                "data-category-field": "1",
+            }
+        ),
+    )
+
+    def __init__(self, *args, bitrix_service: BitrixDealService | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        service = bitrix_service or BitrixDealService()
+        entity_type = (
+            (self.data.get("entity_type") if self.is_bound else None)
+            or self.initial.get("entity_type")
+            or CallEntityType.DEAL
+        )
+        is_deal = entity_type == CallEntityType.DEAL
+        category_choices = service.get_deal_category_choices() if is_deal else []
+        self.fields["category_id"].choices = [("", "Все канбаны")] + category_choices
+        if not is_deal:
+            self.initial["category_id"] = ""
 
     def clean_query(self):
         query = (self.cleaned_data.get("query") or "").strip()
@@ -193,16 +217,6 @@ class ProductionRecallForm(forms.Form):
             }
         ),
     )
-    category_id = forms.ChoiceField(
-        label="Канбан",
-        required=False,
-        widget=forms.Select(
-            attrs={
-                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
-                "data-category-field": "1",
-            }
-        ),
-    )
     stage_id = forms.ChoiceField(
         label="Колонка CRM",
         widget=forms.Select(
@@ -229,17 +243,9 @@ class ProductionRecallForm(forms.Form):
             or CallEntityType.DEAL
         )
         is_deal = entity_type == CallEntityType.DEAL
-        submitted_category = (
-            (self.data.get("category_id") if self.is_bound else None) or self.initial.get("category_id") or ""
-        )
-        category_choices = service.get_deal_category_choices() if is_deal else []
-        self.fields["category_id"].choices = [("", "Все канбаны")] + category_choices
-        if not is_deal:
-            submitted_category = ""
-            self.initial["category_id"] = ""
 
         submitted_stage = (self.data.get("stage_id") if self.is_bound else None) or self.initial.get("stage_id") or ""
-        stage_choices = service.get_stage_choices(entity_type, category_id=submitted_category if is_deal else None)
+        stage_choices = service.get_stage_choices(entity_type)
         if submitted_stage and submitted_stage not in {value for value, _label in stage_choices}:
             stage_choices = stage_choices + [(submitted_stage, submitted_stage)]
         self.fields["stage_id"].choices = stage_choices
