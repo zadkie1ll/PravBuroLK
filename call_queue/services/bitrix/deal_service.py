@@ -219,6 +219,9 @@ class BitrixDealService:
         entity_type: str,
         stage_field: str,
     ) -> list[dict[str, Any]]:
+        contacts_by_id = self.get_contacts_by_ids(
+            [_safe_int(entity.get("CONTACT_ID")) for entity in entities]
+        )
         items: list[dict[str, Any]] = []
         for entity in entities:
             contact_id = _safe_int(entity.get("CONTACT_ID"))
@@ -226,7 +229,7 @@ class BitrixDealService:
             phones: list[str] = []
             raw_phones: list[str] = []
             if contact_id:
-                contact = self.get_contact(contact_id)
+                contact = contacts_by_id.get(contact_id, {})
                 phones = self.extract_contact_phones(contact)
                 raw_phones = self.extract_contact_raw_phones(contact)
             if not phones:
@@ -316,6 +319,23 @@ class BitrixDealService:
 
     def get_contact(self, contact_id: int) -> dict[str, Any]:
         return self.client.call("crm.contact.get", {"id": int(contact_id)})
+
+    def get_contacts_by_ids(self, contact_ids: list[int]) -> dict[int, dict[str, Any]]:
+        unique_ids = sorted({contact_id for contact_id in contact_ids if contact_id})
+        if not unique_ids:
+            return {}
+        contacts = self.client.paginated_call(
+            "crm.contact.list",
+            {
+                "filter": {"ID": unique_ids},
+                "select": ["ID", "NAME", "SECOND_NAME", "LAST_NAME", "PHONE"],
+            },
+        )
+        return {
+            contact_id: contact
+            for contact in contacts
+            if (contact_id := _safe_int(contact.get("ID")))
+        }
 
     def get_deal(self, deal_id: int) -> dict[str, Any]:
         return self.client.call("crm.deal.get", {"id": int(deal_id)})

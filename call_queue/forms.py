@@ -219,6 +219,7 @@ class ProductionRecallForm(forms.Form):
     )
     stage_id = forms.ChoiceField(
         label="Колонка CRM",
+        required=False,
         widget=forms.Select(
             attrs={
                 "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
@@ -248,10 +249,8 @@ class ProductionRecallForm(forms.Form):
         stage_choices = service.get_stage_choices(entity_type)
         if submitted_stage and submitted_stage not in {value for value, _label in stage_choices}:
             stage_choices = stage_choices + [(submitted_stage, submitted_stage)]
-        self.fields["stage_id"].choices = stage_choices
+        self.fields["stage_id"].choices = [("", "Все стадии")] + stage_choices
         self.fields["stage_id"].label = "Стадия сделки" if is_deal else "Статус лида"
-        if not self.initial.get("stage_id") and stage_choices:
-            self.initial["stage_id"] = stage_choices[0][0]
 
     def clean(self):
         cleaned_data = super().clean()
