@@ -20,6 +20,7 @@ from leadreport.models import SalesManager
 from .forms import (
     CallResultForm,
     CallSessionCreateForm,
+    CustomQueueAddForm,
     MegafonPhoneListForm,
     MegafonTestCallForm,
     ProductionRecallForm,
@@ -49,6 +50,7 @@ MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY = "megafon_prod_queue_index"
 MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY = "megafon_prod_queue_config"
 MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY = "megafon_prod_active_call_id"
 MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY = "megafon_prod_last_completed_call_id"
+MEGAFON_PROD_CUSTOM_ENTITY_TYPE_SESSION_KEY = "megafon_prod_custom_entity_type"
 WHATSAPP_FOLLOWUP_MESSAGE = (
     "Добрый день! Вы хотели получить консультацию по списанию долга, но дозвониться до вас не смогли. "
     "Прикрепляю видео, в котором наш руководитель, Станислав Свириденко, рассказывает, что вы получите "
@@ -403,6 +405,36 @@ def save_prod_queue(request, queue: list[dict]):
     request.session.modified = True
 
 
+def append_prod_queue_items(request, items: list[dict]) -> int:
+    queue = get_prod_queue(request)
+    existing_keys = {(item.get("entity_type"), item.get("entity_id")) for item in queue}
+    added = 0
+    for item in items:
+        key = (item.get("entity_type"), item.get("entity_id"))
+        if key in existing_keys:
+            continue
+        queue.append(
+            with_social_desktop_links(
+                {
+                    **item,
+                    "status": "pending",
+                    "manual_decision": "",
+                    "comment_logged": False,
+                    "call_id": "",
+                    "source": "custom",
+                }
+            )
+        )
+        existing_keys.add(key)
+        added += 1
+    if added:
+        save_prod_queue(request, queue)
+        if len(queue) == added:
+            request.session[MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY] = 0
+            request.session.modified = True
+    return added
+
+
 def get_prod_queue_index(request, queue: list[dict]) -> int:
     raw_index = request.session.get(MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY, 0)
     if not isinstance(raw_index, int):
@@ -485,7 +517,6 @@ def with_social_desktop_links(item: dict) -> dict:
 def get_production_form_initial(config: dict, today):
     return {
         "entity_type": config.get("entity_type") or CallEntityType.DEAL,
-        "search_query": config.get("search_query") or "",
         "date_from": config.get("date_from") or today,
         "date_to": config.get("date_to") or today,
         "stage_id": config.get("stage_id") or "",
@@ -978,30 +1009,51 @@ def production_handler(request):
                 messages.success(request, f"Сделка {removed.get('client_name') or removed.get('deal_id')} удалена из очереди.")
             return redirect("call_queue:production_handler")
 
+        if action == "add_custom_item":
+            custom_add_form = CustomQueueAddForm(request.POST)
+            request.session[MEGAFON_PROD_CUSTOM_ENTITY_TYPE_SESSION_KEY] = (
+                request.POST.get("entity_type") or CallEntityType.DEAL
+            )
+            request.session.modified = True
+            if custom_add_form.is_valid():
+                found_items = bitrix_service.search_production_entities(
+                    entity_type=custom_add_form.cleaned_data["entity_type"],
+                    query=custom_add_form.cleaned_data["query"],
+                )
+                if not found_items:
+                    messages.warning(request, "По этому запросу ничего не найдено в Bitrix24.")
+                else:
+                    added = append_prod_queue_items(request, found_items)
+                    if added:
+                        messages.success(request, f"Добавлено в очередь: {added}.")
+                    else:
+                        messages.info(request, "Найденные записи уже есть в очереди.")
+            else:
+                messages.error(request, "Укажите номер телефона или имя клиента для поиска.")
+            return redirect("call_queue:production_handler")
+
         if action == "build_queue":
             form = ProductionRecallForm(request.POST, bitrix_service=bitrix_service)
             if form.is_valid():
-                search_query = (form.cleaned_data.get("search_query") or "").strip()
                 category_id = (
                     form.cleaned_data.get("category_id") or ""
                     if form.cleaned_data["entity_type"] == CallEntityType.DEAL
                     else ""
                 )
-                if search_query:
-                    items = bitrix_service.search_production_entities(
-                        entity_type=form.cleaned_data["entity_type"],
-                        query=search_query,
-                        category_id=category_id,
-                    )
-                else:
-                    items = bitrix_service.fetch_production_recall_deals(
-                        entity_type=form.cleaned_data["entity_type"],
-                        date_from=form.cleaned_data["date_from"],
-                        date_to=form.cleaned_data["date_to"],
-                        stage_id=form.cleaned_data["stage_id"],
-                        category_id=category_id,
-                    )
-                queue = [
+                items = bitrix_service.fetch_production_recall_deals(
+                    entity_type=form.cleaned_data["entity_type"],
+                    date_from=form.cleaned_data["date_from"],
+                    date_to=form.cleaned_data["date_to"],
+                    stage_id=form.cleaned_data["stage_id"],
+                    category_id=category_id,
+                )
+                kept_custom_items = [
+                    item for item in get_prod_queue(request) if item.get("source") == "custom"
+                ]
+                custom_keys = {
+                    (item.get("entity_type"), item.get("entity_id")) for item in kept_custom_items
+                }
+                fetched_items = [
                     with_social_desktop_links(
                         {
                             **item,
@@ -1012,12 +1064,13 @@ def production_handler(request):
                         }
                     )
                     for item in items
+                    if (item.get("entity_type"), item.get("entity_id")) not in custom_keys
                 ]
+                queue = kept_custom_items + fetched_items
                 request.session[MEGAFON_PROD_QUEUE_SESSION_KEY] = queue
                 request.session[MEGAFON_PROD_QUEUE_INDEX_SESSION_KEY] = 0
                 request.session[MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY] = {
                     "entity_type": form.cleaned_data["entity_type"],
-                    "search_query": search_query,
                     "date_from": form.cleaned_data["date_from"].isoformat() if form.cleaned_data.get("date_from") else "",
                     "date_to": form.cleaned_data["date_to"].isoformat() if form.cleaned_data.get("date_to") else "",
                     "stage_id": form.cleaned_data["stage_id"],
@@ -1071,7 +1124,6 @@ def production_handler(request):
     else:
         production_form_fields = {
             "entity_type",
-            "search_query",
             "date_from",
             "date_to",
             "stage_id",
@@ -1089,12 +1141,19 @@ def production_handler(request):
     queue, current_index, current_item = get_prod_current_item(request)
     current_call_id = request.GET.get("callid", "").strip() or (current_item.get("call_id", "") if current_item else "")
     current_snapshot = build_megafon_call_snapshot(current_call_id) if current_call_id else None
+    custom_add_form = CustomQueueAddForm(
+        initial={
+            "entity_type": request.session.get(MEGAFON_PROD_CUSTOM_ENTITY_TYPE_SESSION_KEY)
+            or CallEntityType.DEAL,
+        }
+    )
 
     return render(
         request,
         "call_queue/production_handler.html",
         {
             "form": form,
+            "custom_add_form": custom_add_form,
             "sales_manager_profile": request.sales_manager_profile,
             "queue": queue,
             "queue_size": len(queue),

@@ -134,9 +134,9 @@ class MegafonPhoneListForm(forms.Form):
         return phones
 
 
-class ProductionRecallForm(forms.Form):
+class CustomQueueAddForm(forms.Form):
     entity_type = forms.ChoiceField(
-        label="Что обзваниваем",
+        label="Что добавляем",
         choices=CallEntityType.choices,
         initial=CallEntityType.DEAL,
         widget=forms.Select(
@@ -145,12 +145,30 @@ class ProductionRecallForm(forms.Form):
             }
         ),
     )
-    search_query = forms.CharField(
-        label="Поиск по названию или телефону",
-        required=False,
+    query = forms.CharField(
+        label="Телефон или имя клиента",
         widget=forms.TextInput(
             attrs={
-                "placeholder": "Например: Иванов или +7 900 123-45-67",
+                "placeholder": "Например: +7 900 123-45-67 или Иванов",
+                "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
+            }
+        ),
+    )
+
+    def clean_query(self):
+        query = (self.cleaned_data.get("query") or "").strip()
+        if not query:
+            raise forms.ValidationError("Введите номер телефона или имя клиента.")
+        return query
+
+
+class ProductionRecallForm(forms.Form):
+    entity_type = forms.ChoiceField(
+        label="Что обзваниваем",
+        choices=CallEntityType.choices,
+        initial=CallEntityType.DEAL,
+        widget=forms.Select(
+            attrs={
                 "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
             }
         ),
@@ -187,7 +205,6 @@ class ProductionRecallForm(forms.Form):
     )
     stage_id = forms.ChoiceField(
         label="Колонка CRM",
-        required=False,
         widget=forms.Select(
             attrs={
                 "class": "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500",
@@ -215,7 +232,6 @@ class ProductionRecallForm(forms.Form):
         submitted_category = (
             (self.data.get("category_id") if self.is_bound else None) or self.initial.get("category_id") or ""
         )
-        blank = [("", "---------")]
         category_choices = service.get_deal_category_choices() if is_deal else []
         self.fields["category_id"].choices = [("", "Все канбаны")] + category_choices
         if not is_deal:
@@ -226,22 +242,19 @@ class ProductionRecallForm(forms.Form):
         stage_choices = service.get_stage_choices(entity_type, category_id=submitted_category if is_deal else None)
         if submitted_stage and submitted_stage not in {value for value, _label in stage_choices}:
             stage_choices = stage_choices + [(submitted_stage, submitted_stage)]
-        self.fields["stage_id"].choices = blank + stage_choices
+        self.fields["stage_id"].choices = stage_choices
         self.fields["stage_id"].label = "Стадия сделки" if is_deal else "Статус лида"
         if not self.initial.get("stage_id") and stage_choices:
             self.initial["stage_id"] = stage_choices[0][0]
 
     def clean(self):
         cleaned_data = super().clean()
-        search_query = (cleaned_data.get("search_query") or "").strip()
         date_from = cleaned_data.get("date_from")
         date_to = cleaned_data.get("date_to")
-        if search_query:
-            return cleaned_data
         if not date_from:
-            self.add_error("date_from", "Укажите дату или заполните поиск по названию/телефону.")
+            self.add_error("date_from", "Укажите дату.")
         if not date_to:
-            self.add_error("date_to", "Укажите дату или заполните поиск по названию/телефону.")
+            self.add_error("date_to", "Укажите дату.")
         if date_from and date_to and date_from > date_to:
             raise forms.ValidationError("Дата начала не может быть позже даты окончания.")
         return cleaned_data

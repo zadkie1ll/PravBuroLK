@@ -138,31 +138,64 @@
     <div class="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
       <section class="rounded-3xl bg-white p-6 shadow-lg ring-1 ring-slate-200">
         <h2 class="text-xl font-semibold">Формирование очереди</h2>
-        <form method="post" class="mt-6 space-y-5">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="build_queue">
-          {% for field in form %}
-            <div{% if field.name == 'category_id' %} data-category-row{% endif %}>
-              {% if field.field.widget.input_type == 'checkbox' %}
-                <label class="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+
+        <div class="mt-4 flex gap-2" data-queue-mode-tabs>
+          <button type="button" data-mode-tab="date" class="rounded-full px-4 py-2 text-sm font-medium transition">По датам</button>
+          <button type="button" data-mode-tab="custom" class="rounded-full px-4 py-2 text-sm font-medium transition">Кастомная очередь</button>
+        </div>
+
+        <div class="mt-6" data-mode-panel="date">
+          <form method="post" class="space-y-5">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="build_queue">
+            {% for field in form %}
+              <div{% if field.name == 'category_id' %} data-category-row{% endif %}>
+                {% if field.field.widget.input_type == 'checkbox' %}
+                  <label class="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+                    {{ field }}
+                    <span>{{ field.label }}</span>
+                  </label>
+                {% else %}
+                  <label for="{{ field.id_for_label }}" class="mb-2 block text-sm font-medium text-slate-700">{{ field.label }}</label>
                   {{ field }}
-                  <span>{{ field.label }}</span>
-                </label>
-              {% else %}
+                {% endif %}
+                {% if field.errors %}
+                  <p class="mt-1 text-sm text-rose-600">{{ field.errors|join:", " }}</p>
+                {% endif %}
+              </div>
+            {% endfor %}
+            <div class="flex flex-wrap gap-3">
+              <button type="submit" class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-slate-700">
+                Загрузить очередь
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="mt-6 hidden" data-mode-panel="custom">
+          <p class="mb-4 text-sm text-slate-500">
+            Введите номер телефона или имя клиента — карточка найдётся в Bitrix24 и добавится в конец текущей очереди обзвона.
+          </p>
+          <form method="post" class="space-y-5">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_custom_item">
+            {% for field in custom_add_form %}
+              <div>
                 <label for="{{ field.id_for_label }}" class="mb-2 block text-sm font-medium text-slate-700">{{ field.label }}</label>
                 {{ field }}
-              {% endif %}
-              {% if field.errors %}
-                <p class="mt-1 text-sm text-rose-600">{{ field.errors|join:", " }}</p>
-              {% endif %}
+                {% if field.errors %}
+                  <p class="mt-1 text-sm text-rose-600">{{ field.errors|join:", " }}</p>
+                {% endif %}
+              </div>
+            {% endfor %}
+            <div class="flex flex-wrap gap-3">
+              <button type="submit" class="rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-emerald-500">
+                Добавить в очередь
+              </button>
             </div>
-          {% endfor %}
-          <div class="flex flex-wrap gap-3">
-            <button type="submit" class="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-slate-700">
-              Загрузить очередь
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
+
         <form method="post" class="mt-3">
           {% csrf_token %}
           <input type="hidden" name="action" value="reset_queue">
@@ -239,7 +272,10 @@
             <div class="rounded-3xl border p-5 {% if forloop.counter0 == current_index %}border-emerald-300 bg-emerald-50/60{% else %}border-slate-200 bg-white{% endif %}">
               <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <div class="text-xs uppercase tracking-[0.15em] text-slate-500">#{{ forloop.counter }}</div>
+                  <div class="text-xs uppercase tracking-[0.15em] text-slate-500">
+                    #{{ forloop.counter }}
+                    {% if item.source == 'custom' %}<span class="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700">добавлено вручную</span>{% endif %}
+                  </div>
                   <div class="mt-1 text-lg font-semibold text-slate-900">{{ item.client_name|default:"Без названия" }}</div>
                 </div>
                 <span class="rounded-full px-3 py-1 text-xs font-medium
@@ -563,6 +599,34 @@
     </script>
   {% endif %}
   <script>
+    (function () {
+      const tabButtons = document.querySelectorAll("[data-mode-tab]");
+      const panels = document.querySelectorAll("[data-mode-panel]");
+      const storageKey = "callQueueBuildMode";
+
+      function setActiveMode(mode) {
+        localStorage.setItem(storageKey, mode);
+        tabButtons.forEach((button) => {
+          const isActive = button.dataset.modeTab === mode;
+          button.classList.toggle("bg-slate-900", isActive);
+          button.classList.toggle("text-white", isActive);
+          button.classList.toggle("bg-slate-100", !isActive);
+          button.classList.toggle("text-slate-700", !isActive);
+        });
+        panels.forEach((panel) => {
+          panel.classList.toggle("hidden", panel.dataset.modePanel !== mode);
+        });
+      }
+
+      if (tabButtons.length) {
+        const savedMode = localStorage.getItem(storageKey) === "custom" ? "custom" : "date";
+        setActiveMode(savedMode);
+        tabButtons.forEach((button) => {
+          button.addEventListener("click", () => setActiveMode(button.dataset.modeTab));
+        });
+      }
+    })();
+
     (function () {
       const modeToggle = document.querySelector("[data-whatsapp-mode-toggle]");
       const whatsappLinks = document.querySelectorAll("[data-whatsapp-link]");
