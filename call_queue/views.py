@@ -51,6 +51,7 @@ MEGAFON_PROD_QUEUE_CONFIG_SESSION_KEY = "megafon_prod_queue_config"
 MEGAFON_PROD_ACTIVE_CALL_ID_SESSION_KEY = "megafon_prod_active_call_id"
 MEGAFON_PROD_LAST_COMPLETED_CALL_ID_SESSION_KEY = "megafon_prod_last_completed_call_id"
 MEGAFON_PROD_CUSTOM_ENTITY_TYPE_SESSION_KEY = "megafon_prod_custom_entity_type"
+MEGAFON_PROD_CUSTOM_CATEGORY_SESSION_KEY = "megafon_prod_custom_category"
 WHATSAPP_FOLLOWUP_MESSAGE = (
     "Добрый день! Вы хотели получить консультацию по списанию долга, но дозвониться до вас не смогли. "
     "Прикрепляю видео, в котором наш руководитель, Станислав Свириденко, рассказывает, что вы получите "
@@ -1013,6 +1014,7 @@ def production_handler(request):
             request.session[MEGAFON_PROD_CUSTOM_ENTITY_TYPE_SESSION_KEY] = (
                 request.POST.get("entity_type") or CallEntityType.DEAL
             )
+            request.session[MEGAFON_PROD_CUSTOM_CATEGORY_SESSION_KEY] = request.POST.get("category_id") or ""
             request.session.modified = True
             if custom_add_form.is_valid():
                 category_id = (
@@ -1142,6 +1144,7 @@ def production_handler(request):
         initial={
             "entity_type": request.session.get(MEGAFON_PROD_CUSTOM_ENTITY_TYPE_SESSION_KEY)
             or CallEntityType.DEAL,
+            "category_id": request.session.get(MEGAFON_PROD_CUSTOM_CATEGORY_SESSION_KEY) or "",
         },
         bitrix_service=bitrix_service,
     )
