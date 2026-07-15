@@ -21,6 +21,14 @@ def rub(amount):
     return f"{amount:,}".replace(",", ".") + "₽"
 
 
+EMPTY_SENTINELS = (None, "", "0", "N", [])
+
+
+def is_present(val) -> bool:
+    """Bitrix-поля (чекбокс/список/файл) по-разному кодируют 'пусто'."""
+    return val not in EMPTY_SENTINELS
+
+
 def parse_amount(val):
     if val is None:
         return None
@@ -38,11 +46,23 @@ def parse_amount(val):
 def format_consultation_datetime(raw_value: str) -> tuple[str, str]:
     if not raw_value:
         return "", ""
+    raw = str(raw_value)
+
+    dt = None
     try:
-        dt = datetime.strptime(str(raw_value), "%Y-%m-%d %H:%M")
-        return dt.strftime("%d.%m.%Y"), dt.strftime("%H:%M")
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
-        return str(raw_value), ""
+        for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                dt = datetime.strptime(raw, fmt)
+                break
+            except ValueError:
+                continue
+
+    if dt is None:
+        return "", ""
+
+    return dt.strftime("%d.%m.%Y"), dt.strftime("%H:%M")
 
 
 def download_photo(url: str, filepath: str):
@@ -108,7 +128,7 @@ def generate_pdf(data) -> bytes:
 
     data["consultation"] = {
         "date": data["document"]["generated_at"],
-        "isContract": data['summary']['contract'] != None
+        "isContract": is_present(data['summary']['contract'])
     }
 
     # Parse finance amounts
@@ -128,6 +148,26 @@ def generate_pdf(data) -> bytes:
     data["finance"]["cost_ratio_percent"] = f"{cost_ratio:.2f}%"
     data["finance"]["debt_ratio_value"] = round(debt_ratio, 2)
     data["finance"]["cost_ratio_value"] = round(cost_ratio, 2)
+
+    # ---- сравнение "кредит vs рассрочка" (только вывод данных, без расчётов) ----
+    credit_monthly = parse_amount(data["finance"].get("credit_monthly"))
+    credit_total = parse_amount(data["finance"].get("credit_total"))
+    installment_monthly = parse_amount(data["finance"].get("installment_monthly"))
+    installment_total = parse_amount(data["finance"].get("installment_total"))
+
+    data["finance"]["credit_monthly_rub"] = rub(credit_monthly)
+    data["finance"]["credit_total_rub"] = rub(credit_total)
+    data["finance"]["credit_term"] = data["finance"].get("credit_term") or ""
+    data["finance"]["installment_monthly_rub"] = rub(installment_monthly)
+    data["finance"]["installment_total_rub"] = rub(installment_total)
+    data["finance"]["installment_term"] = data["finance"].get("installment_term") or ""
+
+    data["finance"]["show_credit_comparison"] = is_present(data["finance"].get("credit_monthly")) or \
+        is_present(data["finance"].get("credit_term")) or \
+        is_present(data["finance"].get("credit_total")) or \
+        is_present(data["finance"].get("installment_monthly")) or \
+        is_present(data["finance"].get("installment_term")) or \
+        is_present(data["finance"].get("installment_total"))
 
     consult_date, consult_time = format_consultation_datetime(data["consultation"]["date"])
     data["consultation"]["date_only"] = consult_date
@@ -163,6 +203,8 @@ def generate_pdf(data) -> bytes:
     data["summary"]["income_rub"] = data["summary"]["official_income_rub"]
 
     with tempfile.TemporaryDirectory() as tmp:
+        shutil.copy2(os.path.join("bitrix", "templates", "styles.css"), os.path.join(tmp, "styles.css"))
+
     # ====================== ФОТО МЕНЕДЖЕРА (оставляем как было) ======================
         photo_url = data.get("manager", {}).get("photo")
         photo_path = os.path.join(tmp, "manager_photo.jpg")

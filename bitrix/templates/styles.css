@@ -1,0 +1,412 @@
+@page {
+    size: A4;
+    margin: 24px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #fff;
+    color: #22252a;
+}
+
+svg a {
+    cursor: pointer;
+}
+
+svg a rect {
+    pointer-events: all;
+}
+
+
+.social-icons-wrap{
+    position: relative;
+    margin-top: -40px;
+    padding-bottom: 80px;
+}
+.social-icons-wrap svg {
+    display: block;
+}
+
+.social-icons-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+}
+
+.social-icons-overlay a {
+    position: absolute;
+    display: block;
+}
+
+.social-icons-overlay img {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.social-icon-telegram {
+    left: 154px;
+    top: 24px;
+    width: 50px;
+    height: auto;
+}
+
+.social-icon-vk {
+    left: 324px;
+    top: 24px;
+     width: 50px;
+    height: auto;
+}
+
+.social-icon-youtube {
+    left: 496px;
+    top: 24px;
+     width: 50px;
+    height: auto;
+}
+.support-link {
+    width: 72px;
+    height: auto;
+    margin-left: 620px;
+    margin-top: -85px;
+}
+.sheet {
+    width: 100%;
+    min-height: 100%;
+    background: #fff;
+    padding: 10px 18px 28px;
+}
+
+.logo {
+    text-align: center;
+    font-size: 52px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    line-height: 1;
+    margin: 10px 0 18px;
+}
+
+.logo .blue {
+    color: #1377e6;
+}
+
+.title {
+    text-align: center;
+    font-size: 30px;
+    line-height: 1.1;
+    margin: 0 0 56px;
+    font-weight: 500;
+}
+
+.manager-block {
+    display: flex;
+    align-items: center;
+    gap: 34px;
+    margin-bottom: 52px;
+}
+
+.manager-photo {
+    width: 126px;
+    height: 126px;
+    border-radius: 18px;
+    object-fit: cover;
+    display: block;
+}
+
+.manager-lines {
+    flex: 1;
+}
+
+.line-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0;
+    font-size: 28px;
+    min-width: auto;
+    line-height: 1;
+}
+
+.line-row .label {
+    color: #fff;
+    background: #1377e6;
+    border-radius: 14px;
+    padding: 8px 18px 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.line-row .value {
+    color: #22252a;
+}
+
+.separator {
+    height: 2px;
+    background: #a7adb4;
+    margin: 20px 0 22px;
+}
+
+.section-title {
+    margin: 0 0 18px;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.05;
+}
+
+.finance-pill {
+    background: #1377e6;
+    border-radius: 22px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 26px;
+}
+
+.finance-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    font-size: 18px;
+    white-space: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.finance-item .chip {
+    color: #22252a;
+    background: #e9ecef;
+    border-radius: 12px;
+    padding: 5px 10px;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1;
+    display: inline-block;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.viz-title {
+    font-size: 20px;
+    color: #7f8790;
+    margin-bottom: 18px;
+}
+
+.viz-item {
+    margin: 16px 0;
+}
+
+.viz-label {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.viz-amount {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.viz-caption {
+    font-size: 15px;
+    color: #7f8790;
+}
+
+.viz-track {
+    width: 100%;
+    height: 22px;
+    background: #eef1f4;
+    border-radius: 11px;
+    overflow: hidden;
+}
+
+.viz-track-svg {
+    width: 100%;
+    height: 22px;
+    display: block;
+}
+
+.credit-compare {
+    display: flex;
+    gap: 24px;
+    margin: 18px 0 8px;
+}
+
+.credit-compare-col {
+    flex: 1;
+    background: #eef1f4;
+    border-radius: 16px;
+    padding: 14px 18px;
+}
+
+.credit-compare-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 15px;
+    margin: 6px 0;
+}
+
+.cc-label {
+    color: #7f8790;
+}
+
+.cc-value {
+    font-weight: 700;
+}
+
+.credit-compare-note {
+    font-size: 18px;
+    line-height: 1.3;
+    margin: 12px 0 4px;
+}
+
+.client-data-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.client-layout {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 14px 14px;
+    margin-left: -10px;
+    table-layout: fixed;
+    margin-top: 8px;
+}
+
+.client-layout td {
+    width: auto;
+    vertical-align: top;
+}
+
+.client-layout tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.pair-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 5px 0;
+    table-layout: fixed;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.pair-table td {
+    vertical-align: middle;
+    min-width: 0;
+}
+
+.label-cell {
+    width: 126px;
+    vertical-align: middle;
+}
+
+.block-label {
+    background: #1377e6;
+    color: #fff;
+    border-radius: 12px;
+    padding: 0 14px;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    height: 40px;
+}
+
+.block-value {
+    font-size: 18px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    text-align: left;
+    min-width: 0;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+}
+
+.property-card {
+    background: #eef1f4;
+    border-radius: 20px;
+    padding: 0 18px 12px;
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.property-card--highlight {
+    background: #b8efc8;
+}
+
+.property-save {
+    color: #159b5a;
+    font-size: 14px;
+    margin-top: 4px;
+    font-weight: 600;
+}
+
+.income-card {
+    background: #eef1f4;
+    border-radius: 20px;
+    padding: 0 16px 10px;
+    width: 100%;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.income-card--highlight {
+    background: #a8d0f4;
+}
+
+.income-save {
+    color: #1766b1;
+    font-size: 14px;
+    margin-top: 2px;
+    line-height: 1.1;
+}
+
+.data-card {
+    background: #eef1f4;
+    border-radius: 20px;
+    padding: 10px 18px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.stack-gap {
+    margin-bottom: 12px;
+}
+
+.figma-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin-top: 18px;
+}
+
+.figma-svg--divider {
+    margin-top: 16px;
+    margin-bottom: 4px;
+}
+svg{
+    width: 100%;
+    height: auto;
+}
