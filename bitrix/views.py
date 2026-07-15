@@ -344,7 +344,7 @@ def build_consultation(request):
         payload = {
             "document": {
                 "document_id": f"CONS-{deal_id}",
-                "generated_at": pick(deal_data, "DATE_CREATE"),
+                "generated_at": pick(deal_data, "UF_CRM_69808148B5C98") or pick(deal_data, "DATE_CREATE"),
             },
             "manager": {
                 "bitrix_user_id": assigned_id,
@@ -358,10 +358,10 @@ def build_consultation(request):
                 "work_bonus": pick(deal_data, "UF_CRM_WORK_BONUS_OR_EMPTY"),
                 "installment_plan": pick(deal_data, "UF_CRM_1784121569198"),
                 "credit_monthly": pick(deal_data, "UF_CRM_1754380522464"),
-                "credit_term": pick(deal_data, "UF_CRM_1784119713818"),
+                "credit_term": pick(deal_data, "UF_CRM_1784123305317"),
                 "credit_total": pick(deal_data, "UF_CRM_1784119774361"),
                 "installment_monthly": pick(deal_data, "UF_CRM_1784121569198"),
-                "installment_term": pick(deal_data, "UF_CRM_1784121605312"),
+                "installment_term": pick(deal_data, "UF_CRM_1784123341603"),
                 "installment_total": pick(deal_data, "UF_CRM_1784121635252"),
             },
             "summary": {
