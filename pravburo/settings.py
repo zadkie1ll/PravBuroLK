@@ -291,6 +291,10 @@ CALL_QUEUE_BITRIX_LEAD_UNANSWERED_STATUS_ID = os.getenv("CALL_QUEUE_BITRIX_LEAD_
 CALL_QUEUE_BITRIX_TIME_ZONE = os.getenv("CALL_QUEUE_BITRIX_TIME_ZONE", "Europe/Moscow")
 CALL_QUEUE_MAX_DESKTOP_URL = os.getenv("CALL_QUEUE_MAX_DESKTOP_URL", "max://")
 
+# Общий секрет для internal-эндпоинтов (сервис call_queue_service ходит сюда за SalesManager).
+# Пусто = эндпоинт открыт — годится только для локального прототипа, не для прода.
+LEADREPORT_INTERNAL_API_TOKEN = os.getenv("LEADREPORT_INTERNAL_API_TOKEN", "")
+
 
 # ------------------------------------------------------------------
 # lead_control

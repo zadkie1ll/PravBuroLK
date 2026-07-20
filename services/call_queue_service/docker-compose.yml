@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: call_queue_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-call_queue}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-call_queue}
+      POSTGRES_DB: ${POSTGRES_DB:-call_queue}
+    ports:
+      - "5433:5432"
+    volumes:
+      - call_queue_postgres_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-call_queue}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: call_queue_backend
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://call_queue:call_queue@postgres:5432/call_queue}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build: ./frontend
+    container_name: call_queue_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8001
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  call_queue_postgres_data:
