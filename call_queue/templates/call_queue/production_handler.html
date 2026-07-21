@@ -406,6 +406,10 @@
         let decision = "{{ current_item.manual_decision|default:''|escapejs }}";
         let autoAdvanceTriggered = false;
         let latestSnapshot = null;
+        // Телефон менеджера (SIP-клиент) не успевает закрыть предыдущую сессию звонка
+        // сразу после его завершения, из-за чего мгновенный авто-дозвон на следующий
+        // номер физически не доходит. Даём телефону время освободиться.
+        const AUTO_NEXT_DELAY_MS = 6000;
 
         function renderPause() {
           pauseToggle.textContent = paused ? "Возобновить" : "Пауза";
@@ -505,9 +509,16 @@
           evaluate(latestSnapshot);
         }
 
-        async function triggerNext(forceResume = false) {
+        async function triggerNext(forceResume = false, delayMs = 0) {
           if (paused || autoAdvanceTriggered) return;
           autoAdvanceTriggered = true;
+          if (delayMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            if (paused) {
+              autoAdvanceTriggered = false;
+              return;
+            }
+          }
           const response = await fetch(autoNextUrl, {
             method: "POST",
             headers: {
@@ -550,13 +561,13 @@
           }
           if (decision === "failed" || decision === "voicemail") {
             if (!paused) {
-              triggerNext();
+              triggerNext(false, AUTO_NEXT_DELAY_MS);
             }
             return;
           }
           if (!clientAnswered) {
             if (!paused) {
-              triggerNext();
+              triggerNext(false, AUTO_NEXT_DELAY_MS);
             }
           }
         }

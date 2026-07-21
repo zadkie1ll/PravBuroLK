@@ -26,6 +26,11 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
   const autoAdvanceTriggeredRef = useRef(false);
   const latestSnapshotRef = useRef<CallSnapshot | null>(null);
 
+  // Телефон менеджера (SIP-клиент) не успевает закрыть предыдущую сессию звонка
+  // сразу после его завершения, из-за чего мгновенный авто-дозвон на следующий
+  // номер физически не доходит. Даём телефону время освободиться.
+  const AUTO_NEXT_DELAY_MS = 6000;
+
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
@@ -43,10 +48,14 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
     latestSnapshotRef.current = null;
   }, [callId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function triggerNext(forceResume = false) {
+  async function triggerNext(forceResume = false, delayMs = 0) {
     if (pausedRef.current || autoAdvanceTriggeredRef.current) return;
     autoAdvanceTriggeredRef.current = true;
     try {
+      if (delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        if (pausedRef.current) return;
+      }
       const data = await api.triggerAutoNext(callId, forceResume);
       if (data.started) {
         onQueueRefresh();
@@ -74,11 +83,11 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
       return;
     }
     if (decisionRef.current === "failed" || decisionRef.current === "voicemail") {
-      if (!pausedRef.current) triggerNext();
+      if (!pausedRef.current) triggerNext(false, AUTO_NEXT_DELAY_MS);
       return;
     }
     if (!clientAnswered) {
-      if (!pausedRef.current) triggerNext();
+      if (!pausedRef.current) triggerNext(false, AUTO_NEXT_DELAY_MS);
     }
   }
 
