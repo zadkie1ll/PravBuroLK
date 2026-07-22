@@ -12,10 +12,11 @@ export interface RegistrationResponse {
     user: UserInterface
 }
 interface UserInterface {
-    id: number, 
+    id: number,
     username: string,
     first_name: string,
     last_name: string,
     department: string,
-    departments: { code: string, name: string }[]
+    departments: { code: string, name: string }[],
+    is_staff: boolean
 }

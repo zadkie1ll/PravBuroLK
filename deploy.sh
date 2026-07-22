@@ -4,7 +4,7 @@ set -euo pipefail
 APP_DIR="/home/zadkiel/projects/PravBuroLK"
 VENV="$APP_DIR/venv"
 PY="$VENV/bin/python"
-FRONT_DIR="$APP_DIR/lms-front"
+FRONT_DIR="$APP_DIR/services/education_platform_service/frontend"
 FRONT_STATIC_DIR="$APP_DIR/static/lms-front"
 DEPLOY_FRONTEND="${DEPLOY_FRONTEND:-1}"
 CELERY_SERVICE_NAME="${CELERY_SERVICE_NAME:-pravburo-celery.service}"

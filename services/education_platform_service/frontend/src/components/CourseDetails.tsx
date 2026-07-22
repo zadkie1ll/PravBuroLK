@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { backend } from "../lib/utils";
+import { authHeaders, getToken } from "../lib/token";
 import {
   Typography,
   Box,
@@ -28,8 +29,8 @@ import { LoadModules } from "../lib/api";
 
 // API-функции
 async function LoadTest(moduleId: number) {
-  const response = await fetch(`${backend}/api/education/tests/?module=${moduleId}`, {
-    credentials: "include",
+  const response = await fetch(`${backend}/tests?module=${moduleId}`, {
+    headers: authHeaders(),
   });
   if (!response.ok) {
     if (response.status === 404) return null;
@@ -39,10 +40,9 @@ async function LoadTest(moduleId: number) {
 }
 
 async function SubmitTest(moduleId: number, answers: Record<number, any>) {
-  const response = await fetch(`${backend}/api/education/tests/submit/`, {
+  const response = await fetch(`${backend}/tests/submit`, {
     method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ module_id: moduleId, answers }),
   });
   if (!response.ok) throw new Error("Ошибка отправки теста");
@@ -50,10 +50,9 @@ async function SubmitTest(moduleId: number, answers: Record<number, any>) {
 }
 
 async function UpdateModuleStatus(moduleId: number, status: string) {
-  const response = await fetch(`${backend}/api/education/progress/`, {
+  const response = await fetch(`${backend}/progress`, {
     method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ module_id: moduleId, status }),
   });
   if (!response.ok) throw new Error("Ошибка обновления статуса");
@@ -117,7 +116,12 @@ const CourseDetails = () => {
   // Прогресс
   const completedModules = modules.filter((m) => m.status === "completed").length;
   const progress = modules.length > 0 ? (completedModules / modules.length) * 100 : 0;
-  const resolveUrl = (url: string) => (url.startsWith("http") ? url : `${backend}${url}`);
+  const resolveUrl = (url: string) => {
+    if (url.startsWith("http")) return url;
+    const token = getToken();
+    const separator = url.includes("?") ? "&" : "?";
+    return token ? `${backend}${url}${separator}token=${token}` : `${backend}${url}`;
+  };
 
   useEffect(() => {
     const fetchModules = async () => {

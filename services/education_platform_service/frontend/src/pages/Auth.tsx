@@ -30,6 +30,7 @@ const Auth = () => {
           localStorage.setItem("username", result.user.username);
           localStorage.setItem("department", result.user.department);
           localStorage.setItem("departments", JSON.stringify(result.user.departments || []));
+          localStorage.setItem("is_staff", String(result.user.is_staff));
           navigate("/dashboard", { replace: true });
         }
       } catch (error) {
@@ -55,6 +56,7 @@ const Auth = () => {
           localStorage.setItem("username", result.user.username);
           localStorage.setItem("department", result.user.department);
           localStorage.setItem("departments", JSON.stringify(result.user.departments || []));
+          localStorage.setItem("is_staff", String(result.user.is_staff));
           navigate("/dashboard", { replace: true });
         }
       } catch (error) {

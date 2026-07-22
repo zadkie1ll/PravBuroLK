@@ -1,17 +1,18 @@
 // api.ts (LoadCourses с параметрами в URL)
 import type { Course } from "./types/components"; // Убедитесь, что тип Course включает user_progress: number | null;
 import { backend } from "./utils";
+import { authHeaders } from "./token";
 import type { Module } from "./types/components";
 export async function LoadCourses(department: string): Promise<Course[]> {
   const params = new URLSearchParams({
     department: department,
   });
 
-  const response = await fetch(`${backend}/api/education/courses/?${params.toString()}`, {
-    method: 'GET', // GET по умолчанию, но уточняем
-    credentials: 'include',
+  const response = await fetch(`${backend}/courses?${params.toString()}`, {
+    method: 'GET',
     headers: {
-      'Content-Type': 'application/json', // Изменяем на json, так как ответ JSON
+      'Content-Type': 'application/json',
+      ...authHeaders(),
     },
   });
 
@@ -26,11 +27,11 @@ export async function LoadModules(course_id: number): Promise<Module[]> {
     course: course_id.toString(),
   });
 
-  const response = await fetch(`${backend}/api/education/modules/?${params.toString()}`, {
+  const response = await fetch(`${backend}/modules?${params.toString()}`, {
     method: 'GET',
-    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders(),
     },
   });
 
