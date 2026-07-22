@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     monolith_internal_token: str = ""
     sales_manager_cache_ttl_seconds: int = 60
 
+    bitrix_gateway_base_url: str = "http://host.docker.internal:8002"
+    bitrix_gateway_token: str = ""
+    bitrix_gateway_profile: str = "default"
+
+    # Используется только для построения ссылок на сделки/лиды (deal_service.build_entity_url),
+    # сами запросы к Bitrix теперь идут через bitrix-gateway.
     bitrix_webhook_url: str = ""
     bitrix_base_url: str = ""
     call_queue_bitrix_time_zone: str = "Europe/Moscow"
