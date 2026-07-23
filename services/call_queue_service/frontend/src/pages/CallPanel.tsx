@@ -29,7 +29,7 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
   // Телефон менеджера (SIP-клиент) не успевает закрыть предыдущую сессию звонка
   // сразу после его завершения, из-за чего мгновенный авто-дозвон на следующий
   // номер физически не доходит. Даём телефону время освободиться.
-  const AUTO_NEXT_DELAY_MS = 6000;
+  const AUTO_NEXT_DELAY_MS = 2000;
 
   useEffect(() => {
     pausedRef.current = paused;
