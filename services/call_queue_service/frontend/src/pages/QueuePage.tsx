@@ -117,7 +117,7 @@ function ItemCard({
           <button
             type="button"
             onClick={async () => {
-              window.open(item.max_desktop_url || "https://max.ru/:share", "_blank", "noopener");
+              window.open(item.max_followup_url || "https://max.ru/:share", "_blank", "noopener");
               try {
                 await navigator.clipboard.writeText(item.phone);
               } catch {
@@ -210,7 +210,7 @@ function CurrentItemCard({ item }: { item: QueueItem }) {
         <button
           type="button"
           onClick={async () => {
-            window.open(item.max_desktop_url || "https://max.ru/:share", "_blank", "noopener");
+            window.open(item.max_followup_url || "https://max.ru/:share", "_blank", "noopener");
             try {
               await navigator.clipboard.writeText(item.phone);
             } catch {
