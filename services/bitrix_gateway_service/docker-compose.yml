@@ -1,3 +1,5 @@
+name: bitrix_gateway_service
+
 services:
   backend:
     build: ./backend

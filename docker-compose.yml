@@ -1,0 +1,12 @@
+name: monolith
+
+services:
+  monolith:
+    build: .
+    container_name: pravburo_monolith
+    env_file: .env
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    command: python manage.py runserver 0.0.0.0:8000
