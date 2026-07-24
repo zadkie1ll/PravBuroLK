@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+docker compose -f services/documents_service/docker-compose.yml down
 docker compose -f services/communications_service/docker-compose.yml down
 docker compose -f services/education_platform_service/docker-compose.yml down
 docker compose -f services/bitrix_gateway_service/docker-compose.yml down

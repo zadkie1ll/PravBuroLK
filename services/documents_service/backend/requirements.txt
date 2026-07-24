@@ -1,0 +1,7 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+requests==2.32.5
+python-docx==1.2.0
+python-dateutil==2.9.0.post0
+pydantic-settings==2.7.0
+python-multipart==0.0.20

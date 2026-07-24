@@ -400,11 +400,11 @@ def _get_alfa_register_url() -> str:
 
 
 def _get_alfa_username() -> str:
-    return getattr(settings, "ALFA_USER_PROD", "").strip() or "r-prav_0-api"
+    return getattr(settings, "ALFA_USER_PROD", "").strip()
 
 
 def _get_alfa_password() -> str:
-    return getattr(settings, "ALFA_PASS_PROD", "").strip() or "Qwasdcvbgh243567!@"
+    return getattr(settings, "ALFA_PASS_PROD", "").strip()
 
 
 def _build_contract_page_return_url(request, deal_id: str | int, token: str, payment_state: str | None = None) -> str:
@@ -1195,7 +1195,7 @@ def parse_creditors_and_calculate(request):
 
 #LEGENDA--------------------------------------------------------------------------------------------------------------------------------
 
-OPENAI_API_KEY = "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"  # лучше перенести в переменные окружения
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
 
 TOR_PROXIES = {
