@@ -1,21 +1,30 @@
 from __future__ import annotations
 
+import base64
 import logging
+import mimetypes
 import re
+import time
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 
 from ..config import settings
-from ..services import bitrix_contract
-from ..services.django_signing import DjangoSigner
+from ..services import alfa_bank, bitrix_contract
+from ..services.bitrix_gateway_client import BitrixClient
+from ..services.django_signing import BadSignature, DjangoSigner
 from ..services.docx_pipeline import calculate_payments, format_date, generate_contract
+from ..services.signed_cookies import read_flags, write_flags
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["dogovor"])
+
+templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
 
 
 def _extract_deal_id(post_data: dict) -> str | None:
@@ -36,14 +45,190 @@ def _build_contract_token(deal_id: str) -> str:
     return _contract_signer().sign(deal_id)
 
 
+def _validate_contract_token(deal_id: str, token: str | None) -> bool:
+    if not token:
+        return False
+    try:
+        return _contract_signer().unsign(token) == str(deal_id)
+    except BadSignature:
+        return False
+
+
 def _build_contract_page_url(deal_id: str) -> str:
     token = _build_contract_token(deal_id)
-    base_url = f"{settings.monolith_base_url}/dogovor/{deal_id}/"
+    base_url = f"{settings.public_base_url}/dogovor/{deal_id}/"
     return f"{base_url}?token={quote(token)}"
+
+
+def _build_contract_file_url(deal_id: str, token: str) -> str:
+    return f"{settings.public_base_url}/dogovor/{deal_id}/document/?token={quote(token)}"
+
+
+def _build_contract_payment_url(deal_id: str, token: str) -> str:
+    return f"{settings.public_base_url}/dogovor/{deal_id}/pay/?token={quote(token)}"
+
+
+def _build_contract_page_return_url(deal_id: str, token: str, payment_state: str | None = None) -> str:
+    query = {"token": token}
+    if payment_state:
+        query["payment_state"] = payment_state
+    return f"{settings.public_base_url}/dogovor/{deal_id}/?{urlencode(query)}"
+
+
+def _build_office_preview_url(download_url: str | None) -> str | None:
+    if not download_url:
+        return None
+    return f"https://view.officeapps.live.com/op/embed.aspx?src={quote(download_url, safe='')}"
 
 
 def _get_generated_contract_path(deal_id: str) -> Path:
     return Path(settings.output_dir) / f"dogovor_{deal_id}.docx"
+
+
+def _extract_file_id(file_value):
+    if not file_value:
+        return None
+    if isinstance(file_value, dict):
+        for key in ("id", "ID", "fileId", "FILE_ID"):
+            if file_value.get(key):
+                return _extract_file_id(file_value.get(key))
+        return None
+    if isinstance(file_value, (list, tuple)):
+        for item in file_value:
+            file_id = _extract_file_id(item)
+            if file_id is not None:
+                return file_id
+        return None
+    if isinstance(file_value, str):
+        if file_value.startswith(("http://", "https://")):
+            return file_value
+        if file_value.isdigit():
+            return int(file_value)
+        return None
+    if isinstance(file_value, int):
+        return file_value
+    return None
+
+
+def _extract_file_url(file_value) -> str | None:
+    if not file_value:
+        return None
+    if isinstance(file_value, dict):
+        for key in ("url", "URL", "downloadUrl", "DOWNLOAD_URL", "showUrl", "SHOW_URL", "detailUrl", "DETAIL_URL", "src", "SRC"):
+            value = file_value.get(key)
+            if isinstance(value, str) and value.startswith(("http://", "https://")):
+                return value
+        for value in file_value.values():
+            nested_url = _extract_file_url(value)
+            if nested_url:
+                return nested_url
+        return None
+    if isinstance(file_value, (list, tuple)):
+        for item in file_value:
+            nested_url = _extract_file_url(item)
+            if nested_url:
+                return nested_url
+        return None
+    if isinstance(file_value, str) and file_value.startswith(("http://", "https://")):
+        return file_value
+    return None
+
+
+def _resolve_contract_download_url(file_value) -> str | None:
+    direct_url = _extract_file_url(file_value)
+    if direct_url:
+        return direct_url
+
+    file_id = _extract_file_id(file_value)
+    if not file_id:
+        return None
+    if isinstance(file_id, str) and file_id.startswith(("http://", "https://")):
+        return file_id
+
+    try:
+        result = BitrixClient().call("disk.file.get", {"id": file_id}) or {}
+    except Exception:
+        logger.exception("Failed to resolve Bitrix disk file URL for file_id=%s", file_id)
+        return None
+    return result.get("DOWNLOAD_URL") or result.get("DETAIL_URL") or result.get("SRC")
+
+
+def _extract_decimal_amount(value) -> Decimal:
+    if value in (None, "", False):
+        return Decimal("0")
+    if isinstance(value, (int, float, Decimal)):
+        return Decimal(str(value))
+    normalized = str(value).split("|")[0].strip().replace(" ", "").replace(",", ".")
+    if not normalized:
+        return Decimal("0")
+    return Decimal(normalized)
+
+
+def _format_amount_rub(amount: Decimal) -> str:
+    normalized = amount.quantize(Decimal("1")) if amount == amount.to_integral_value() else amount.quantize(Decimal("0.01"))
+    return f"{normalized:,.2f}".replace(",", " ").replace(".00", "")
+
+
+def _get_contract_payment_purpose(deal_data: dict) -> str:
+    client_name = (deal_data.get("TITLE") or "").strip()
+    contract_number = (deal_data.get(settings.contract_number_field) or "").strip()
+    if contract_number and client_name:
+        return f"Оплата по договору {contract_number} {client_name}"
+    if contract_number:
+        return f"Оплата по договору {contract_number}"
+    return f"Оплата по договору {client_name}".strip()
+
+
+def _get_contract_payment_requisites() -> list[tuple[str, str]]:
+    requisites = [
+        ("Получатель", settings.contract_payment_recipient.strip()),
+        ("Адрес", settings.contract_payment_address.strip()),
+        ("ИНН", settings.contract_payment_inn.strip()),
+        ("КПП", settings.contract_payment_kpp.strip()),
+        ("Валюта", settings.contract_payment_currency.strip()),
+        ("Банк", settings.contract_payment_bank.strip()),
+        ("БИК", settings.contract_payment_bik.strip()),
+        ("Расчетный счет", settings.contract_payment_account.strip()),
+        ("Корреспондентский счет", settings.contract_payment_corr_account.strip()),
+    ]
+    return [(label, value) for label, value in requisites if value]
+
+
+def _get_contract_payment_qr_data_uri() -> str:
+    if not settings.contract_payment_qr_path:
+        return ""
+    image_path = Path(settings.contract_payment_qr_path)
+    if not image_path.exists():
+        return ""
+    mime_type, _ = mimetypes.guess_type(image_path.name)
+    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    return f"data:{mime_type or 'image/jpeg'};base64,{encoded}"
+
+
+def _build_contract_payment_context(deal_id: str, token: str, deal_data: dict) -> dict:
+    first_payment_amount = _extract_decimal_amount(deal_data.get(settings.contract_first_payment_field))
+    return {
+        "contract_payment_url": _build_contract_payment_url(deal_id, token),
+        "first_payment_amount": _format_amount_rub(first_payment_amount),
+        "payment_purpose": _get_contract_payment_purpose(deal_data),
+        "payment_requisites": _get_contract_payment_requisites(),
+        "payment_qr_data_uri": _get_contract_payment_qr_data_uri(),
+    }
+
+
+def _register_contract_payment(deal_id: str, token: str, deal_data: dict) -> str:
+    amount = _extract_decimal_amount(deal_data.get(settings.contract_first_payment_field))
+    if amount <= 0:
+        raise RuntimeError("Сумма первого платежа не заполнена")
+    order_number = f"contract-{deal_id}-{int(time.time())}"
+
+    return alfa_bank.register_order(
+        order_number=order_number,
+        amount_kopecks=int((amount * 100).quantize(Decimal("1"))),
+        description=_get_contract_payment_purpose(deal_data),
+        return_url=f"{_build_contract_page_return_url(deal_id, token, 'success')}&orderNumber={quote(order_number)}",
+        fail_url=f"{_build_contract_page_return_url(deal_id, token, 'failed')}&orderNumber={quote(order_number)}",
+    )
 
 
 @router.post("/dogovor")
@@ -146,3 +331,148 @@ async def dogovor(request: Request):
             "confirmation_url": confirmation_url,
         }
     )
+
+
+def _cookie_name(deal_id: str) -> str:
+    return f"contract_payment_{deal_id}"
+
+
+@router.get("/dogovor/{deal_id}/")
+@router.post("/dogovor/{deal_id}/")
+async def contract_confirmation_page(request: Request, deal_id: int):
+    token = request.query_params.get("token")
+    if request.method == "POST" and not token:
+        token = (await request.form()).get("token")
+    if not _validate_contract_token(str(deal_id), token):
+        return JSONResponse({"detail": "Страница договора не найдена"}, status_code=404)
+
+    error_message = ""
+    success_message = ""
+
+    try:
+        deal_data = bitrix_contract.get_deal_data(str(deal_id))
+    except Exception as exc:
+        logger.exception("Failed to load contract page for deal %s", deal_id)
+        return templates.TemplateResponse(
+            request,
+            "contract_confirmation.html",
+            {
+                "deal_id": deal_id,
+                "token": token,
+                "error_message": f"Не удалось загрузить договор: {exc}",
+                "contract_download_url": None,
+                "contract_preview_url": None,
+                "is_confirmed": False,
+                "contract_number": "",
+                "client_name": "",
+            },
+            status_code=502,
+        )
+
+    if request.method == "POST":
+        form = await request.form()
+        if form.get("agree") != "on":
+            error_message = "Для подтверждения нужно отметить согласие с договором."
+        else:
+            try:
+                bitrix_contract.update_contract_confirmation(str(deal_id), accepted=True)
+                success_message = "Договор подтвержден."
+                deal_data[settings.contract_accepted_field] = 1
+            except Exception as exc:
+                logger.exception("Failed to confirm contract for deal %s", deal_id)
+                error_message = f"Не удалось сохранить подтверждение: {exc}"
+
+    generated_contract_path = _get_generated_contract_path(str(deal_id))
+    if generated_contract_path.exists():
+        contract_download_url = _build_contract_file_url(str(deal_id), token)
+    else:
+        contract_download_url = _resolve_contract_download_url(deal_data.get(settings.contract_file_field))
+    if not contract_download_url and not error_message:
+        error_message = "Не удалось получить прямую ссылку на файл договора. Подтверждение остается доступным."
+    contract_preview_url = _build_office_preview_url(contract_download_url)
+    is_confirmed = str(deal_data.get(settings.contract_accepted_field)).upper() in {"1", "Y", "TRUE"}
+
+    payment_state = (request.query_params.get("payment_state") or "").strip().lower()
+    payment_error = (request.query_params.get("payment_error") or "").strip()
+    payment_order_number = (request.query_params.get("orderNumber") or "").strip()
+
+    flags = read_flags(request.cookies.get(_cookie_name(str(deal_id))))
+    is_payment_completed = bool(flags.get("completed"))
+
+    if payment_state == "success":
+        is_payment_completed = True
+        flags["completed"] = True
+
+        if payment_order_number and flags.get("logged_order") != payment_order_number:
+            try:
+                amount = _extract_decimal_amount(deal_data.get(settings.contract_first_payment_field))
+                bitrix_contract.add_contract_payment_timeline_comment(
+                    str(deal_id),
+                    payment_order_number,
+                    (
+                        "Поступила успешная оплата по договору\n"
+                        f"Сумма: {_format_amount_rub(amount)} ₽\n"
+                        f"Номер платежа: {payment_order_number}"
+                    ),
+                )
+                flags["logged_order"] = payment_order_number
+            except Exception as exc:
+                logger.exception("Failed to add contract payment timeline comment for deal %s", deal_id)
+                if not payment_error:
+                    payment_error = f"Не удалось записать оплату в журнал: {exc}"
+
+    payment_context = _build_contract_payment_context(str(deal_id), token, deal_data)
+
+    response = templates.TemplateResponse(
+        request,
+        "contract_confirmation.html",
+        {
+            "deal_id": deal_id,
+            "token": token,
+            "error_message": error_message,
+            "success_message": success_message,
+            "contract_download_url": contract_download_url,
+            "contract_preview_url": contract_preview_url,
+            "is_confirmed": is_confirmed,
+            "contract_number": deal_data.get(settings.contract_number_field, ""),
+            "client_name": deal_data.get("TITLE", ""),
+            "payment_state": payment_state,
+            "payment_error": payment_error,
+            "is_payment_completed": is_payment_completed,
+            **payment_context,
+        },
+    )
+    response.set_cookie(_cookie_name(str(deal_id)), write_flags(flags), httponly=True, max_age=60 * 60 * 24 * 30)
+    return response
+
+
+@router.get("/dogovor/{deal_id}/document/")
+def contract_document_file(deal_id: int, token: str | None = None):
+    if not _validate_contract_token(str(deal_id), token):
+        return JSONResponse({"detail": "Файл договора не найден"}, status_code=404)
+
+    contract_path = _get_generated_contract_path(str(deal_id))
+    if not contract_path.exists():
+        return JSONResponse({"detail": "Файл договора не найден"}, status_code=404)
+
+    return FileResponse(
+        contract_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=contract_path.name,
+    )
+
+
+@router.get("/dogovor/{deal_id}/pay/")
+def contract_payment_redirect(deal_id: int, token: str | None = None):
+    if not _validate_contract_token(str(deal_id), token):
+        return JSONResponse({"detail": "Страница оплаты не найдена"}, status_code=404)
+
+    try:
+        deal_data = bitrix_contract.get_deal_data(str(deal_id))
+        form_url = _register_contract_payment(str(deal_id), token, deal_data)
+    except Exception as exc:
+        logger.exception("Failed to create contract payment for deal %s", deal_id)
+        error_query = urlencode({"token": token, "payment_state": "error", "payment_error": str(exc)})
+        return RedirectResponse(f"/dogovor/{deal_id}/?{error_query}", status_code=302)
+
+    return RedirectResponse(form_url, status_code=302)

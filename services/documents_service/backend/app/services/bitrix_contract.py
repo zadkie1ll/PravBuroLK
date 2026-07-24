@@ -52,3 +52,19 @@ def update_contract_link(deal_id: str, contract_url: str) -> None:
         "crm.deal.update",
         {"id": deal_id, "fields": {settings.contract_link_field: contract_url}},
     )
+
+
+def update_contract_confirmation(deal_id: str, accepted: bool = True) -> None:
+    client = BitrixClient()
+    client.call(
+        "crm.deal.update",
+        {"id": deal_id, "fields": {settings.contract_accepted_field: 1 if accepted else 0}},
+    )
+
+
+def add_contract_payment_timeline_comment(deal_id: str, order_number: str, comment: str) -> None:
+    client = BitrixClient()
+    client.call(
+        "crm.timeline.comment.add",
+        {"fields": {"ENTITY_ID": deal_id, "ENTITY_TYPE": "deal", "COMMENT": comment}},
+    )
