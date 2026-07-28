@@ -21,7 +21,7 @@ from communications.views import bitrix_call_webhook, download_call_to_server, m
 from education_platform import urls as education_urls
 from urlshorter.views import generate_url, show_stats
 from yclients.views import yclients_webhook
-from client_withdrawals.views import client_withdrawals_page, create_withdrawal_record, update_withdrawal_record, delete_withdrawal_record
+from client_withdrawals.views import client_withdrawals_page, create_withdrawal_record, update_withdrawal_record, delete_withdrawal_record, internal_client_tail_amount
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("education/", include("education_platform.urls")),
@@ -70,6 +70,7 @@ urlpatterns = [
     path("client-withdrawals/<int:client_id>/create/", create_withdrawal_record, name="create_withdrawal_record"),
     path("client-withdrawals/update/<int:record_id>/", update_withdrawal_record, name="update_withdrawal_record"),
     path("client-withdrawals/delete/<int:record_id>/", delete_withdrawal_record, name="delete_withdrawal_record"),
+    path("api/internal/clients/<int:client_id>/tail-amount/", internal_client_tail_amount, name="internal_client_tail_amount"),
     path('client_search/', client_search_view, name='client_search'),
     path('other/create/', create_other_payments, name='create_other_payments'),
     path('other/delete/<int:payment_id>/', delete_other_payment, name='delete_other_payment'),

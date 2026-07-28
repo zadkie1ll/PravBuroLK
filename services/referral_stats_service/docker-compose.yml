@@ -1,0 +1,36 @@
+name: referral_stats_service
+
+services:
+  backend:
+    build: ./backend
+    container_name: referral_stats_backend
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://pravburo:pravburo@shared_postgres:5432/pravburo}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8009:8009"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - pravburo_shared
+
+  frontend:
+    build: ./frontend
+    container_name: referral_stats_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8009
+      VITE_ADMIN_PANEL_BASE_URL: http://localhost:5176
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5178:5178"
+    depends_on:
+      - backend
+
+networks:
+  pravburo_shared:
+    external: true

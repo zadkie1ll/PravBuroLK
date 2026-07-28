@@ -1,0 +1,35 @@
+name: leadreport_service
+
+services:
+  backend:
+    build: ./backend
+    container_name: leadreport_backend
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://pravburo:pravburo@shared_postgres:5432/pravburo}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8006:8006"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - pravburo_shared
+
+  frontend:
+    build: ./frontend
+    container_name: leadreport_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8006
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5175:5175"
+    depends_on:
+      - backend
+
+networks:
+  pravburo_shared:
+    external: true

@@ -1,0 +1,28 @@
+name: shared_postgres
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: shared_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pravburo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pravburo}
+      POSTGRES_DB: ${POSTGRES_DB:-pravburo}
+    ports:
+      - "5432:5432"
+    volumes:
+      - shared_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pravburo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - pravburo_shared
+
+networks:
+  pravburo_shared:
+    name: pravburo_shared
+
+volumes:
+  shared_postgres_data:

@@ -294,6 +294,7 @@ CALL_QUEUE_MAX_DESKTOP_URL = os.getenv("CALL_QUEUE_MAX_DESKTOP_URL", "max://")
 # Общий секрет для internal-эндпоинтов (сервис call_queue_service ходит сюда за SalesManager).
 # Пусто = эндпоинт открыт — годится только для локального прототипа, не для прода.
 LEADREPORT_INTERNAL_API_TOKEN = os.getenv("LEADREPORT_INTERNAL_API_TOKEN", "")
+CLIENT_WITHDRAWALS_INTERNAL_API_TOKEN = os.getenv("CLIENT_WITHDRAWALS_INTERNAL_API_TOKEN", "")
 
 
 # ------------------------------------------------------------------

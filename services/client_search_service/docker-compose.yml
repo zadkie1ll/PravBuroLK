@@ -1,0 +1,36 @@
+name: client_search_service
+
+services:
+  backend:
+    build: ./backend
+    container_name: client_search_backend
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://pravburo:pravburo@shared_postgres:5432/pravburo}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8008:8008"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - pravburo_shared
+
+  frontend:
+    build: ./frontend
+    container_name: client_search_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8008
+      VITE_ADMIN_PANEL_BASE_URL: http://localhost:5176
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5177:5177"
+    depends_on:
+      - backend
+
+networks:
+  pravburo_shared:
+    external: true

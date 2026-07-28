@@ -1,14 +1,38 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from clients.models import Client
 
 from .models import ClientWithdrawalRecord
 from .services import get_total_tail_amount, sync_withdrawals_to_bitrix
+
+
+def _check_internal_token(request):
+    """Тот же паттерн, что и leadreport/views.py:_check_internal_token — общий секрет
+    для сервис-сервис вызовов. Если CLIENT_WITHDRAWALS_INTERNAL_API_TOKEN не задан —
+    эндпоинт открыт (локальный прототип)."""
+    expected = getattr(settings, "CLIENT_WITHDRAWALS_INTERNAL_API_TOKEN", "")
+    if not expected:
+        return True
+    provided = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    return provided == expected
+
+
+@require_GET
+def internal_client_tail_amount(request, client_id):
+    """Потребитель — services/client_search_service, карточка клиента ("Общий хвост по
+    снятиям"). Сам client_withdrawals пока не вынесен — это единственная точка входа
+    для другого сервиса без переноса всего модуля."""
+    if not _check_internal_token(request):
+        return HttpResponseForbidden("invalid internal token")
+    client = get_object_or_404(Client, pk=client_id)
+    return JsonResponse({"client_id": client.id, "total_tail_amount": str(get_total_tail_amount(client))})
 
 
 def _parse_money(value: str, *, allow_empty: bool = False):

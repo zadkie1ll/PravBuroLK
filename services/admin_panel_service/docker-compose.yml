@@ -1,0 +1,36 @@
+name: admin_panel_service
+
+services:
+  backend:
+    build: ./backend
+    container_name: admin_panel_backend
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://pravburo:pravburo@shared_postgres:5432/pravburo}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8007:8007"
+    networks:
+      - default
+      - pravburo_shared
+
+  frontend:
+    build: ./frontend
+    container_name: admin_panel_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8007
+      VITE_LEADREPORT_BASE_URL: http://localhost:5175
+      VITE_CLIENT_SEARCH_BASE_URL: http://localhost:5177
+      VITE_REFERRAL_STATS_BASE_URL: http://localhost:5178
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5176:5176"
+    depends_on:
+      - backend
+
+networks:
+  pravburo_shared:
+    external: true
