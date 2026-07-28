@@ -1,24 +1,6 @@
 name: communications_service
 
 services:
-  postgres:
-    image: postgres:16
-    container_name: communications_postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-communications}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-communications}
-      POSTGRES_DB: ${POSTGRES_DB:-communications}
-    ports:
-      - "5435:5432"
-    volumes:
-      - communications_postgres_data:/var/lib/postgresql/data
-      - ./postgres-init:/docker-entrypoint-initdb.d
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-communications}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   redis:
     image: redis:7-alpine
     container_name: communications_redis
@@ -30,19 +12,20 @@ services:
     container_name: communications_backend
     env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://communications:communications@postgres:5432/communications}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://pravburo:pravburo@shared_postgres:5432/pravburo}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     volumes:
       - ./backend:/app
     ports:
       - "8004:8004"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_started
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - pravburo_shared
 
   worker:
     build: ./backend
@@ -50,17 +33,19 @@ services:
     command: celery -A app.celery_app worker -l info
     env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://communications:communications@postgres:5432/communications}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://pravburo:pravburo@shared_postgres:5432/pravburo}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     volumes:
       - ./backend:/app
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_started
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - pravburo_shared
 
-volumes:
-  communications_postgres_data:
+networks:
+  pravburo_shared:
+    external: true

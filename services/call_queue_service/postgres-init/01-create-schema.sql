@@ -1,1 +1,0 @@
-CREATE SCHEMA IF NOT EXISTS call_queue AUTHORIZATION call_queue;

@@ -1,38 +1,20 @@
 name: education_platform_service
 
 services:
-  postgres:
-    image: postgres:16
-    container_name: education_platform_postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-education_platform}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-education_platform}
-      POSTGRES_DB: ${POSTGRES_DB:-education_platform}
-    ports:
-      - "5434:5432"
-    volumes:
-      - education_platform_postgres_data:/var/lib/postgresql/data
-      - ./postgres-init:/docker-entrypoint-initdb.d
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-education_platform}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   backend:
     build: ./backend
     container_name: education_platform_backend
     env_file: .env
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://education_platform:education_platform@postgres:5432/education_platform}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://pravburo:pravburo@shared_postgres:5432/pravburo}
     volumes:
       - ./backend:/app
       - ${MONOLITH_PRIVATE_MEDIA_PATH:-../../private_media}:/private_media:ro
     ports:
       - "8003:8003"
-    depends_on:
-      postgres:
-        condition: service_healthy
+    networks:
+      - default
+      - pravburo_shared
 
   frontend:
     build: ./frontend
@@ -47,5 +29,6 @@ services:
     depends_on:
       - backend
 
-volumes:
-  education_platform_postgres_data:
+networks:
+  pravburo_shared:
+    external: true
