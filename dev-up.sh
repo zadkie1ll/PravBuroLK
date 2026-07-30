@@ -18,3 +18,4 @@ docker compose -f services/client_search_service/docker-compose.yml up -d --buil
 docker compose -f services/referral_stats_service/docker-compose.yml up -d --build
 docker compose -f services/admin_panel_service/docker-compose.yml up -d --build
 docker compose -f services/lead_control_service/docker-compose.yml up -d --build
+docker compose -f services/urlshorter_service/docker-compose.yml up -d --build

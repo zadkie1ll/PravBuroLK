@@ -1,0 +1,68 @@
+name: lead_control_service
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: lead_control_redis
+    ports:
+      - "6381:6379"
+
+  backend:
+    build: ./backend
+    container_name: lead_control_backend
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://pravburo:pravburo@shared_postgres:5432/pravburo}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8010:8010"
+    depends_on:
+      redis:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - pravburo_shared
+
+  worker:
+    build: ./backend
+    container_name: lead_control_worker
+    command: celery -A app.celery_app worker -l info
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://pravburo:pravburo@shared_postgres:5432/pravburo}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      redis:
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - pravburo_shared
+
+  beat:
+    build: ./backend
+    container_name: lead_control_beat
+    command: celery -A app.celery_app beat -l info
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg2://pravburo:pravburo@shared_postgres:5432/pravburo}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      redis:
+        condition: service_started
+    networks:
+      - default
+      - pravburo_shared
+
+networks:
+  pravburo_shared:
+    external: true

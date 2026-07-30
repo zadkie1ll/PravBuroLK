@@ -5,6 +5,7 @@ const LEADREPORT_BASE_URL = import.meta.env.VITE_LEADREPORT_BASE_URL || "http://
 const CLIENT_SEARCH_BASE_URL = import.meta.env.VITE_CLIENT_SEARCH_BASE_URL || "http://localhost:5177";
 const REFERRAL_STATS_BASE_URL = import.meta.env.VITE_REFERRAL_STATS_BASE_URL || "http://localhost:5178";
 const PAYMENTS_DASHBOARD_BASE_URL = import.meta.env.VITE_CLIENT_SEARCH_BASE_URL || "http://localhost:5177";
+const URLSHORTER_BASE_URL = import.meta.env.VITE_URLSHORTER_BASE_URL || "http://localhost:5179";
 
 export function AdminPanelPage() {
   const navigate = useNavigate();
@@ -37,6 +38,11 @@ export function AdminPanelPage() {
   function openPaymentsDashboard() {
     const token = localStorage.getItem("access_token");
     window.location.href = `${PAYMENTS_DASHBOARD_BASE_URL}/payments-dashboard?token=${encodeURIComponent(token || "")}`;
+  }
+
+  function openUrlshorter() {
+    const token = localStorage.getItem("access_token");
+    window.location.href = `${URLSHORTER_BASE_URL}/?token=${encodeURIComponent(token || "")}`;
   }
 
   return (
@@ -100,6 +106,14 @@ export function AdminPanelPage() {
             >
               <h3 className="mb-2 text-lg font-semibold text-gray-800">📞 Отчет по менеджерам</h3>
               <p className="text-sm text-gray-600">Смотрите звонки и общее время разговоров по активным менеджерам.</p>
+            </button>
+
+            <button
+              onClick={openUrlshorter}
+              className="block rounded-xl border border-purple-200 bg-gradient-to-tr from-gray-50 to-purple-100 p-6 text-left shadow transition hover:shadow-lg"
+            >
+              <h3 className="mb-2 text-lg font-semibold text-gray-800">🔗 Статистика по источникам</h3>
+              <p className="text-sm text-gray-600">Управляйте короткими ссылками и смотрите статистику кликов по источникам.</p>
             </button>
           </div>
         </div>

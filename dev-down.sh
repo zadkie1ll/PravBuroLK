@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+docker compose -f services/urlshorter_service/docker-compose.yml down
 docker compose -f services/lead_control_service/docker-compose.yml down
 docker compose -f services/admin_panel_service/docker-compose.yml down
 docker compose -f services/referral_stats_service/docker-compose.yml down
