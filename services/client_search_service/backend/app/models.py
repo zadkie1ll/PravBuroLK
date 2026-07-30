@@ -113,3 +113,24 @@ class OtherPayment(Base):
     is_paid = Column(Boolean, nullable=False, default=False)
     comment = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True))
+
+
+class WithdrawalRecord(Base):
+    """Соответствует client_withdrawals/models.py:ClientWithdrawalRecord. tail_amount
+    считается на уровне сервиса (см. services/withdrawals.py:save_withdrawal_record),
+    как в оригинальном Model.save()."""
+
+    __tablename__ = "withdrawal_records"
+
+    id = Column(Integer, primary_key=True)
+    client_id = Column(Integer, ForeignKey("clients.id"), nullable=False, index=True)
+    withdrawal_date = Column(Date, nullable=True)
+    transfer_date = Column(Date, nullable=True)
+    withdrawal_amount = Column(Numeric(12, 2), nullable=True)
+    transferred_amount = Column(Numeric(12, 2), nullable=True)
+    tail_amount = Column(Numeric(12, 2), nullable=False, default=0)
+    comment = Column(String(255), nullable=False, default="")
+    created_at = Column(DateTime(timezone=True))
+    updated_at = Column(DateTime(timezone=True))
+
+    client = relationship("Client")

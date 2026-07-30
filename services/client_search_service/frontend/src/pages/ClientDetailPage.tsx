@@ -179,12 +179,12 @@ export function ClientDetailPage() {
         >
           ← Назад к поиску клиентов
         </Link>
-        <a
-          href={data.withdrawals_url}
+        <Link
+          to={data.withdrawals_url}
           className="inline-block rounded-xl bg-emerald-600 px-5 py-2 font-semibold text-white transition hover:bg-emerald-700"
         >
           Списания клиента
-        </a>
+        </Link>
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-2 font-semibold text-amber-800">
           Общий хвост по снятиям: {data.total_tail_amount} ₽
         </div>

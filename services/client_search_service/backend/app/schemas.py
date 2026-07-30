@@ -132,6 +132,38 @@ class OtherPaymentBulkUpdateItem(BaseModel):
     comment: str | None = None
 
 
+class WithdrawalRecordOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    withdrawal_date: date | None
+    transfer_date: date | None
+    withdrawal_amount: Decimal | None
+    transferred_amount: Decimal | None
+    tail_amount: Decimal
+    comment: str
+
+
+class WithdrawalRecordUpsert(BaseModel):
+    withdrawal_date: date | None = None
+    transfer_date: date | None = None
+    withdrawal_amount: Decimal | None = None
+    transferred_amount: Decimal | None = None
+    comment: str = ""
+
+
+class WithdrawalsPageResponse(BaseModel):
+    client: ClientOut
+    records: list[WithdrawalRecordOut]
+    total_withdrawal_amount: Decimal
+    total_tail_amount: Decimal
+
+
+class WithdrawalMutationResponse(BaseModel):
+    success: bool
+    bitrix_warning: str | None = None
+
+
 class PaymentsDashboardStats(BaseModel):
     day: Decimal
     week: Decimal

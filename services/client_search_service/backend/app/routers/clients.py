@@ -18,7 +18,7 @@ from ..schemas import (
     OtherPaymentBulkUpdateItem,
     OtherPaymentCreate,
 )
-from ..services.tail_amount import get_total_tail_amount
+from ..services.withdrawals import get_total_tail_amount
 
 router = APIRouter(prefix="/api", tags=["clients"], dependencies=[Depends(require_staff)])
 
@@ -87,9 +87,9 @@ def client_detail(client_id: int, db: Session = Depends(get_db)):
         total_installments_sum=total_installments_sum,
         total_actuals_sum=total_actuals_sum,
         contract_final_amount=contract_final_amount,
-        total_tail_amount=get_total_tail_amount(client_id),
+        total_tail_amount=get_total_tail_amount(db, client_id),
         bitrix_deal_url=f"{settings.bitrix_deal_base_url}/{client.bitrix_id}/" if client.bitrix_id else None,
-        withdrawals_url=f"{settings.monolith_client_withdrawals_url}/{client_id}/",
+        withdrawals_url=f"/clients/{client_id}/withdrawals",
     )
 
 

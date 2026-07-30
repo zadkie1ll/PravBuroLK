@@ -4,6 +4,7 @@ import { setToken } from "./api/client";
 import { ClientSearchPage } from "./pages/ClientSearchPage";
 import { ClientDetailPage } from "./pages/ClientDetailPage";
 import { PaymentsDashboardPage } from "./pages/PaymentsDashboardPage";
+import { WithdrawalsPage } from "./pages/WithdrawalsPage";
 
 const ADMIN_PANEL_BASE_URL = import.meta.env.VITE_ADMIN_PANEL_BASE_URL || "http://localhost:5176";
 
@@ -43,6 +44,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<ClientSearchPage />} />
       <Route path="/clients/:clientId" element={<ClientDetailPage />} />
+      <Route path="/clients/:clientId/withdrawals" element={<WithdrawalsPage />} />
       <Route path="/payments-dashboard" element={<PaymentsDashboardPage />} />
     </Routes>
   );

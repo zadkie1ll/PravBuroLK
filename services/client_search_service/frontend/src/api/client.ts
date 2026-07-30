@@ -94,6 +94,36 @@ export interface ClientDetailResponse {
   withdrawals_url: string;
 }
 
+export interface WithdrawalRecordOut {
+  id: number;
+  withdrawal_date: string | null;
+  transfer_date: string | null;
+  withdrawal_amount: string | null;
+  transferred_amount: string | null;
+  tail_amount: string;
+  comment: string;
+}
+
+export interface WithdrawalsPageResponse {
+  client: ClientOut;
+  records: WithdrawalRecordOut[];
+  total_withdrawal_amount: string;
+  total_tail_amount: string;
+}
+
+export interface WithdrawalMutationResponse {
+  success: boolean;
+  bitrix_warning: string | null;
+}
+
+export interface WithdrawalRecordUpsert {
+  withdrawal_date: string | null;
+  transfer_date: string | null;
+  withdrawal_amount: string | null;
+  transferred_amount: string | null;
+  comment: string;
+}
+
 export const OTHER_PAYMENT_TYPES: { value: string; label: string }[] = [
   { value: "deposit", label: "Судебный депозит" },
   { value: "publication", label: "Публикация" },
@@ -143,6 +173,21 @@ export const api = {
   ) => request("/api/other-payments/bulk", { method: "PATCH", body: JSON.stringify(items) }),
 
   paymentsDashboard: (page: number) => request<PaymentsDashboardResponse>(`/api/payments-dashboard?page=${page}`),
+
+  withdrawalsPage: (clientId: number) =>
+    request<WithdrawalsPageResponse>(`/api/clients/${clientId}/withdrawals`),
+  createWithdrawal: (clientId: number, payload: WithdrawalRecordUpsert) =>
+    request<WithdrawalMutationResponse>(`/api/clients/${clientId}/withdrawals`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateWithdrawal: (recordId: number, payload: WithdrawalRecordUpsert) =>
+    request<WithdrawalMutationResponse>(`/api/withdrawals/${recordId}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteWithdrawal: (recordId: number) =>
+    request<WithdrawalMutationResponse>(`/api/withdrawals/${recordId}`, { method: "DELETE" }),
 };
 
 export interface PaymentsDashboardStats {

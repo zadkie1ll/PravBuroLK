@@ -10,16 +10,21 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-insecure-secret-change-me"
     jwt_algorithm: str = "HS256"
 
-    # Ссылка "Списания клиента" — client_withdrawals пока не вынесен, ведёт прямо в монолит.
-    monolith_client_withdrawals_url: str = "https://prav-buro.ru/client-withdrawals"
-
-    # internal-эндпоинт монолита для "Общий хвост по снятиям"
-    # (client_withdrawals/views.py:internal_client_tail_amount) — сам модуль пока не вынесен,
-    # это единственная точка чтения без переноса всего client_withdrawals.
-    monolith_internal_base_url: str = "https://prav-buro.ru"
-    monolith_internal_token: str = ""
-
     bitrix_deal_base_url: str = "https://prav-buro.bitrix24.ru/crm/deal/details"
+
+    # bitrix_gateway_service — используется для синка "Списания клиента" в Bitrix
+    # (crm.deal.update, порт client_withdrawals/services.py:sync_withdrawals_to_bitrix)
+    # теперь, когда withdrawal_records живут в этом сервисе, а не в монолите.
+    bitrix_gateway_base_url: str = "http://host.docker.internal:8002"
+    bitrix_gateway_token: str = ""
+    bitrix_gateway_profile: str = "default"
+
+    # Ссылка на страницу списаний для поля в Bitrix — теперь это страница в собственном
+    # фронтенде сервиса, не в монолите. Placeholder-порт для локальной разработки — на
+    # проде должен указывать на реальный домен фронтенда после cutover.
+    withdrawals_page_base_url: str = "http://localhost:5177"
+    bitrix_client_withdrawals_link_field: str = "UF_CRM_1774516783"
+    bitrix_client_withdrawals_field: str = "UF_CRM_1774516806"
 
 
 settings = Settings()
