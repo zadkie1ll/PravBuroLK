@@ -24,7 +24,7 @@ from .models import Employee
 import logging
 import requests
 from payments.utilities import get_deal_data_from_bitrix
-from lead_control.bitrix_api import duplicate_deal_to_agents_category, BitrixAPIError
+from django.conf import settings as django_settings
 BITRIX_WEBHOOK_URL = "https://prav-buro.bitrix24.ru/rest/24/pa1x5irnfpbcnh27/"
 logger = logging.getLogger(__name__)
 
@@ -294,8 +294,19 @@ def bitrix_deal_webhook(request):
             client.set_stage(stage)
 
         try:
-            duplicate_deal_to_agents_category(deal_data)
-        except BitrixAPIError:
+            headers = (
+                {"Authorization": f"Bearer {django_settings.LEAD_CONTROL_SERVICE_INTERNAL_TOKEN}"}
+                if django_settings.LEAD_CONTROL_SERVICE_INTERNAL_TOKEN
+                else {}
+            )
+            response = requests.post(
+                f"{django_settings.LEAD_CONTROL_SERVICE_BASE_URL}/api/internal/duplicate-deal",
+                json={"deal_data": deal_data},
+                headers=headers,
+                timeout=30,
+            )
+            response.raise_for_status()
+        except requests.RequestException:
             logger.exception("Failed to duplicate deal %s into Агенты category", bitrix_id)
 
         return JsonResponse({

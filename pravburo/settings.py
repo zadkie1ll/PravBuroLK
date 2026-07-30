@@ -296,6 +296,11 @@ CALL_QUEUE_MAX_DESKTOP_URL = os.getenv("CALL_QUEUE_MAX_DESKTOP_URL", "max://")
 LEADREPORT_INTERNAL_API_TOKEN = os.getenv("LEADREPORT_INTERNAL_API_TOKEN", "")
 CLIENT_WITHDRAWALS_INTERNAL_API_TOKEN = os.getenv("CLIENT_WITHDRAWALS_INTERNAL_API_TOKEN", "")
 
+# lead_control_service — монолит вызывает его /api/internal/duplicate-deal вместо прежнего
+# прямого Python-импорта lead_control.bitrix_api.duplicate_deal_to_agents_category в clients/views.py.
+LEAD_CONTROL_SERVICE_BASE_URL = os.getenv("LEAD_CONTROL_SERVICE_BASE_URL", "http://host.docker.internal:8010")
+LEAD_CONTROL_SERVICE_INTERNAL_TOKEN = os.getenv("LEAD_CONTROL_SERVICE_INTERNAL_TOKEN", "")
+
 
 # ------------------------------------------------------------------
 # lead_control
