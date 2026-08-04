@@ -1,0 +1,28 @@
+name: admin_panel_service
+
+# Прод-вариант: network_mode: host (Postgres на сервере слушает только 127.0.0.1,
+# так проще всего до него достучаться из контейнера, не трогая конфиг Postgres).
+# ВАЖНО: раз сеть — хостовая, каждый сервис обязан слушать 127.0.0.1, а не 0.0.0.0,
+# иначе порт станет доступен снаружи напрямую, в обход nginx.
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    build: ./backend
+    container_name: admin_panel_backend
+    network_mode: host
+    env_file: .env
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 127.0.0.1 --port 8007"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: ""
+    container_name: admin_panel_frontend
+    network_mode: host
+    restart: unless-stopped
