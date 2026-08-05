@@ -1,0 +1,17 @@
+name: bitrix_gateway_service
+
+# Прод-вариант: network_mode: host. Без БД и без фронтенда — просто REST-прокси
+# к Bitrix24, вызывается другими сервисами напрямую по 127.0.0.1:8002 (не публикуется
+# через nginx, наружу не смотрит).
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    build: ./backend
+    container_name: bitrix_gateway_backend
+    network_mode: host
+    env_file: .env
+    command: uvicorn app.main:app --host 127.0.0.1 --port 8002
+    restart: unless-stopped

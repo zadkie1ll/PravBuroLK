@@ -26,6 +26,7 @@ services:
         # Путь-based карточки хаба (не поддомены) — добавлять сюда по мере деплоя
         # каждого следующего модульного сервиса.
         VITE_URLSHORTER_BASE_URL: "https://panel.prav-buro.ru/urlshorter"
+        VITE_LEADREPORT_BASE_URL: "https://panel.prav-buro.ru/leadreport"
     container_name: admin_panel_frontend
     network_mode: host
     restart: unless-stopped

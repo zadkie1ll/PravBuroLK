@@ -1,0 +1,31 @@
+name: leadreport_service
+
+# Прод-вариант: network_mode: host (Postgres на сервере слушает только 127.0.0.1).
+# Сервис живёт под panel.prav-buro.ru/leadreport (фронтенд-страницы) и
+# panel.prav-buro.ru/leadreport-api (backend) — раздельные префиксы обязательны,
+# т.к. у backend'а есть маршруты /admin/managers-list и т.п., совпадающие по пути
+# с фронтенд-страницами SPA (/admin/managers-list) — под одним префиксом было бы
+# неоднозначно, куда nginx должен проксировать запрос.
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    build: ./backend
+    container_name: leadreport_backend
+    network_mode: host
+    env_file: .env
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 127.0.0.1 --port 8006"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: "https://panel.prav-buro.ru/leadreport-api"
+        DEPLOY_BASE_PATH: "/leadreport/"
+    container_name: leadreport_frontend
+    network_mode: host
+    restart: unless-stopped
