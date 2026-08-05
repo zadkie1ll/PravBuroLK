@@ -32,7 +32,7 @@ def get_dest_conn():
 
 
 def main():
-    src = psycopg2.connect(SOURCE_DSN)
+    src = psycopg2.connect(SOURCE_DSN.replace("postgresql+psycopg2://", "postgresql://", 1))
     dst = get_dest_conn()
     src_cur = src.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     dst_cur = dst.cursor()
