@@ -25,6 +25,7 @@ services:
       dockerfile: Dockerfile.prod
       args:
         VITE_API_BASE_URL: "https://panel.prav-buro.ru/leadreport-api"
+        VITE_ADMIN_PANEL_BASE_URL: "https://panel.prav-buro.ru"
         DEPLOY_BASE_PATH: "/leadreport/"
     container_name: leadreport_frontend
     network_mode: host

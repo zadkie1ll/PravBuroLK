@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { api, clearToken, DashboardResponse } from "../api/client";
+
+const ADMIN_PANEL_BASE_URL = import.meta.env.VITE_ADMIN_PANEL_BASE_URL || "http://localhost:5176";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -11,7 +13,6 @@ export function AdminDashboardPage() {
   const [error, setError] = useState("");
   const [start, setStart] = useState(today());
   const [end, setEnd] = useState(today());
-  const navigate = useNavigate();
 
   function load(s = start, e = end) {
     setError("");
@@ -34,7 +35,7 @@ export function AdminDashboardPage() {
 
   function logout() {
     clearToken();
-    navigate("/login");
+    window.location.href = `${ADMIN_PANEL_BASE_URL}/admin-panel`;
   }
 
   return (
