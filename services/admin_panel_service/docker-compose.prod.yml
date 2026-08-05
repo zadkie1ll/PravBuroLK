@@ -23,6 +23,9 @@ services:
       dockerfile: Dockerfile.prod
       args:
         VITE_API_BASE_URL: "https://panel.prav-buro.ru"
+        # Путь-based карточки хаба (не поддомены) — добавлять сюда по мере деплоя
+        # каждого следующего модульного сервиса.
+        VITE_URLSHORTER_BASE_URL: "https://panel.prav-buro.ru/urlshorter"
     container_name: admin_panel_frontend
     network_mode: host
     restart: unless-stopped

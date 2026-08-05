@@ -1,0 +1,29 @@
+name: urlshorter_service
+
+# Прод-вариант: network_mode: host (Postgres на сервере слушает только 127.0.0.1).
+# Сервис живёт под panel.prav-buro.ru/urlshorter (параллельный тест, см. nginx-panel
+# deploy-конфиг) — не отдельный поддомен, поэтому фронтенд собирается с --base=/urlshorter/.
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    build: ./backend
+    container_name: urlshorter_backend
+    network_mode: host
+    env_file: .env
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 127.0.0.1 --port 8011"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: "https://panel.prav-buro.ru/urlshorter"
+        VITE_ADMIN_PANEL_BASE_URL: "https://panel.prav-buro.ru"
+        DEPLOY_BASE_PATH: "/urlshorter/"
+    container_name: urlshorter_frontend
+    network_mode: host
+    restart: unless-stopped
