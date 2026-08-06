@@ -7,7 +7,7 @@ app = FastAPI(title="Client Search Service", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5177", "http://127.0.0.1:5177"],
+    allow_origins=["http://localhost:5177", "http://127.0.0.1:5177", "https://panel.prav-buro.ru"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

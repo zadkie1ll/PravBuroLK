@@ -28,6 +28,7 @@ services:
         VITE_URLSHORTER_BASE_URL: "https://panel.prav-buro.ru/urlshorter"
         VITE_LEADREPORT_BASE_URL: "https://panel.prav-buro.ru/leadreport"
         VITE_REFERRAL_STATS_BASE_URL: "https://panel.prav-buro.ru/referrals"
+        VITE_CLIENT_SEARCH_BASE_URL: "https://panel.prav-buro.ru/clients"
     container_name: admin_panel_frontend
     network_mode: host
     restart: unless-stopped

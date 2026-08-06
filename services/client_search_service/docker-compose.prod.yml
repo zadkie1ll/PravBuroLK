@@ -1,0 +1,29 @@
+name: client_search_service
+
+# Прод-вариант: network_mode: host (Postgres на сервере слушает только 127.0.0.1).
+# Сервис живёт под panel.prav-buro.ru/clients — backend уже под /api-префиксом,
+# коллизий с фронтенд-страницами SPA нет (та же схема, что urlshorter/referral_stats).
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    build: ./backend
+    container_name: client_search_backend
+    network_mode: host
+    env_file: .env
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 127.0.0.1 --port 8008"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: "https://panel.prav-buro.ru/clients"
+        VITE_ADMIN_PANEL_BASE_URL: "https://panel.prav-buro.ru"
+        DEPLOY_BASE_PATH: "/clients/"
+    container_name: client_search_frontend
+    network_mode: host
+    restart: unless-stopped
