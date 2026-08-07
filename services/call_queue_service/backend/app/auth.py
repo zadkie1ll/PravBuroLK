@@ -4,6 +4,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from passlib.exc import UnknownHashError
 from sqlalchemy.orm import Session
 
 from .config import settings
@@ -19,7 +20,22 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    return pwd_context.verify(password, hashed)
+    try:
+        return pwd_context.verify(password, hashed)
+    except (UnknownHashError, ValueError):
+        # Плейсхолдер-хэш у пользователей, импортированных ETL из истории звонков
+        # ("!imported-" + hex, см. etl_import_call_history.py) — passlib его не опознаёт.
+        # Такой пользователь никогда не сможет войти по этому хэшу — это ожидаемо.
+        return False
+
+
+def has_usable_password(hashed: str) -> bool:
+    """False для плейсхолдер-хэшей импортированных пользователей — у них ещё не было
+    реальной регистрации, значит /auth/register может "забрать" такой аккаунт."""
+    try:
+        return pwd_context.identify(hashed) is not None
+    except (UnknownHashError, ValueError):
+        return False
 
 
 def create_access_token(user: User) -> str:

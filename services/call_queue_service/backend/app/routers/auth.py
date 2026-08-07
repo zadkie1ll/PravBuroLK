@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..auth import create_access_token, get_current_user, hash_password, verify_password
+from ..auth import create_access_token, get_current_user, has_usable_password, hash_password, verify_password
 from ..db import get_db
 from ..models import User
 from ..schemas import LoginRequest, RegisterRequest, TokenResponse
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     """Только для локального прототипа — создание тестового пользователя сервиса."""
     existing = db.query(User).filter(User.email == payload.email).first()
-    if existing:
+    if existing and has_usable_password(existing.hashed_password):
         raise HTTPException(status_code=400, detail="Пользователь с таким email уже существует")
 
     try:
@@ -23,16 +23,20 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     except LeadreportClientError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    user = User(
-        email=payload.email,
-        hashed_password=hash_password(payload.password),
-        sales_manager_id=sales_manager.id if sales_manager else None,
-        sales_manager_name=sales_manager.name if sales_manager else "",
-        sales_manager_megafon_user=sales_manager.megafon_user if sales_manager else "",
-        sales_manager_megafon_group=sales_manager.megafon_group if sales_manager else "",
-        sales_manager_megafon_clid=sales_manager.megafon_clid if sales_manager else "",
-    )
-    db.add(user)
+    if existing:
+        # Плейсхолдер-хэш от ETL истории звонков — у аккаунта ещё не было реальной
+        # регистрации, разрешаем "забрать" его вместо блокировки на "уже существует".
+        user = existing
+        user.hashed_password = hash_password(payload.password)
+    else:
+        user = User(email=payload.email, hashed_password=hash_password(payload.password))
+        db.add(user)
+
+    user.sales_manager_id = sales_manager.id if sales_manager else None
+    user.sales_manager_name = sales_manager.name if sales_manager else ""
+    user.sales_manager_megafon_user = sales_manager.megafon_user if sales_manager else ""
+    user.sales_manager_megafon_group = sales_manager.megafon_group if sales_manager else ""
+    user.sales_manager_megafon_clid = sales_manager.megafon_clid if sales_manager else ""
     db.commit()
     db.refresh(user)
     return TokenResponse(access_token=create_access_token(user))
