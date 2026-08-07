@@ -1,0 +1,30 @@
+name: lead_control_service
+
+# Прод-вариант: network_mode: host (Postgres на сервере слушает только 127.0.0.1).
+# ВАЖНО: сюда сознательно НЕ включены worker/beat — beat сам по расписанию (10/13/16/19 мск)
+# обрабатывает реальные активные лиды и создаёт задачи модераторам в реальном Bitrix.
+# Пока деплоим только backend (webhook-приёмник + internal API), без фоновой обработки.
+# worker/beat добавить отдельным шагом, когда будет решено включать реальную работу.
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: lead_control_redis
+    network_mode: host
+    command: redis-server --port 6381
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: lead_control_backend
+    network_mode: host
+    env_file: .env
+    environment:
+      REDIS_URL: redis://127.0.0.1:6381/0
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 127.0.0.1 --port 8010"
+    restart: unless-stopped
+    depends_on:
+      - redis
