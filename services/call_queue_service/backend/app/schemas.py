@@ -1,17 +1,19 @@
 from datetime import date
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 from .models import CallEntityType
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr
+    # Не EmailStr: логин не всегда настоящий email (например, тестовые аккаунты
+    # вроде "test-manager", заведённые напрямую в базе).
+    email: str
     password: str
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
