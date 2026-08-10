@@ -1,0 +1,31 @@
+name: education_platform_service
+
+# Прод-вариант: network_mode: host (Postgres на сервере слушает только 127.0.0.1).
+# Сервис живёт под panel.prav-buro.ru/education (фронтенд) и
+# panel.prav-buro.ru/education-api (backend) — раздельные префиксы, т.к. у backend'а
+# нет /api-префикса (маршруты /auth, /hr, /courses и т.п. напрямую), как у leadreport/callqueue.
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    build: ./backend
+    container_name: education_platform_backend
+    network_mode: host
+    env_file: .env
+    volumes:
+      - ${MONOLITH_PRIVATE_MEDIA_PATH:-../../private_media}:/private_media:ro
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 127.0.0.1 --port 8003"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: "https://panel.prav-buro.ru/education-api"
+        DEPLOY_BASE_PATH: "/education/"
+    container_name: education_platform_frontend
+    network_mode: host
+    restart: unless-stopped

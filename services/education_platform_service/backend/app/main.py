@@ -7,7 +7,7 @@ app = FastAPI(title="Education Platform Service", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5174", "http://127.0.0.1:5174"],
+    allow_origins=["http://localhost:5174", "http://127.0.0.1:5174", "https://panel.prav-buro.ru"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

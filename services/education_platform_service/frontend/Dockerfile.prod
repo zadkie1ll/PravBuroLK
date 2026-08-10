@@ -1,0 +1,20 @@
+# Прод-сборка: билдим статику Vite под путём /education/ (сервис живёт на
+# panel.prav-buro.ru/education, не на своём поддомене), отдаём через nginx-контейнер.
+# Отдельный файл от Dockerfile (тот остаётся для локальной разработки с `npm run dev`).
+FROM node:20-slim AS build
+WORKDIR /app
+COPY package.json ./
+RUN npm install
+COPY . .
+
+# Vite инлайнит VITE_* переменные и --base в статику на этапе сборки, поэтому это
+# build arg, а не runtime environment (docker-compose environment: тут не сработает).
+ARG VITE_API_BASE_URL=""
+ARG DEPLOY_BASE_PATH="/"
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+RUN npm run build -- --base=$DEPLOY_BASE_PATH
+
+FROM nginx:1.27-alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 5174
