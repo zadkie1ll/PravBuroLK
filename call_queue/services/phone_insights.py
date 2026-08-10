@@ -203,6 +203,8 @@ def build_phone_insights(phone: str) -> dict[str, str | bool]:
                 region_label = geocoder.description_for_number(parsed, "ru")
                 timezones = phone_timezone.time_zones_for_number(parsed)
                 timezone_name = timezones[0] if len(timezones) == 1 else ""
+                if timezone_name == "Etc/Unknown":
+                    timezone_name = ""
                 if digits[1] == "9" and region_label == "Россия":
                     region_label = "Мобильный номер РФ"
                 if region_label or timezone_name:
