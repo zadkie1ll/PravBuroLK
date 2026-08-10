@@ -26,7 +26,9 @@ BATCH_SIZE = 5000
 
 
 def _connect(url: str, schema: str | None = None):
-    conn = psycopg2.connect(url)
+    # psycopg2.connect() не понимает SQLAlchemy-диалект в схеме URL (postgresql+psycopg2://),
+    # а .env хранит DATABASE_URL именно в этом формате (для приложения, там это SQLAlchemy).
+    conn = psycopg2.connect(url.replace("postgresql+psycopg2://", "postgresql://", 1))
     if schema:
         with conn.cursor() as cur:
             cur.execute(f"SET search_path TO {schema}")

@@ -1,0 +1,40 @@
+name: communications_service
+
+# Прод-вариант: network_mode: host (Postgres на сервере слушает только 127.0.0.1).
+# Нет фронтенда — это webhook-приёмник (Bitrix voximplant call-end) + Celery worker,
+# как и в монолите (только Django admin, никакого UI). Один префикс на backend.
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: communications_redis
+    network_mode: host
+    command: redis-server --port 6382
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: communications_backend
+    network_mode: host
+    env_file: .env
+    environment:
+      REDIS_URL: redis://127.0.0.1:6382/0
+    command: uvicorn app.main:app --host 127.0.0.1 --port 8004
+    restart: unless-stopped
+    depends_on:
+      - redis
+
+  worker:
+    build: ./backend
+    container_name: communications_worker
+    network_mode: host
+    env_file: .env
+    environment:
+      REDIS_URL: redis://127.0.0.1:6382/0
+    command: celery -A app.celery_app worker -l info
+    restart: unless-stopped
+    depends_on:
+      - redis
