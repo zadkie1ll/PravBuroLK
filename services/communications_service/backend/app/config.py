@@ -15,6 +15,12 @@ class Settings(BaseSettings):
 
     media_root: str = "/app/uploads"
 
+    # Пока монолит и этот сервис работают параллельно на одном исходящем вебхуке Bitrix
+    # (ONVOXIMPLANTCALLEND) — форвардим копию каждого события в монолит, чтобы его собственная
+    # (пока не отключённая) обработка звонков тоже продолжала получать вебхуки.
+    # Пусто = форвардинг выключен.
+    bitrix_webhook_forward_url: str = ""
+
     min_call_duration_seconds: int = 300
     bitrix_stat_poll_timeout_seconds: float = 400.0
     bitrix_stat_poll_interval_seconds: float = 10.0

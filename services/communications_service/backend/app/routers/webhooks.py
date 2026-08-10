@@ -2,17 +2,35 @@ from __future__ import annotations
 
 import json
 import logging
+from urllib.parse import parse_qsl
 
+import requests
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from ..config import settings
 from ..db import SessionLocal, get_db
 from ..models import CallStatus, CallWebhookEvent
 from ..services import call_processing
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["webhooks"])
+
+
+def _forward_to_monolith(body: bytes, content_type: str, query_string: str) -> None:
+    """Лучшее усилие, без ретраев — если монолит недоступен, событие просто теряется
+    для его копии обработки, но собственная обработка в этом сервисе уже прошла успешно."""
+    if not settings.bitrix_webhook_forward_url:
+        return
+    try:
+        headers = {"Content-Type": content_type} if content_type else {}
+        url = settings.bitrix_webhook_forward_url
+        if query_string:
+            url = f"{url}?{query_string}"
+        requests.post(url, data=body, headers=headers, timeout=15)
+    except requests.RequestException:
+        logger.warning("bitrix_call_webhook: forward to monolith failed", exc_info=True)
 
 
 def _process_event_background(event_id: int) -> None:
@@ -47,10 +65,31 @@ async def _extract_payload(request: Request) -> dict:
     return dict(form)
 
 
+def _extract_payload_bytes(body: bytes, content_type: str) -> dict:
+    """Парсит из уже прочитанных байт (а не заново из request.stream()) — тело читается один
+    раз в самом начале обработчика, Starlette не даёт прочитать ASGI-поток дважды."""
+    if not body:
+        return {}
+    if "application/json" in content_type:
+        try:
+            return json.loads(body.decode("utf-8"))
+        except json.JSONDecodeError:
+            return {}
+    return dict(parse_qsl(body.decode("utf-8", errors="ignore")))
+
+
 @router.post("/bitrix/webhook/call-end")
 async def bitrix_call_webhook(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     try:
-        payload = await _extract_payload(request)
+        raw_body = await request.body()
+        content_type = (request.headers.get("content-type") or "").lower()
+        payload = _extract_payload_bytes(raw_body, content_type)
+
+        if settings.bitrix_webhook_forward_url:
+            background_tasks.add_task(
+                _forward_to_monolith, raw_body, content_type, str(request.query_params)
+            )
+
         event, queued = call_processing.enqueue_call_webhook(db, payload)
         if queued:
             _spawn_background_processing(background_tasks, event.id)
