@@ -24,7 +24,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        VITE_API_BASE_URL: "https://panel.prav-buro.ru/education-api"
+        VITE_BACKEND_URL: "https://panel.prav-buro.ru/education-api"
         DEPLOY_BASE_PATH: "/education/"
     container_name: education_platform_frontend
     network_mode: host
