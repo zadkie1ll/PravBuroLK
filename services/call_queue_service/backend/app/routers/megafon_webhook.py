@@ -1,5 +1,6 @@
 import json
 import logging
+from urllib.parse import parse_qsl
 
 import requests
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
@@ -34,17 +35,15 @@ def _extract_call_id(payload: dict) -> str:
     return str(payload.get("callid") or payload.get("call_id") or payload.get("callId") or payload.get("id") or "")
 
 
-async def _normalize_payload(request: Request) -> dict:
+def _normalize_payload_bytes(body: bytes, content_type: str) -> dict:
     """Соответствует normalize_megafon_payload (call_queue/views.py:100) — сперва form-данные,
-    иначе пытаемся распарсить JSON-тело."""
-    content_type = request.headers.get("content-type", "")
-    if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
-        form = await request.form()
-        if form:
-            return dict(form)
-    body = await request.body()
+    иначе пытаемся распарсить JSON-тело. Парсит из уже прочитанных байт (а не заново из
+    request.stream()), т.к. тело читается один раз в самом начале обработчика — Starlette не
+    даёт прочитать ASGI-поток дважды (form()/body() после form() падают "Stream consumed")."""
     if not body:
         return {}
+    if "application/x-www-form-urlencoded" in content_type:
+        return dict(parse_qsl(body.decode("utf-8", errors="ignore")))
     try:
         parsed = json.loads(body.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -63,10 +62,11 @@ async def megafon_webhook(request: Request, background_tasks: BackgroundTasks, d
         or request.query_params.get("auth")
     )
 
-    payload = await _normalize_payload(request)
+    raw_body = await request.body()
+    content_type = request.headers.get("content-type", "")
+    payload = _normalize_payload_bytes(raw_body, content_type)
 
     if settings.megafon_webhook_forward_url:
-        raw_body = await request.body()
         headers_to_copy = {
             k: v for k, v in {
                 "X-CRM-AUTH": request.headers.get("X-CRM-AUTH"),
@@ -76,7 +76,7 @@ async def megafon_webhook(request: Request, background_tasks: BackgroundTasks, d
         background_tasks.add_task(
             _forward_to_monolith,
             raw_body,
-            request.headers.get("content-type", ""),
+            content_type,
             headers_to_copy,
             str(request.query_params),
         )
