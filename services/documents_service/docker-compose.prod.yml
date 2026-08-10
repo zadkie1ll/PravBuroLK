@@ -1,0 +1,17 @@
+name: documents_service
+
+# Прод-вариант: network_mode: host. Без БД и без фронтенда — Шаг A (генерация договора,
+# вызывается Bitrix-автоматикой) + Шаг B (клиентские страницы подтверждения/оплаты).
+# Один префикс на backend, как у lead_control/communications.
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    build: ./backend
+    container_name: documents_backend
+    network_mode: host
+    env_file: .env
+    command: uvicorn app.main:app --host 127.0.0.1 --port 8005
+    restart: unless-stopped
