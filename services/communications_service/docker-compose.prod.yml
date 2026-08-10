@@ -22,7 +22,7 @@ services:
     env_file: .env
     environment:
       REDIS_URL: redis://127.0.0.1:6382/0
-    command: uvicorn app.main:app --host 127.0.0.1 --port 8004
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 127.0.0.1 --port 8004"
     restart: unless-stopped
     depends_on:
       - redis
