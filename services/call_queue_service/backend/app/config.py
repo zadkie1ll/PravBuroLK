@@ -36,5 +36,11 @@ class Settings(BaseSettings):
     megafon_vats_auth_mode: str = "header"
     megafon_vats_crm_auth_key: str = ""
 
+    # Пока монолит и этот сервис работают параллельно, MegaFon настроен слать вебхук
+    # только сюда — форвардим копию каждого события в монолит, чтобы его собственная
+    # (пока не отключённая) очередь звонков тоже продолжала получать статусы.
+    # Пусто = форвардинг выключен.
+    megafon_webhook_forward_url: str = ""
+
 
 settings = Settings()
