@@ -11,10 +11,8 @@ import TraineeCreate from './pages/hr/TraineeCreate'
 import TraineeDetail from './pages/hr/TraineeDetail'
 
 function App() {
-  const basename = (import.meta.env.VITE_APP_BASENAME as string | undefined)?.trim() || '/'
-
   return(
-    <BrowserRouter basename={basename}>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
     <Routes>
       <Route path='/' element={<Home/>}/>
       <Route path='/auth' element={<Auth/>}/>
