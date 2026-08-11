@@ -101,21 +101,32 @@ def create_client_from_deal(
     total_with_bonus = max(total_amount - discount + bonus, 0)
 
     external_id = deal_data.get("CONTACT_ID")
-    if not external_id:
-        raise ClientOnboardingError("CONTACT_ID not found")
-
-    contact_url = f"https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/crm.contact.get.json?ID={external_id}"
-    contact_resp = requests.get(contact_url, timeout=30)
-    if contact_resp.status_code != 200:
-        raise ClientOnboardingError(f"Failed to fetch contact (status={contact_resp.status_code})")
-
-    external_data = contact_resp.json()
-    contact_data = external_data.get("result") or {}
+    contact_data = {}
 
     if username_override:
+        # Ручное создание — контакт нужен только как источник имени/фамилии (best-effort),
+        # логин задан явно, поэтому отсутствие/недоступность контакта не блокирует создание.
         username = username_override
+        if external_id:
+            contact_url = f"https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/crm.contact.get.json?ID={external_id}"
+            try:
+                contact_resp = requests.get(contact_url, timeout=30)
+                if contact_resp.status_code == 200:
+                    contact_data = contact_resp.json().get("result") or {}
+            except requests.RequestException:
+                contact_data = {}
     else:
-        username = (external_data.get("result", {}).get("PHONE", [{}]) or [{}])[0].get("VALUE")
+        # Автоматическое создание — контакт обязателен, логин = его телефон.
+        if not external_id:
+            raise ClientOnboardingError("CONTACT_ID not found")
+
+        contact_url = f"https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/crm.contact.get.json?ID={external_id}"
+        contact_resp = requests.get(contact_url, timeout=30)
+        if contact_resp.status_code != 200:
+            raise ClientOnboardingError(f"Failed to fetch contact (status={contact_resp.status_code})")
+
+        contact_data = contact_resp.json().get("result") or {}
+        username = (contact_data.get("PHONE") or [{}])[0].get("VALUE")
         if not username:
             raise ClientOnboardingError("Phone number not found")
 
