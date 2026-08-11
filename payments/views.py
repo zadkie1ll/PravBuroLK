@@ -1333,19 +1333,11 @@ class BitrixCreateClientFromDealView(View):
     """
 
     def post(self, request):
-        import json, re, requests, random, string
-        from datetime import datetime
+        import json
+
         from django.http import JsonResponse
-        from django.db import transaction
-        from clients.services import ClientService
-        from clients.models import Client
 
-        BITRIX_WEBHOOK = settings.BITRIX_WEBHOOK_URL.rstrip("/") + "/"
-
-        def generate_password(length=8):
-            """Генерация простого пароля"""
-            chars = string.ascii_letters + string.digits
-            return ''.join(random.choice(chars) for _ in range(length))
+        from payments.client_onboarding import ClientOnboardingError, create_client_from_deal
 
         try:
             post_data = request.POST.dict()
@@ -1356,164 +1348,18 @@ class BitrixCreateClientFromDealView(View):
                 except Exception:
                     post_data = {}
 
-            # --- Получаем данные сделки ---
             deal_data, error = get_deal_data_from_bitrix(post_data)
             if error:
                 return JsonResponse({"error": error, "payload_keys": list(post_data.keys())}, status=400)
             if not deal_data:
                 return JsonResponse({"error": "Empty deal data"}, status=400)
 
-            # --- Хелперы ---
-            def safe_int(value, default=0):
-                if value is None:
-                    return default
-                s = str(value).split("|")[0].strip()
-                s = s.replace("\u00A0", "").replace(" ", "")
-                m = re.search(r"-?\d+[\,\.\d]*", s)
-                if not m:
-                    try:
-                        return int(s)
-                    except:
-                        return default
-                num = m.group(0).replace(",", ".")
-                try:
-                    return int(float(num))
-                except:
-                    return default
+            try:
+                result = create_client_from_deal(deal_data)
+            except ClientOnboardingError as exc:
+                return JsonResponse({"error": str(exc), "deal_id": deal_data.get("ID")}, status=400)
 
-            def parse_bitrix_date(value):
-                if not value:
-                    return None
-                s = str(value).strip()
-                for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
-                    try:
-                        return datetime.strptime(s[:10], "%Y-%m-%d").date()
-                    except:
-                        continue
-                try:
-                    return datetime.fromisoformat(s).date()
-                except:
-                    return None
-
-            def clean_text(value):
-                return str(value or "").strip()
-
-            def split_full_name(full_name):
-                parts = [part for part in clean_text(full_name).split() if part]
-                if len(parts) >= 2:
-                    return parts[1], parts[0], " ".join(parts[2:])
-                if len(parts) == 1:
-                    return parts[0], "", ""
-                return "", "", ""
-
-            # --- Извлекаем данные клиента ---
-            first_name = clean_text(deal_data.get("UF_CRM_1754380684375"))
-            last_name = clean_text(deal_data.get("UF_CRM_1754380678904"))
-            middlename = clean_text(deal_data.get("UF_CRM_1754380692399"))
-
-            total_amount = safe_int(deal_data.get("OPPORTUNITY"))
-            discount = safe_int(deal_data.get("UF_CRM_1742457148727"))
-            bonus = safe_int(deal_data.get("UF_CRM_1742457114242"))
-            first_payment = safe_int(deal_data.get("UF_CRM_1742468532579"))
-            number_of_payments = safe_int(deal_data.get("UF_CRM_1742480133860"))
-            preferred_payment_day = safe_int(deal_data.get("UF_CRM_1745893194511"))
-
-            total_with_bonus = max(total_amount - discount + bonus, 0)
-
-            # --- Получаем контакт ---
-            external_id = deal_data.get("CONTACT_ID")
-            if not external_id:
-                return JsonResponse({"error": "CONTACT_ID not found"}, status=400)
-
-            contact_url = f"https://prav-buro.bitrix24.ru/rest/24/vszzr53045oedn5m/crm.contact.get.json?ID={external_id}"
-            contact_resp = requests.get(contact_url)
-            if contact_resp.status_code != 200:
-                return JsonResponse({"error": "Failed to fetch contact"}, status=contact_resp.status_code)
-
-            external_data = contact_resp.json()
-            contact_data = external_data.get("result") or {}
-            username = external_data.get("result", {}).get("PHONE", [{}])[0].get("VALUE")
-            if not username:
-                return JsonResponse({"error": "Phone number not found"}, status=400)
-
-            if not first_name:
-                first_name = clean_text(contact_data.get("NAME"))
-            if not last_name:
-                last_name = clean_text(contact_data.get("LAST_NAME"))
-            if not middlename:
-                middlename = clean_text(contact_data.get("SECOND_NAME"))
-
-            title_first_name, title_last_name, title_middlename = split_full_name(deal_data.get("TITLE"))
-            if not first_name:
-                first_name = title_first_name
-            if not last_name:
-                last_name = title_last_name
-            if not middlename:
-                middlename = title_middlename
-
-            if not (first_name and last_name):
-                return JsonResponse(
-                    {
-                        "error": "Имя и фамилия обязательны",
-                        "details": "Не удалось получить имя и фамилию из полей сделки, контакта или названия сделки",
-                        "deal_id": deal_data.get("ID"),
-                    },
-                    status=400,
-                )
-
-            # --- Генерация пароля ---
-            new_password = generate_password()
-            
-            # --- Проверка поля 2022 ---
-            acquiring_flag = (str(deal_data.get("UF_CRM_1760099004")) == "2022")
-
-            # --- Создание клиента ---
-            with transaction.atomic():
-                client, contract, plan = ClientService.create_client_with_contract(
-                    username=username,
-                    password=new_password,
-                    name=first_name,
-                    surname=last_name,
-                    middlename=middlename,
-                    email="client@prav-buro.ru",
-                    bitrix_id=str(deal_data.get("ID") or ""),
-                    stage="1",
-                    total_amount=total_with_bonus,
-                    discount=discount,
-                    first_payment=first_payment,
-                    first_payment_date=parse_bitrix_date(deal_data.get("UF_CRM_1742468566169")),
-                    number_of_payments=number_of_payments,
-                    preferred_payment_day=preferred_payment_day,
-                    acquiring_enabled=acquiring_flag,
-                )
-
-                deal_id = str(deal_data.get("ID") or "")
-                bitrix_url = f"{BITRIX_WEBHOOK}crm.deal.update.json"
-                auth_text = f"{username}\n{new_password}"
-
-                payload = {
-                    "id": deal_id,
-                    "fields": {
-                        "UF_CRM_1745888913952": auth_text,
-                        **build_withdrawals_bitrix_fields(client),
-                    }
-                }
-
-                response = requests.post(bitrix_url, json=payload)
-                resp_data = response.json()
-                if resp_data.get("error"):
-                    raise Exception(f"Bitrix error: {resp_data.get('error_description', resp_data.get('error'))}")
-
-            return JsonResponse(
-                {
-                    "client_id": client.id,
-                    "contract_id": contract.id,
-                    "plan_id": plan.id,
-                    "username": client.user.username,
-                    "bitrix_deal_id": deal_data.get("ID"),
-                    "message": "Клиент успешно создан и данные отправлены в Битрикс",
-                }
-            )
+            return JsonResponse({**result, "message": "Клиент успешно создан и данные отправлены в Битрикс"})
 
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=400)

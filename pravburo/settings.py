@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "administration",
     "bitrix",
     "payments",
+    "scripts",
     "clients",
     "documents",
     "education_platform",
