@@ -1,3 +1,7 @@
+from datetime import datetime
+
+import openpyxl
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 
@@ -22,6 +26,7 @@ class Command(BaseCommand):
 
         clients = Client.objects.select_related("user").filter(bitrix_id__in=[str(d) for d in BACKFILL_DEAL_IDS])
 
+        rows = []
         found_any = False
         for client in clients:
             username = client.user.username
@@ -50,5 +55,49 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(f"  СТАРЫЙ user={other.id} (нет связанного Client?) username={other.username}")
 
+            rows.append(
+                [
+                    client.id,
+                    client.bitrix_id,
+                    f"{client.surname} {client.name} {client.middlename or ''}".strip(),
+                    username,
+                    other_client.id if other_client else other.id,
+                    other_client.bitrix_id if other_client else "",
+                    (
+                        f"{other_client.surname} {other_client.name} {other_client.middlename or ''}".strip()
+                        if other_client
+                        else ""
+                    ),
+                    other.username,
+                ]
+            )
+
         if not found_any:
             self.stdout.write(self.style.SUCCESS("Коллизий не найдено."))
+            return
+
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.title = "Коллизии логинов"
+        sheet.append(
+            [
+                "Новый client_id",
+                "Новый deal_id",
+                "Новый ФИО",
+                "Новый логин (фейковый)",
+                "Старый client_id",
+                "Старый deal_id",
+                "Старый ФИО",
+                "Старый логин (реальный телефон)",
+            ]
+        )
+        for row in rows:
+            sheet.append(row)
+
+        for column_cells in sheet.columns:
+            length = max(len(str(cell.value or "")) for cell in column_cells)
+            sheet.column_dimensions[column_cells[0].column_letter].width = min(length + 2, 60)
+
+        filepath = settings.BASE_DIR / f"backfill_username_collisions_{datetime.now():%Y%m%d_%H%M%S}.xlsx"
+        workbook.save(filepath)
+        self.stdout.write(self.style.SUCCESS(f"\nФайл сохранён: {filepath}"))
