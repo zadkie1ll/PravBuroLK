@@ -73,10 +73,16 @@ def _split_full_name(full_name):
     return "", "", ""
 
 
-def create_client_from_deal(deal_data: dict) -> dict:
+def create_client_from_deal(
+    deal_data: dict, username_override: str | None = None, password_override: str | None = None
+) -> dict:
     """Создаёт Client+Contract+InstallmentPlan по данным сделки Bitrix и пишет логин/пароль
     обратно в поле сделки. Бросает ClientOnboardingError с понятным текстом при любой проблеме.
-    Оборачивать в transaction.atomic не нужно — уже сделано внутри."""
+    Оборачивать в transaction.atomic не нужно — уже сделано внутри.
+
+    username_override/password_override — задать логин/пароль вручную вместо автогенерации
+    (телефон контакта / случайная строка). При заданном username_override телефон контакта
+    всё равно используется как fallback для имени/фамилии, но не для логина."""
     from clients.services import ClientService
 
     BITRIX_WEBHOOK = settings.BITRIX_WEBHOOK_URL.rstrip("/") + "/"
@@ -105,9 +111,13 @@ def create_client_from_deal(deal_data: dict) -> dict:
 
     external_data = contact_resp.json()
     contact_data = external_data.get("result") or {}
-    username = (external_data.get("result", {}).get("PHONE", [{}]) or [{}])[0].get("VALUE")
-    if not username:
-        raise ClientOnboardingError("Phone number not found")
+
+    if username_override:
+        username = username_override
+    else:
+        username = (external_data.get("result", {}).get("PHONE", [{}]) or [{}])[0].get("VALUE")
+        if not username:
+            raise ClientOnboardingError("Phone number not found")
 
     if not first_name:
         first_name = _clean_text(contact_data.get("NAME"))
@@ -129,7 +139,7 @@ def create_client_from_deal(deal_data: dict) -> dict:
             "Имя и фамилия обязательны — не удалось получить их из полей сделки, контакта или названия сделки"
         )
 
-    new_password = generate_password()
+    new_password = password_override or generate_password()
     acquiring_flag = str(deal_data.get("UF_CRM_1760099004")) == "2022"
 
     with transaction.atomic():
