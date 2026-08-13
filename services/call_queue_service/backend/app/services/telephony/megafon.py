@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any
 
 import requests
 
 from ...config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class MegafonAPIError(Exception):
@@ -12,6 +16,9 @@ class MegafonAPIError(Exception):
 
 
 class MegafonTelephonyService:
+    MAX_ATTEMPTS = 3
+    RETRY_DELAY_SECONDS = 2
+
     def __init__(
         self,
         base_url: str | None = None,
@@ -65,30 +72,51 @@ class MegafonTelephonyService:
         else:
             raise MegafonAPIError(f"Неизвестный режим авторизации МегаФона: {self.auth_mode}")
 
-        try:
-            response = requests.post(
-                f"{self.base_url}/makecall",
-                json=payload,
-                headers=headers,
-                params=params,
-                timeout=30,
+        last_exc: requests.RequestException | None = None
+        response: requests.Response | None = None
+        for attempt in range(1, self.MAX_ATTEMPTS + 1):
+            logger.info("МегаФон: попытка подключения к АТС %s/%s (звонок на %s)", attempt, self.MAX_ATTEMPTS, phone)
+            try:
+                response = requests.post(
+                    f"{self.base_url}/makecall",
+                    json=payload,
+                    headers=headers,
+                    params=params,
+                    timeout=30,
+                )
+                response.raise_for_status()
+                last_exc = None
+                break
+            except requests.HTTPError as exc:
+                response = exc.response
+                details = ""
+                if response is not None:
+                    try:
+                        error_payload = response.json()
+                    except ValueError:
+                        error_payload = response.text.strip()
+                    if error_payload:
+                        details = f" Детали ответа: {error_payload}"
+                raise MegafonAPIError(
+                    f"МегаФон вернул HTTP {response.status_code if response else 'error'}.{details}"
+                ) from exc
+            except requests.RequestException as exc:
+                last_exc = exc
+                logger.warning(
+                    "МегаФон: попытка %s/%s не удалась (%s)", attempt, self.MAX_ATTEMPTS, exc
+                )
+                if attempt < self.MAX_ATTEMPTS:
+                    time.sleep(self.RETRY_DELAY_SECONDS)
+
+        if last_exc is not None:
+            logger.error(
+                "МегаФон: не удалось подключиться к АТС после %s попыток (%s)",
+                self.MAX_ATTEMPTS,
+                last_exc,
             )
-            response.raise_for_status()
-        except requests.HTTPError as exc:
-            response = exc.response
-            details = ""
-            if response is not None:
-                try:
-                    error_payload = response.json()
-                except ValueError:
-                    error_payload = response.text.strip()
-                if error_payload:
-                    details = f" Детали ответа: {error_payload}"
             raise MegafonAPIError(
-                f"МегаФон вернул HTTP {response.status_code if response else 'error'}.{details}"
-            ) from exc
-        except requests.RequestException as exc:
-            raise MegafonAPIError(f"Ошибка запроса к МегаФону: {exc}") from exc
+                f"Не удалось подключиться к АТС МегаФона после {self.MAX_ATTEMPTS} попыток: {last_exc}"
+            ) from last_exc
 
         data = response.json()
         if not isinstance(data, dict):

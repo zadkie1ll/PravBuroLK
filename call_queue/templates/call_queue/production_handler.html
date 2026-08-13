@@ -52,6 +52,21 @@
           </div>
         </div>
 
+        <div class="mt-3 hidden items-center gap-2 rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-700 ring-1 ring-sky-200" data-auto-next-status>
+          <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+          <span data-auto-next-status-text>Дозваниваемся до следующего клиента...</span>
+        </div>
+
+        <div class="mt-3 hidden rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" data-auto-next-error>
+          <div data-auto-next-error-text></div>
+          <button type="button" class="mt-3 rounded-full bg-rose-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-rose-500" data-auto-next-retry>
+            Повторить попытку
+          </button>
+        </div>
+
         <div class="mt-4 grid gap-4 md:grid-cols-4">
           <div class="rounded-2xl bg-slate-50 p-4">
             <div class="text-sm text-slate-500">Клиент</div>
@@ -401,6 +416,11 @@
         const timelineNode = panel.querySelector("[data-call-timeline]");
         const pauseToggle = panel.querySelector("[data-pause-toggle]");
         const decisionModal = document.querySelector("[data-decision-modal]");
+        const autoNextStatus = panel.querySelector("[data-auto-next-status]");
+        const autoNextStatusText = panel.querySelector("[data-auto-next-status-text]");
+        const autoNextError = panel.querySelector("[data-auto-next-error]");
+        const autoNextErrorText = panel.querySelector("[data-auto-next-error-text]");
+        const autoNextRetryBtn = panel.querySelector("[data-auto-next-retry]");
 
         let paused = !autoDialEnabled;
         let decision = "{{ current_item.manual_decision|default:''|escapejs }}";
@@ -427,6 +447,30 @@
           if (!decisionModal) return;
           decisionModal.classList.add("hidden");
           decisionModal.classList.remove("flex");
+        }
+
+        function showAutoNextLoading(text) {
+          if (autoNextError) autoNextError.classList.add("hidden");
+          if (autoNextStatus) {
+            if (autoNextStatusText) autoNextStatusText.textContent = text || "Дозваниваемся до следующего клиента...";
+            autoNextStatus.classList.remove("hidden");
+            autoNextStatus.classList.add("flex");
+          }
+        }
+
+        function hideAutoNextLoading() {
+          if (autoNextStatus) {
+            autoNextStatus.classList.add("hidden");
+            autoNextStatus.classList.remove("flex");
+          }
+        }
+
+        function showAutoNextError(message) {
+          hideAutoNextLoading();
+          if (autoNextError) {
+            if (autoNextErrorText) autoNextErrorText.textContent = message || "Не удалось связаться с АТС МегаФона.";
+            autoNextError.classList.remove("hidden");
+          }
         }
 
         function renderTimeline(items) {
@@ -512,34 +556,47 @@
         async function triggerNext(forceResume = false, delayMs = 0) {
           if (paused || autoAdvanceTriggered) return;
           autoAdvanceTriggered = true;
+          showAutoNextLoading("Готовим следующий звонок...");
           if (delayMs > 0) {
             await new Promise((resolve) => setTimeout(resolve, delayMs));
             if (paused) {
               autoAdvanceTriggered = false;
+              hideAutoNextLoading();
               return;
             }
           }
-          const response = await fetch(autoNextUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-              "X-CSRFToken": csrfToken,
-              "X-Requested-With": "XMLHttpRequest"
-            },
-            body: new URLSearchParams({
-              completed_callid: callId,
-              force_resume: forceResume ? "1" : "0"
-            }).toString()
-          });
-          const data = await response.json();
+          showAutoNextLoading("Подключаемся к АТС МегаФона...");
+          let response;
+          let data;
+          try {
+            response = await fetch(autoNextUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-CSRFToken": csrfToken,
+                "X-Requested-With": "XMLHttpRequest"
+              },
+              body: new URLSearchParams({
+                completed_callid: callId,
+                force_resume: forceResume ? "1" : "0"
+              }).toString()
+            });
+            data = await response.json();
+          } catch (_error) {
+            autoAdvanceTriggered = false;
+            showAutoNextError("Не удалось связаться с сервером. Попробуйте ещё раз.");
+            return;
+          }
           if (!response.ok || !data.ok) {
             autoAdvanceTriggered = false;
+            showAutoNextError(data && data.error ? data.error : "Не удалось подключиться к АТС МегаФона.");
             return;
           }
           if (data.started && data.redirect_url) {
             window.location.href = data.redirect_url;
             return;
           }
+          hideAutoNextLoading();
           autoAdvanceTriggered = false;
         }
 
@@ -598,10 +655,27 @@
         });
 
         document.querySelectorAll("[data-decision]").forEach((button) => {
-          button.addEventListener("click", () => submitDecision(button.dataset.decision, {
-            openWhatsapp: button.dataset.openWhatsapp === "1"
-          }));
+          button.addEventListener("click", () => {
+            const allDecisionButtons = document.querySelectorAll("[data-decision]");
+            allDecisionButtons.forEach((b) => { b.disabled = true; });
+            const originalHtml = button.innerHTML;
+            button.innerHTML = '<span class="inline-flex items-center gap-2"><svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>Отправляем...</span>';
+            submitDecision(button.dataset.decision, {
+              openWhatsapp: button.dataset.openWhatsapp === "1"
+            }).finally(() => {
+              allDecisionButtons.forEach((b) => { b.disabled = false; });
+              button.innerHTML = originalHtml;
+            });
+          });
         });
+
+        if (autoNextRetryBtn) {
+          autoNextRetryBtn.addEventListener("click", () => {
+            autoAdvanceTriggered = false;
+            if (autoNextError) autoNextError.classList.add("hidden");
+            triggerNext(false, 0);
+          });
+        }
 
         renderPause();
         poll();
@@ -713,6 +787,18 @@
       }
       toggleCategoryRow();
       entityField.addEventListener("change", toggleCategoryRow);
+    })();
+
+    (function () {
+      document.querySelectorAll('form[method="post"]').forEach((form) => {
+        form.addEventListener("submit", () => {
+          const submitButton = form.querySelector('button[type="submit"]');
+          if (!submitButton || submitButton.disabled) return;
+          submitButton.dataset.originalHtml = submitButton.innerHTML;
+          submitButton.disabled = true;
+          submitButton.innerHTML = '<span class="inline-flex items-center gap-2"><svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>Обработка...</span>';
+        });
+      });
     })();
 
     (function () {
