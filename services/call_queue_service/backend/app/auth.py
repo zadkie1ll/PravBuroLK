@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
@@ -48,6 +50,44 @@ def create_access_token(user: User) -> str:
         "exp": expire,
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def _hash_refresh_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode()).hexdigest()
+
+
+def create_refresh_token(user: User, db: Session) -> str:
+    """Непрозрачный токен (не JWT) — выдаётся вместе с access-токеном, чтобы фронт мог
+    молча перевыпустить access, когда тот истечёт, без повторного ввода логина/пароля."""
+    raw_token = secrets.token_urlsafe(48)
+    user.refresh_token_hash = _hash_refresh_token(raw_token)
+    user.refresh_token_expires_at = datetime.now(timezone.utc) + timedelta(
+        days=settings.refresh_token_expires_days
+    )
+    db.add(user)
+    db.commit()
+    return raw_token
+
+
+def verify_refresh_token(raw_token: str, db: Session) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Refresh-токен недействителен, нужен повторный вход",
+    )
+    token_hash = _hash_refresh_token(raw_token)
+    user = db.query(User).filter(User.refresh_token_hash == token_hash).first()
+    if user is None or not user.refresh_token_hash:
+        raise credentials_exception
+    expires_at = user.refresh_token_expires_at
+    if expires_at is None:
+        raise credentials_exception
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < datetime.now(timezone.utc):
+        raise credentials_exception
+    if not user.is_active:
+        raise credentials_exception
+    return user
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:

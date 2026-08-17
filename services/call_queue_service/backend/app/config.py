@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-insecure-secret-change-me"
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 12
+    refresh_token_expires_days: int = 30
 
     monolith_base_url: str = "http://host.docker.internal:8000"
     monolith_internal_token: str = ""

@@ -64,6 +64,8 @@ class User(Base):
     sales_manager_megafon_user: Mapped[str] = mapped_column(String(128), default="")
     sales_manager_megafon_group: Mapped[str] = mapped_column(String(128), default="")
     sales_manager_megafon_clid: Mapped[str] = mapped_column(String(64), default="")
+    refresh_token_hash: Mapped[str] = mapped_column(String(64), default="")
+    refresh_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -1,10 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..auth import create_access_token, get_current_user, has_usable_password, hash_password, verify_password
+from ..auth import (
+    create_access_token,
+    create_refresh_token,
+    get_current_user,
+    has_usable_password,
+    hash_password,
+    verify_password,
+    verify_refresh_token,
+)
 from ..db import get_db
 from ..models import User
-from ..schemas import LoginRequest, RegisterRequest, TokenResponse
+from ..schemas import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
 from ..services import leadreport_client
 from ..services.leadreport_client import LeadreportClientError
 
@@ -39,7 +47,9 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     user.sales_manager_megafon_clid = sales_manager.megafon_clid if sales_manager else ""
     db.commit()
     db.refresh(user)
-    return TokenResponse(access_token=create_access_token(user))
+    access_token = create_access_token(user)
+    refresh_token = create_refresh_token(user, db)
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -62,7 +72,19 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         user.sales_manager_megafon_group = sales_manager.megafon_group
         user.sales_manager_megafon_clid = sales_manager.megafon_clid
         db.commit()
-    return TokenResponse(access_token=create_access_token(user))
+    access_token = create_access_token(user)
+    refresh_token = create_refresh_token(user, db)
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
+    """Молча перевыпускает access-токен по refresh-токену — фронт дёргает это при 401,
+    чтобы менеджеру не приходилось логиниться заново каждые 12 часов."""
+    user = verify_refresh_token(payload.refresh_token, db)
+    access_token = create_access_token(user)
+    new_refresh_token = create_refresh_token(user, db)
+    return TokenResponse(access_token=access_token, refresh_token=new_refresh_token)
 
 
 @router.get("/me")

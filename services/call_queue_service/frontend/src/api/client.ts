@@ -4,15 +4,49 @@ function getToken(): string | null {
   return localStorage.getItem("access_token");
 }
 
-export function setToken(token: string) {
-  localStorage.setItem("access_token", token);
+function getRefreshToken(): string | null {
+  return localStorage.getItem("refresh_token");
+}
+
+export function setTokens(accessToken: string, refreshToken: string) {
+  localStorage.setItem("access_token", accessToken);
+  localStorage.setItem("refresh_token", refreshToken);
 }
 
 export function clearToken() {
   localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+// Несколько запросов могут словить 401 одновременно (например, параллельный поллинг) —
+// держим один и тот же promise рефреша, чтобы не выпускать кучу refresh-токенов разом.
+let refreshInFlight: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) throw new Error("no refresh token");
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!response.ok) {
+        clearToken();
+        throw new Error("refresh failed");
+      }
+      const data: TokenResponse = await response.json();
+      setTokens(data.access_token, data.refresh_token);
+      return data.access_token;
+    })().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+async function request<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const token = getToken();
   const headers: HeadersInit = {
     "Content-Type": "application/json",
@@ -21,6 +55,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  if (response.status === 401 && !isRetry && getRefreshToken() && path !== "/auth/refresh") {
+    try {
+      await refreshAccessToken();
+    } catch {
+      window.location.href = "/login";
+      throw new Error("Сессия истекла, нужен повторный вход");
+    }
+    return request<T>(path, options, true);
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(body.detail || `Ошибка запроса: ${response.status}`);
@@ -30,6 +73,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export interface TokenResponse {
   access_token: string;
+  refresh_token: string;
   token_type: string;
 }
 

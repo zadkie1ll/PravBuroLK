@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, setToken } from "../api/client";
+import { api, setTokens } from "../api/client";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,7 +14,7 @@ export function LoginPage() {
     setError(false);
     try {
       const response = mode === "login" ? await api.login(email, password) : await api.register(email, password);
-      setToken(response.access_token);
+      setTokens(response.access_token, response.refresh_token);
       navigate("/");
     } catch (err) {
       setError(true);
