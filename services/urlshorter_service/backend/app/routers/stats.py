@@ -55,10 +55,19 @@ def create_source(payload: CreateSourcePayload, db: Session = Depends(get_db)):
     if not source or not destination:
         raise HTTPException(status_code=400, detail="Заполните оба поля.")
 
+    existing = db.query(UrlShortener).filter(UrlShortener.source == source).first()
+    if existing is not None:
+        if existing.destination == destination:
+            # Повтор той же самой заявки (двойной клик, ретрай после таймаута) —
+            # источник уже создан с тем же назначением, отдаём успех, а не ошибку.
+            return MutationResponse(success=True, message=f'Источник "{source}" уже добавлен.')
+        raise HTTPException(status_code=409, detail="Источник с таким кодом уже существует.")
+
     db.add(UrlShortener(source=source, destination=destination))
     try:
         db.commit()
     except IntegrityError:
+        # Гонка: кто-то создал тот же source между нашей проверкой и commit.
         db.rollback()
         raise HTTPException(status_code=409, detail="Источник с таким кодом уже существует.")
 
