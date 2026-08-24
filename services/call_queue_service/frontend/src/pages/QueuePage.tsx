@@ -243,6 +243,7 @@ export function QueuePage() {
   const [customEntityType, setCustomEntityType] = useState("deal");
   const [customQuery, setCustomQuery] = useState("");
   const [customCategoryId, setCustomCategoryId] = useState("");
+  const [startingCall, setStartingCall] = useState(false);
 
   async function load() {
     setError("");
@@ -312,10 +313,13 @@ export function QueuePage() {
 
   async function handleStartCall() {
     setError("");
+    setStartingCall(true);
     try {
       setState(await api.startCall());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось начать обзвон");
+    } finally {
+      setStartingCall(false);
     }
   }
 
@@ -543,9 +547,16 @@ export function QueuePage() {
                   </div>
                   <button
                     onClick={handleStartCall}
-                    className="rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-emerald-500"
+                    disabled={startingCall}
+                    className="flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-medium text-white shadow-lg transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    Начать обзвон
+                    {startingCall && (
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                    )}
+                    {startingCall ? "Подключаемся к АТС МегаФона..." : "Начать обзвон"}
                   </button>
                 </div>
               </div>

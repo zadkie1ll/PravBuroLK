@@ -76,6 +76,7 @@ class MegafonTelephonyService:
         response: requests.Response | None = None
         for attempt in range(1, self.MAX_ATTEMPTS + 1):
             logger.info("МегаФон: попытка подключения к АТС %s/%s (звонок на %s)", attempt, self.MAX_ATTEMPTS, phone)
+            started_at = time.monotonic()
             try:
                 response = requests.post(
                     f"{self.base_url}/makecall",
@@ -85,6 +86,15 @@ class MegafonTelephonyService:
                     timeout=30,
                 )
                 response.raise_for_status()
+                elapsed = time.monotonic() - started_at
+                # Пишем время каждого УСПЕШНОГО запроса, а не только упавших по таймауту —
+                # иначе "ответил за 20 секунд, но не свалился" никак не видно в логах.
+                # warning (не info), чтобы попадало в docker logs без отдельной настройки
+                # логирования — но только для реально медленных ответов, не спамим на каждый звонок.
+                if elapsed >= 5:
+                    logger.warning("МегаФон: /makecall ответил медленно — %.1f сек (попытка %s/%s)", elapsed, attempt, self.MAX_ATTEMPTS)
+                else:
+                    logger.info("МегаФон: /makecall ответил за %.1f сек (попытка %s/%s)", elapsed, attempt, self.MAX_ATTEMPTS)
                 last_exc = None
                 break
             except requests.HTTPError as exc:

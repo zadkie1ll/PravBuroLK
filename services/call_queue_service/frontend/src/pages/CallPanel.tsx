@@ -20,11 +20,15 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [expandedTimeline, setExpandedTimeline] = useState(false);
   const [error, setError] = useState("");
+  const [autoNextLoading, setAutoNextLoading] = useState(false);
+  const [soundMuted, setSoundMuted] = useState(() => localStorage.getItem("call_panel_sound_muted") === "1");
 
   const pausedRef = useRef(paused);
   const decisionRef = useRef(decision);
   const autoAdvanceTriggeredRef = useRef(false);
   const latestSnapshotRef = useRef<CallSnapshot | null>(null);
+  const showModalRef = useRef(false);
+  const soundMutedRef = useRef(soundMuted);
 
   // Телефон менеджера (SIP-клиент) не успевает закрыть предыдущую сессию звонка
   // сразу после его завершения, из-за чего мгновенный авто-дозвон на следующий
@@ -37,6 +41,10 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
   useEffect(() => {
     decisionRef.current = decision;
   }, [decision]);
+  useEffect(() => {
+    soundMutedRef.current = soundMuted;
+    localStorage.setItem("call_panel_sound_muted", soundMuted ? "1" : "0");
+  }, [soundMuted]);
 
   useEffect(() => {
     // новый звонок — сбрасываем локальное состояние панели
@@ -44,6 +52,7 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
     setPaused(!autoDialEnabled);
     setDecision(item.manual_decision || "");
     setShowModal(false);
+    showModalRef.current = false;
     autoAdvanceTriggeredRef.current = false;
     latestSnapshotRef.current = null;
   }, [callId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -56,6 +65,7 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
         if (pausedRef.current) return;
       }
+      setAutoNextLoading(true);
       const data = await api.triggerAutoNext(callId, forceResume);
       if (data.started) {
         onQueueRefresh();
@@ -65,6 +75,28 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
       setError(err instanceof Error ? err.message : "Не удалось перейти к следующему номеру");
     } finally {
       autoAdvanceTriggeredRef.current = false;
+      setAutoNextLoading(false);
+    }
+  }
+
+  // Звук на подтверждение "клиент взял трубку" — окно легко пропустить, если менеджер
+  // в этот момент не смотрит на экран (ждёт звука в трубке, а не всплывающего окна).
+  function playConfirmationBeep() {
+    if (soundMutedRef.current) return;
+    try {
+      const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = 880;
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start();
+      oscillator.stop(ctx.currentTime + 0.6);
+    } catch {
+      /* звук не критичен — молча пропускаем, если AudioContext недоступен */
     }
   }
 
@@ -72,9 +104,11 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
     if (!snap) return;
     const clientAnswered = snap.last_event_type === "ACCEPTED" && snap.last_event_direction === "out";
     if (clientAnswered && !decisionRef.current) {
+      if (!showModalRef.current) playConfirmationBeep();
       setPaused(true);
       pausedRef.current = true;
       setShowModal(true);
+      showModalRef.current = true;
     }
     if (!snap.latest_history_status) return;
     if (decisionRef.current === "answered") {
@@ -131,6 +165,7 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
       setPaused(nextPaused);
       pausedRef.current = nextPaused;
       setShowModal(false);
+      showModalRef.current = false;
       if (value === "answered" && data.bitrix_url) {
         if (bitrixWindow && !bitrixWindow.closed) {
           bitrixWindow.location.href = data.bitrix_url;
@@ -184,6 +219,16 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
 
       {error && <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
 
+      {autoNextLoading && (
+        <div className="mt-3 flex items-center gap-2 rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-700 ring-1 ring-sky-200">
+          <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+          <span>Дозваниваемся до следующего клиента...</span>
+        </div>
+      )}
+
       <div className="mt-4 grid gap-4 md:grid-cols-4">
         <div className="rounded-2xl bg-slate-50 p-4">
           <div className="text-sm text-slate-500">Клиент</div>
@@ -209,6 +254,13 @@ export function CallPanel({ item, autoDialEnabled, onQueueRefresh }: Props) {
           className="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-700"
         >
           {paused ? "Возобновить" : "Пауза"}
+        </button>
+        <button
+          onClick={() => setSoundMuted((prev) => !prev)}
+          title={soundMuted ? "Включить звук подтверждения" : "Выключить звук подтверждения"}
+          className="rounded-full bg-white px-5 py-3 text-sm font-medium text-slate-900 shadow-sm ring-1 ring-slate-300 transition hover:bg-slate-100"
+        >
+          {soundMuted ? "🔇 Звук выключен" : "🔊 Звук включён"}
         </button>
         {autoDialEnabled && (
           <div className="rounded-full bg-emerald-50 px-4 py-3 text-sm text-emerald-800 ring-1 ring-emerald-200">
