@@ -794,6 +794,7 @@ def dogovor(request):
     )
 
 
+@csrf_exempt
 def dogovor_mfc(request):
     """Хендлер генерации договора МФЦ. Вызывается вручную из бизнес-процесса Bitrix."""
     if request.method != 'POST':
