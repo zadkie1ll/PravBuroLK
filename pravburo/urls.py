@@ -15,7 +15,7 @@ from leadreport.views import (
     internal_sales_managers_list,
     internal_sales_manager_lookup,
 )
-from documents.views import contract_confirmation_page, contract_document_file, contract_payment_redirect, document_form, generate_document, dogovor, parse_legenda
+from documents.views import contract_confirmation_page, contract_document_file, contract_payment_redirect, document_form, generate_document, dogovor, dogovor_mfc, parse_legenda
 from lead_control.views import deal_webhook_handler
 from communications.views import bitrix_call_webhook, download_call_to_server, manual_analyze_last_call
 from education_platform import urls as education_urls
@@ -83,6 +83,7 @@ urlpatterns = [
     path("form/", document_form, name="document_form"),
     path("generate/", generate_document, name="generate_document"),
     path("dogovor/", dogovor, name="dogovor"),
+    path("dogovor-mfc/", dogovor_mfc, name="dogovor_mfc"),
     path("dogovor/<int:deal_id>/", contract_confirmation_page, name="contract_confirmation_page"),
     path("dogovor/<int:deal_id>/document/", contract_document_file, name="contract_document_file"),
     path("dogovor/<int:deal_id>/pay/", contract_payment_redirect, name="contract_payment_redirect"),
