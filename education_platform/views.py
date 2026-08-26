@@ -9,7 +9,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Prefetch, Q
-from django.http import FileResponse, Http404, HttpRequest, HttpResponse, JsonResponse, StreamingHttpResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -124,6 +124,27 @@ def _get_accessible_module_or_404(user, profile: TraineeProfile, module_id: int)
     return module
 
 
+def _is_direct_video_navigation(request: HttpRequest) -> bool:
+    range_header = request.headers.get("Range")
+    sec_fetch_dest = request.headers.get("Sec-Fetch-Dest", "").lower()
+    accept = request.headers.get("Accept", "").lower()
+    if sec_fetch_dest == "document":
+        return True
+    return not range_header and "text/html" in accept
+
+
+def _add_private_file_headers(response: HttpResponse) -> HttpResponse:
+    response["Accept-Ranges"] = "bytes"
+    response["Content-Disposition"] = "inline"
+    response["Cache-Control"] = "private, no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["X-Download-Options"] = "noopen"
+    response["Cross-Origin-Resource-Policy"] = "same-origin"
+    return response
+
+
 def _stream_file_range(file_field, request: HttpRequest, content_type: str, filename: str) -> HttpResponse:
     file_size = file_field.size
     range_header = request.headers.get("Range", "")
@@ -132,10 +153,7 @@ def _stream_file_range(file_field, request: HttpRequest, content_type: str, file
     if not range_match:
         response = FileResponse(file_field.open("rb"), content_type=content_type)
         response["Content-Length"] = str(file_size)
-        response["Accept-Ranges"] = "bytes"
-        response["Content-Disposition"] = f'inline; filename="{filename}"'
-        response["Cache-Control"] = "private, no-store"
-        return response
+        return _add_private_file_headers(response)
 
     start = int(range_match.group(1))
     end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
@@ -160,10 +178,7 @@ def _stream_file_range(file_field, request: HttpRequest, content_type: str, file
     response = StreamingHttpResponse(iterator(), status=206, content_type=content_type)
     response["Content-Length"] = str(length)
     response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
-    response["Accept-Ranges"] = "bytes"
-    response["Content-Disposition"] = f'inline; filename="{filename}"'
-    response["Cache-Control"] = "private, no-store"
-    return response
+    return _add_private_file_headers(response)
 
 
 def _generate_password(length: int = 12) -> str:
@@ -556,6 +571,8 @@ def module_video_file(request: HttpRequest, module_id: int) -> FileResponse:
     module = _get_accessible_module_or_404(request.user, profile, module_id)
     if not module.private_video:
         raise Http404("Видео не найдено")
+    if _is_direct_video_navigation(request):
+        return HttpResponseForbidden("Видео доступно только во встроенном плеере LMS.")
 
     content_type = mimetypes.guess_type(module.private_video.name)[0] or "application/octet-stream"
     filename = module.private_video.name.rsplit("/", 1)[-1]

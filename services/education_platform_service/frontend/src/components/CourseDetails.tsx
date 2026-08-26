@@ -429,7 +429,9 @@ const CourseDetails = () => {
                     <video
                       src={resolveUrl(selectedModule.video_url)}
                       controls
-                      controlsList="nodownload"
+                      controlsList="nodownload noplaybackrate"
+                      disablePictureInPicture
+                      onContextMenu={(event) => event.preventDefault()}
                       style={{
                         width: "100%",
                         aspectRatio: "16 / 9",
