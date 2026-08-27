@@ -10,6 +10,24 @@ from lead_control.services import resolve_moderator_task_deal_id
 @override_settings(BITRIX_WEBHOOK_URL="https://example.bitrix24.ru/rest/1/test/")
 class LeadControlBitrixAPITests(SimpleTestCase):
     @patch("lead_control.bitrix_api._post")
+    def test_create_task_sets_deadline(self, post_mock):
+        post_mock.return_value = {"result": 321}
+
+        deadline = "2026-08-27T15:30:00+03:00"
+        task_id = create_bitrix_task(
+            title="Test task",
+            description="Description",
+            responsible_id=10,
+            deadline=deadline,
+        )
+
+        self.assertEqual(task_id, 321)
+        self.assertEqual(
+            post_mock.call_args.args[1]["fields"]["DEADLINE"],
+            deadline,
+        )
+
+    @patch("lead_control.bitrix_api._post")
     def test_create_task_keeps_existing_deal_binding(self, post_mock):
         post_mock.side_effect = [
             {"result": 321},

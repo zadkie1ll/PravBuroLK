@@ -400,6 +400,7 @@ def create_bitrix_task(
     created_by_id: int | None = None,
     auditor_id: int | None = None,
     deal_id: int | None = None,
+    deadline: str | None = None,
 ) -> int:
     """
     Создает задачу в Bitrix24 и возвращает ее ID.
@@ -411,4 +412,5 @@ def create_bitrix_task(
         created_by_id=created_by_id,
         auditor_id=auditor_id,
         deal_id=deal_id,
+        deadline=deadline,
     )

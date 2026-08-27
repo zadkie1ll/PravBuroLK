@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import timedelta
 
 from django.db import transaction
 from django.http import JsonResponse
@@ -96,6 +97,9 @@ def deal_webhook_handler(request):
         # Первую задачу ставим всегда, но только один раз на запись мониторинга
         if not monitor.initial_task_created:
             task_title = f"Прозвонить клиента по сделке #{deal_id}"
+            deadline = (
+                timezone.localtime() + timedelta(hours=1)
+            ).isoformat(timespec="seconds")
 
             task_id = create_bitrix_task(
                 title=task_title,
@@ -103,6 +107,7 @@ def deal_webhook_handler(request):
                 responsible_id=responsible_id,
                 auditor_id=moderator_id,
                 deal_id=deal_id,
+                deadline=deadline,
             )
 
             monitor.initial_bitrix_task_id = task_id
