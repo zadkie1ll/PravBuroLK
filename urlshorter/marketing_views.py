@@ -28,6 +28,7 @@ BOT_BASE_URL = "https://t.me/pravburohelpBot"
 SOURCE_ALPHABET = string.ascii_lowercase + string.digits
 
 GROUP_BY_FIELDS = {
+    "full_link": "link__id",
     "utm_source": "link__utm_source__code",
     "utm_medium": "link__utm_medium__code",
     "utm_campaign": "link__utm_campaign",
@@ -36,6 +37,18 @@ GROUP_BY_FIELDS = {
     "link_type": "link__link_type",
     "destination": "link__destination",
     "bot_block": "link__bot_block__key",
+}
+
+GROUP_BY_LABELS = {
+    "full_link": "Полная ссылка (с крео)",
+    "utm_source": "utm_source",
+    "utm_medium": "utm_medium",
+    "utm_campaign": "utm_campaign",
+    "utm_content": "utm_content",
+    "utm_term": "utm_term",
+    "link_type": "Тип назначения",
+    "destination": "Целевая ссылка",
+    "bot_block": "Блок бота",
 }
 
 FILTER_LOOKUPS = {
@@ -219,14 +232,24 @@ def marketing_stats(request):
         if value:
             qs = qs.filter(**{lookup: value})
 
-    group_by = request.GET.get("group_by") or "utm_source"
+    group_by = request.GET.get("group_by") or "full_link"
     group_field = GROUP_BY_FIELDS.get(group_by, GROUP_BY_FIELDS["utm_source"])
 
     raw_grouped = qs.values(group_field).annotate(clicks=Count("id")).order_by("-clicks")
-    grouped = [
-        {"group_value": row[group_field] if row[group_field] not in (None, "") else "—", "clicks": row["clicks"]}
-        for row in raw_grouped
-    ]
+
+    if group_by == "full_link":
+        links_by_id = {l.id: l for l in MarketingLink.objects.filter(
+            id__in=[row["link__id"] for row in raw_grouped]
+        ).select_related("utm_source", "utm_medium", "bot_block")}
+        grouped = [
+            {"group_value": _build_destination_with_utm(links_by_id[row["link__id"]]), "clicks": row["clicks"]}
+            for row in raw_grouped if row["link__id"] in links_by_id
+        ]
+    else:
+        grouped = [
+            {"group_value": row[group_field] if row[group_field] not in (None, "") else "—", "clicks": row["clicks"]}
+            for row in raw_grouped
+        ]
     total_clicks = sum(row["clicks"] for row in grouped)
 
     if request.GET.get("export") == "csv":
@@ -242,7 +265,8 @@ def marketing_stats(request):
         "grouped": grouped,
         "group_field": group_field,
         "group_by": group_by,
-        "group_options": list(GROUP_BY_FIELDS.keys()),
+        "group_options": [(key, GROUP_BY_LABELS[key]) for key in GROUP_BY_FIELDS],
+        "group_label": GROUP_BY_LABELS.get(group_by, group_by),
         "total_clicks": total_clicks,
         "utm_sources": UtmSource.objects.filter(is_active=True).order_by("code"),
         "utm_mediums": UtmMedium.objects.filter(is_active=True).order_by("code"),

@@ -22,7 +22,7 @@
     button:hover { background: #0056b3; }
     a.csv-btn { display: inline-block; padding: 8px 14px; margin-top: 14px; border-radius: 4px; background: #28a745; color: white; text-decoration: none; }
     table { width: 100%; border-collapse: collapse; margin: 15px 0; background: white; border-radius: 8px; overflow: hidden; }
-    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; word-break: break-all; }
     th { background: #007bff; color: white; }
     tr:hover { background: #f8f9fa; }
     .total { text-align: right; font-weight: bold; margin-top: 10px; }
@@ -107,8 +107,8 @@
             <div>
                 <label>Группировать по</label>
                 <select name="group_by">
-                    {% for option in group_options %}
-                        <option value="{{ option }}" {% if group_by == option %}selected{% endif %}>{{ option }}</option>
+                    {% for value, label in group_options %}
+                        <option value="{{ value }}" {% if group_by == value %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -120,7 +120,7 @@
     <table>
         <thead>
             <tr>
-                <th>{{ group_by }}</th>
+                <th>{{ group_label }}</th>
                 <th>Клики</th>
             </tr>
         </thead>
