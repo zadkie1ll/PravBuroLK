@@ -30,6 +30,11 @@
 <div class="container">
     <h1>Статистика по назначениям и источникам</h1>
 
+    <p style="text-align:center;">
+        <a href="{% url 'url-stats' %}" style="padding:8px 16px;border-radius:4px;text-decoration:none;margin:0 5px;background:#4a4a8c;color:white;">Старая UTM-система</a>
+        <a href="{% url 'marketing_stats' %}" style="padding:8px 16px;border-radius:4px;text-decoration:none;margin:0 5px;background:#ddd;color:#333;">Новая UTM-система</a>
+    </p>
+
     <!-- Форма нового назначения -->
     <h2>Добавить новое назначение</h2>
     <form method="post">

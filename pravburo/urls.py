@@ -20,6 +20,7 @@ from lead_control.views import deal_webhook_handler
 from communications.views import bitrix_call_webhook, download_call_to_server, manual_analyze_last_call
 from education_platform import urls as education_urls
 from urlshorter.views import generate_url, show_stats
+from urlshorter.marketing_views import marketing_dictionaries, marketing_link_form, marketing_link_redirect, marketing_stats
 from yclients.views import yclients_webhook
 from client_withdrawals.views import client_withdrawals_page, create_withdrawal_record, update_withdrawal_record, delete_withdrawal_record, internal_client_tail_amount
 urlpatterns = [
@@ -89,6 +90,10 @@ urlpatterns = [
     path("dogovor/<int:deal_id>/pay/", contract_payment_redirect, name="contract_payment_redirect"),
     path("url/", generate_url, name="short_url"),
     path("url-stats/", show_stats, name="url-stats"),
+    path("marketing/create/", marketing_link_form, name="marketing_link_form"),
+    path("marketing/stats/", marketing_stats, name="marketing_stats"),
+    path("marketing/dictionaries/", marketing_dictionaries, name="marketing_dictionaries"),
+    path("go/", marketing_link_redirect, name="marketing_link_redirect"),
     path("yclients-webhook/", yclients_webhook),
     path('bitrix/webhook/call-end/', bitrix_call_webhook),
     path('download_call', download_call_to_server),

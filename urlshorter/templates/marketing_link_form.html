@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Создание ссылки с разметкой</title>
+<style>
+    body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 20px; color: #333; }
+    h1 { text-align: center; color: #4a4a8c; }
+    .container { max-width: 700px; margin: 0 auto; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    label { display: block; margin-top: 14px; font-weight: bold; }
+    input[type="text"], input[type="url"], select { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+    .hint { color: #777; font-size: 0.85em; margin-top: 2px; }
+    button { margin-top: 20px; padding: 10px 18px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .error { color: #dc3545; font-weight: bold; }
+    .result { margin-top: 20px; padding: 16px; background: #e9f9ee; border: 1px solid #28a745; border-radius: 6px; word-break: break-all; }
+    .result.existing { background: #fff8e6; border-color: #ffc107; }
+    [data-bot-only] { display: none; }
+    .back-link { display: inline-block; margin-bottom: 10px; color: #4a4a8c; text-decoration: none; font-weight: bold; }
+    .back-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+    <a href="{% url 'marketing_stats' %}" class="back-link">← Назад к статистике</a>
+    <h1>Создание ссылки с разметкой</h1>
+
+    {% for e in errors %}
+        <p class="error">{{ e }}</p>
+    {% endfor %}
+
+    {% if result_link %}
+        <div class="result {% if is_existing %}existing{% endif %}">
+            {% if is_existing %}
+                <strong>Такая ссылка уже существует:</strong>
+            {% else %}
+                <strong>Ссылка создана:</strong>
+            {% endif %}
+            <div>{{ public_link }}</div>
+        </div>
+    {% endif %}
+
+    <form method="post" id="link-form">
+        {% csrf_token %}
+
+        <label for="link_type">Тип назначения</label>
+        <select name="link_type" id="link_type" required>
+            <option value="site">Сайт (классическая UTM)</option>
+            <option value="bot">Telegram-бот</option>
+            <option value="other">Прочие площадки</option>
+        </select>
+
+        <div data-non-bot>
+            <label for="destination">Целевая ссылка</label>
+            <input type="url" name="destination" id="destination" placeholder="https://prav-buro.com/">
+        </div>
+
+        <label for="utm_source">utm_source</label>
+        <select name="utm_source" id="utm_source" required>
+            {% for s in utm_sources %}
+                <option value="{{ s.id }}">{{ s.code }}</option>
+            {% endfor %}
+        </select>
+        <div class="hint">Указывает на название источника трафика.</div>
+
+        <label for="utm_medium">utm_medium</label>
+        <select name="utm_medium" id="utm_medium" required>
+            {% for m in utm_mediums %}
+                <option value="{{ m.id }}">{{ m.code }}</option>
+            {% endfor %}
+        </select>
+        <div class="hint">cpc — платный трафик, organic — бесплатный.</div>
+
+        <div data-bot-only>
+            <label for="bot_block">Блок бота</label>
+            <select name="bot_block" id="bot_block">
+                {% for b in bot_blocks %}
+                    <option value="{{ b.id }}">{{ b.key }} — {{ b.title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <label for="utm_campaign">utm_campaign</label>
+        <input type="text" name="utm_campaign" id="utm_campaign" required pattern="[a-z0-9\-]+" list="campaign-suggestions">
+        <datalist id="campaign-suggestions">
+            {% for value in known_campaigns %}<option value="{{ value }}">{% endfor %}
+        </datalist>
+        <div class="hint">Тема кампании/видео/крео. Латиница, цифры, дефис — без подчёркивания.</div>
+
+        <label for="utm_content">utm_content (необязательно)</label>
+        <input type="text" name="utm_content" id="utm_content" pattern="[a-z0-9\-]*" list="content-suggestions">
+        <datalist id="content-suggestions">
+            {% for value in known_contents %}<option value="{{ value }}">{% endfor %}
+        </datalist>
+
+        <label for="utm_term">utm_term (необязательно)</label>
+        <input type="text" name="utm_term" id="utm_term" pattern="[a-z0-9\-]*" list="term-suggestions">
+        <datalist id="term-suggestions">
+            {% for value in known_terms %}<option value="{{ value }}">{% endfor %}
+        </datalist>
+
+        <button type="submit">Создать ссылку</button>
+    </form>
+</div>
+
+<script>
+    const typeSelect = document.getElementById('link_type');
+    const botOnly = document.querySelectorAll('[data-bot-only]');
+    const nonBot = document.querySelectorAll('[data-non-bot]');
+
+    function toggleFields() {
+        const isBot = typeSelect.value === 'bot';
+        botOnly.forEach(el => el.style.display = isBot ? 'block' : 'none');
+        nonBot.forEach(el => el.style.display = isBot ? 'none' : 'block');
+        document.getElementById('bot_block').required = isBot;
+        document.getElementById('destination').required = !isBot;
+    }
+
+    typeSelect.addEventListener('change', toggleFields);
+    toggleFields();
+</script>
+</body>
+</html>
