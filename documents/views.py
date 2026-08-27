@@ -884,6 +884,79 @@ def dogovor_mfc(request):
         }
     )
 
+
+@csrf_exempt
+def dogovor_pristav(request):
+    """Хендлер генерации разового договора (ФССП/приставы). Вызывается вручную из бизнес-процесса Bitrix."""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)
+
+    from documents.services.pristav_contract import (
+        PRISTAV_CONTRACT_FIELD,
+        PRISTAV_SERVICE_NAME_FIELD,
+        generate_pristav_contract,
+        upload_pristav_contract_to_bitrix,
+    )
+
+    logger.error(f"INCOMING POST (PRISTAV): {request.POST}")
+
+    deal_id = _extract_deal_id(request.POST)
+    if not deal_id:
+        return JsonResponse({'status': 'error', 'message': 'Invalid deal ID'}, status=400)
+
+    try:
+        deal_data = _get_deal_data(deal_id)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'Deal fetch error: {e}'}, status=500)
+
+    try:
+        fio = deal_data.get("TITLE", "")
+
+        contract = {
+            "номер договора": deal_data.get('UF_CRM_1745892727271', "000"),
+            "ФИО": fio,
+            "дата рождения": format_date(deal_data.get('UF_CRM_1745888327609')),
+            "серия": deal_data.get('UF_CRM_1745889060779', ''),
+            "номер": deal_data.get('UF_CRM_1745889067225', ''),
+            "кем": deal_data.get('UF_CRM_1745889085935', ''),
+            "дата выдачи": format_date(deal_data.get('UF_CRM_1754384630146')),
+            "код": deal_data.get('UF_CRM_1745889094660', ''),
+            "место рождения": deal_data.get('UF_CRM_1745889105838', ''),
+            "адрес регистрации": deal_data.get('UF_CRM_1745893079148', ''),
+            "сумма юристы": str(int(float(deal_data.get('OPPORTUNITY', 0)))),
+            "наименование услуг": deal_data.get(PRISTAV_SERVICE_NAME_FIELD, ''),
+        }
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'Data preparation error: {e}'}, status=500)
+
+    BASE = _get_documents_dir()
+    template = BASE / "templates_src" / "pristav_template.docx"
+    output = BASE / "generated_docs" / f"dogovor_pristav_{deal_id}.docx"
+
+    if not template.exists():
+        return JsonResponse({'status': 'error', 'message': f'Template not found: {template}'}, status=500)
+
+    try:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        generate_pristav_contract(contract, str(template), str(output))
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'Doc generation error: {e}'}, status=500)
+
+    try:
+        result = upload_pristav_contract_to_bitrix(deal_id, str(output), PRISTAV_CONTRACT_FIELD)
+        logger.error(f"BITRIX UPLOAD RESULT (PRISTAV): {result}")
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'Upload error: {e}'}, status=500)
+
+    return JsonResponse(
+        {
+            'status': 'success',
+            'message': 'Pristav document generated & uploaded',
+            'deal_id': deal_id,
+        }
+    )
+
+
 def calculate_payments(num_payments, total_amount, discount, start_date, first_payment, second_payment_day):
     if num_payments == 1 and first_payment >= (total_amount - discount):
         return [[1, start_date, f"{first_payment:.2f}"]]

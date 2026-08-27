@@ -1,4 +1,4 @@
-# documents/services/mfc_contract.py
+# documents/services/pristav_contract.py
 
 import base64
 import os
@@ -8,45 +8,29 @@ import requests
 from docx import Document
 
 from documents.services.docx_utils import replace_text_preserving_format
-from documents.views import (
-    WEBHOOK_URL,
-    insert_table_after_heading,
-    number_to_words,
-)
+from documents.views import WEBHOOK_URL
 
-MFC_CONTRACT_FIELD = "UF_CRM_1787661784627"
+PRISTAV_CONTRACT_FIELD = "UF_CRM_1787841432134"  # Договор об оказании юридеческих услуг (file)
+PRISTAV_SERVICE_NAME_FIELD = "UF_CRM_1787841397747"  # Наименование услуг (string)
 
 
-def generate_mfc_contract(data, template_path, output_path, payments):
-    today = datetime.now().strftime("%d.%m.%Y")
-    data["today"] = today
-    discount = int(data.get("скидка", 0))
-
-    if data.get("сумма бонус", "") == "":
-        data["сумма бонус"] = "0"
+def generate_pristav_contract(data, template_path, output_path):
+    data["today"] = datetime.now().strftime("%d.%m.%Y")
 
     fio_parts = data.get("ФИО", "").split()
     if len(fio_parts) < 3:
         raise ValueError(f"ФИО должно содержать минимум 3 части (Фамилия Имя Отчество), получили: {data.get('ФИО')}")
-
-    data["инициалы"] = f"{fio_parts[0]} {fio_parts[1][0]}. {fio_parts[2][0]}."
-
-    data["сумма юристы"] = str(int(data["сумма юристы"]) - discount)
-    data["сумма"] = str(int(data["сумма бонус"]) + int(data["сумма юристы"]))
-    data["words_sum"] = number_to_words(int(data["сумма юристы"]))
 
     if not os.path.exists(template_path):
         raise FileNotFoundError(f"Template not found: {template_path}")
 
     doc = Document(template_path)
     replace_text_preserving_format(doc, data)
-    insert_table_after_heading(doc, payments)
-
     doc.save(output_path)
 
 
-def upload_mfc_contract_to_bitrix(deal_id, file_path, field_id):
-    """Заливает МФЦ-договор в выделенное под него поле сделки Bitrix (UF_CRM_1787661784627)."""
+def upload_pristav_contract_to_bitrix(deal_id, file_path, field_id):
+    """Заливает договор в выделенное под него поле сделки Bitrix."""
     if not os.path.exists(file_path):
         return {"status": "error", "message": f"Файл не найден: {file_path}"}
 
