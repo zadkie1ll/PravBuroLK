@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -261,8 +262,16 @@ def marketing_stats(request):
             writer.writerow([row["group_value"], row["clicks"]])
         return response
 
+    paginator = Paginator(grouped, 30)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    base_query_params = request.GET.copy()
+    base_query_params.pop("page", None)
+    base_query = base_query_params.urlencode()
+
     return render(request, "marketing_stats.html", {
-        "grouped": grouped,
+        "grouped": page_obj,
+        "page_obj": page_obj,
         "group_field": group_field,
         "group_by": group_by,
         "group_options": [(key, GROUP_BY_LABELS[key]) for key in GROUP_BY_FIELDS],
@@ -272,6 +281,7 @@ def marketing_stats(request):
         "utm_mediums": UtmMedium.objects.filter(is_active=True).order_by("code"),
         "link_types": MarketingLink.LINK_TYPE_CHOICES,
         "filters": request.GET,
+        "base_query": base_query,
     })
 
 

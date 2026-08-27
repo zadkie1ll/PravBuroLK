@@ -26,6 +26,10 @@
     th { background: #007bff; color: white; }
     tr:hover { background: #f8f9fa; }
     .total { text-align: right; font-weight: bold; margin-top: 10px; }
+    .pagination { text-align: center; margin-top: 14px; }
+    .pagination a { padding: 6px 14px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; margin: 0 8px; }
+    .pagination a:hover { background: #0056b3; }
+    .pagination span { color: #555; }
 </style>
 </head>
 <body>
@@ -135,6 +139,18 @@
             {% endfor %}
         </tbody>
     </table>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+            <a href="?{{ base_query }}&page={{ page_obj.previous_page_number }}">← Назад</a>
+        {% endif %}
+        <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+            <a href="?{{ base_query }}&page={{ page_obj.next_page_number }}">Вперёд →</a>
+        {% endif %}
+    </div>
+    {% endif %}
 
     <div class="total">Всего кликов (без ботов-превьюеров): {{ total_clicks }}</div>
 </div>
