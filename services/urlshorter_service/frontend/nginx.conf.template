@@ -1,0 +1,21 @@
+server {
+    # 127.0.0.1, не 0.0.0.0 — с network_mode: host это реальный порт хоста,
+    # без ограничения адреса сервис был бы виден снаружи напрямую, в обход nginx.
+    # Порт берётся из NGINX_PORT (docker-compose.prod.yml) и подставляется официальным
+    # entrypoint-скриптом nginx-образа (envsubst-on-templates.sh) при старте контейнера —
+    # раньше порт был зашит прямо в файл на этапе сборки образа, из-за чего BuildKit
+    # иногда путал между собой почти идентичные nginx.conf разных сервисов при сборке.
+    listen 127.0.0.1:${NGINX_PORT};
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+        # index.html ссылается на хэшированные имена JS/CSS — если браузер закэширует
+        # саму index.html, после передеплоя он продолжит грузить старый бандл со старыми
+        # build-args (например, старый localhost) до принудительного hard refresh.
+        add_header Cache-Control "no-cache";
+    }
+}
