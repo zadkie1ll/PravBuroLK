@@ -27,4 +27,6 @@ services:
         DEPLOY_BASE_PATH: "/referrals/"
     container_name: referral_stats_frontend
     network_mode: host
+    environment:
+      NGINX_PORT: "5178"
     restart: unless-stopped

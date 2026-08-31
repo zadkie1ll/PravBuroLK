@@ -29,4 +29,6 @@ services:
         DEPLOY_BASE_PATH: "/leadreport/"
     container_name: leadreport_frontend
     network_mode: host
+    environment:
+      NGINX_PORT: "5175"
     restart: unless-stopped

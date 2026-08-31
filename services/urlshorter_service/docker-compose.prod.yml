@@ -26,4 +26,6 @@ services:
         DEPLOY_BASE_PATH: "/urlshorter/"
     container_name: urlshorter_frontend
     network_mode: host
+    environment:
+      NGINX_PORT: "5179"
     restart: unless-stopped

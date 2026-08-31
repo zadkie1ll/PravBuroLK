@@ -26,4 +26,6 @@ services:
         DEPLOY_BASE_PATH: "/clients/"
     container_name: client_search_frontend
     network_mode: host
+    environment:
+      NGINX_PORT: "5177"
     restart: unless-stopped

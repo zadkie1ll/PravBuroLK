@@ -31,4 +31,6 @@ services:
         VITE_CLIENT_SEARCH_BASE_URL: "https://panel.prav-buro.ru/clients"
     container_name: admin_panel_frontend
     network_mode: host
+    environment:
+      NGINX_PORT: "5176"
     restart: unless-stopped
