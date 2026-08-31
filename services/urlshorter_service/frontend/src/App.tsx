@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { Route, Routes } from "react-router-dom";
 import { setToken } from "./api/client";
+import { Shell } from "./components/Shell";
 import { StatsPage } from "./pages/StatsPage";
+import { MarketingStatsPage } from "./pages/MarketingStatsPage";
+import { CreateLinkPage } from "./pages/CreateLinkPage";
+import { DictionariesPage } from "./pages/DictionariesPage";
 
 const ADMIN_PANEL_BASE_URL = import.meta.env.VITE_ADMIN_PANEL_BASE_URL || "http://localhost:5176";
 
@@ -37,8 +41,13 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<StatsPage />} />
-    </Routes>
+    <Shell>
+      <Routes>
+        <Route path="/" element={<MarketingStatsPage />} />
+        <Route path="/legacy" element={<StatsPage />} />
+        <Route path="/marketing/create" element={<CreateLinkPage />} />
+        <Route path="/marketing/dictionaries" element={<DictionariesPage />} />
+      </Routes>
+    </Shell>
   );
 }

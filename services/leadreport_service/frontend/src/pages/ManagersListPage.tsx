@@ -2,6 +2,12 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, SalesManagerAdminRow, SalesManagerListResponse } from "../api/client";
 
+const FILTERS: { value: "" | "true" | "false"; label: string }[] = [
+  { value: "", label: "Все" },
+  { value: "true", label: "Активные" },
+  { value: "false", label: "Неактивные" },
+];
+
 export function ManagersListPage() {
   const [data, setData] = useState<SalesManagerListResponse | null>(null);
   const [search, setSearch] = useState("");
@@ -51,153 +57,129 @@ export function ManagersListPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.count / data.per_page)) : 1;
 
   return (
-    <div className="min-h-screen bg-[#f8f8f8] text-[13px] text-[#333]">
-      <div className="bg-[#417690] px-6 py-3 text-white">
-        <span className="text-lg">Django administration</span>
-      </div>
-      <div className="bg-white px-6 py-2 text-xs text-[#666]">
-        <Link to="/admin" className="text-[#417690] hover:underline">
-          Главная
-        </Link>{" "}
-        › Leadreport › Sales managers
-      </div>
-
-      <div className="mx-auto max-w-6xl px-6 py-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-normal text-[#333]">Select sales manager to change</h1>
-          <button
-            onClick={syncFromBitrix}
-            className="rounded border border-[#ccc] bg-white px-3 py-1.5 text-sm text-[#333] hover:bg-[#f8f8f8]"
-          >
-            Обновить менеджеров из Bitrix
-          </button>
+    <div className="min-h-screen bg-[#f7f7f8] text-[#1c1c1e]">
+      <header className="border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-6xl px-6 py-4">
+          <Link to="/admin/leadreport" className="text-xs font-medium text-gray-400 hover:text-gray-600">
+            ← Справочники
+          </Link>
+          <div className="mt-1 flex items-center justify-between">
+            <h1 className="text-base font-semibold">Менеджеры</h1>
+            <button
+              onClick={syncFromBitrix}
+              className="rounded-lg bg-[#1c1c1e] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#333]"
+            >
+              Обновить из Bitrix
+            </button>
+          </div>
         </div>
-        {syncMessage && <p className="mb-4 text-sm text-[#417690]">{syncMessage}</p>}
+      </header>
+
+      <main className="mx-auto max-w-6xl px-6 py-6">
+        {syncMessage && <p className="mb-4 text-sm text-gray-600">{syncMessage}</p>}
         {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-        <div className="flex gap-6">
-          <div className="flex-1 rounded border border-[#ccc] bg-white">
-            <form onSubmit={handleSearchSubmit} className="flex gap-2 border-b border-[#eee] p-3">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search"
-                className="flex-1 rounded border border-[#ccc] px-2 py-1 text-sm"
-              />
-              <button type="submit" className="rounded bg-[#417690] px-3 py-1 text-sm text-white hover:bg-[#356179]">
-                Search
-              </button>
-            </form>
+        <div className="flex flex-wrap items-center gap-4">
+          <form onSubmit={handleSearchSubmit} className="flex gap-2">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск..."
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+            />
+            <button type="submit" className="rounded-lg bg-[#1c1c1e] px-4 py-1.5 text-sm font-medium text-white hover:bg-[#333]">
+              Найти
+            </button>
+          </form>
 
-            <table className="w-full border-collapse text-left text-sm">
+          <div className="ml-auto flex gap-1 rounded-lg bg-[#f2f2f3] p-1">
+            {FILTERS.map((f) => (
+              <button
+                key={f.value}
+                onClick={() => {
+                  setActiveFilter(f.value);
+                  setPage(1);
+                }}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  activeFilter === f.value ? "bg-white text-[#1c1c1e] shadow-sm" : "text-gray-500 hover:text-[#1c1c1e]"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
               <thead>
-                <tr className="bg-[#79aec8] text-white">
-                  <th className="px-3 py-2 font-normal">NAME</th>
-                  <th className="px-3 py-2 font-normal">BITRIX USER ID</th>
-                  <th className="px-3 py-2 font-normal">MEGAFON USER</th>
-                  <th className="px-3 py-2 font-normal">MEGAFON CLID</th>
-                  <th className="px-3 py-2 font-normal">EMAIL</th>
-                  <th className="px-3 py-2 font-normal">PHONE</th>
-                  <th className="px-3 py-2 font-normal">USER</th>
-                  <th className="px-3 py-2 font-normal">IS ACTIVE</th>
-                  <th className="px-3 py-2 font-normal">UPDATED AT</th>
+                <tr className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3">Имя</th>
+                  <th className="px-4 py-3">Bitrix ID</th>
+                  <th className="px-4 py-3">Megafon user</th>
+                  <th className="px-4 py-3">Megafon CLID</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Телефон</th>
+                  <th className="px-4 py-3">Пользователь</th>
+                  <th className="px-4 py-3">Активен</th>
+                  <th className="px-4 py-3">Обновлён</th>
                 </tr>
               </thead>
               <tbody>
-                {data?.results.map((row, i) => (
-                  <tr key={row.id} className={i % 2 === 0 ? "bg-white" : "bg-[#f8f8f8]"}>
-                    <td className="px-3 py-2">
-                      <span className="text-[#417690]">{row.name}</span>
-                    </td>
-                    <td className="px-3 py-2">{row.bitrix_user_id}</td>
-                    <td className="px-3 py-2">{row.megafon_user || "—"}</td>
-                    <td className="px-3 py-2">{row.megafon_clid || "—"}</td>
-                    <td className="px-3 py-2">{row.email || "—"}</td>
-                    <td className="px-3 py-2">{row.phone || "—"}</td>
-                    <td className="px-3 py-2">{row.user_username || "—"}</td>
-                    <td className="px-3 py-2">
+                {data?.results.map((row) => (
+                  <tr key={row.id} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-2.5 font-medium text-[#1c1c1e]">{row.name}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{row.bitrix_user_id}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{row.megafon_user || "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{row.megafon_clid || "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{row.email || "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{row.phone || "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{row.user_username || "—"}</td>
+                    <td className="px-4 py-2.5">
                       <input type="checkbox" checked={row.is_active} onChange={() => toggleActive(row)} />
                     </td>
-                    <td className="px-3 py-2">{new Date(row.updated_at).toLocaleString("ru-RU")}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{new Date(row.updated_at).toLocaleString("ru-RU")}</td>
                   </tr>
                 ))}
                 {data && data.results.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-3 py-6 text-center text-[#999]">
-                      0 sales managers
+                    <td colSpan={9} className="px-4 py-8 text-center text-gray-400">
+                      Менеджеров нет
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
 
-            {data && (
-              <div className="flex items-center justify-between border-t border-[#eee] px-3 py-2 text-sm text-[#666]">
-                <span>{data.count} sales managers</span>
-                <div className="flex gap-2">
-                  <button
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => p - 1)}
-                    className="disabled:opacity-40"
-                  >
-                    ← Previous
-                  </button>
-                  <span>
-                    Page {page} of {totalPages}
-                  </span>
-                  <button
-                    disabled={page >= totalPages}
-                    onClick={() => setPage((p) => p + 1)}
-                    className="disabled:opacity-40"
-                  >
-                    Next →
-                  </button>
-                </div>
+          {data && (
+            <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-sm text-gray-500">
+              <span>{data.count} менеджеров</span>
+              <div className="flex items-center gap-4">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => p - 1)}
+                  className="rounded-md px-3 py-1.5 font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                >
+                  ← Назад
+                </button>
+                <span>
+                  Страница {page} из {totalPages}
+                </span>
+                <button
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="rounded-md px-3 py-1.5 font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                >
+                  Вперёд →
+                </button>
               </div>
-            )}
-          </div>
-
-          <div className="w-56 shrink-0 rounded border border-[#ccc] bg-white p-3">
-            <h3 className="mb-2 text-sm font-semibold text-[#666]">By is active</h3>
-            <ul className="space-y-1 text-sm">
-              <li>
-                <button
-                  onClick={() => {
-                    setActiveFilter("");
-                    setPage(1);
-                  }}
-                  className={activeFilter === "" ? "font-semibold text-black" : "text-[#417690] hover:underline"}
-                >
-                  All
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => {
-                    setActiveFilter("true");
-                    setPage(1);
-                  }}
-                  className={activeFilter === "true" ? "font-semibold text-black" : "text-[#417690] hover:underline"}
-                >
-                  Yes
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => {
-                    setActiveFilter("false");
-                    setPage(1);
-                  }}
-                  className={activeFilter === "false" ? "font-semibold text-black" : "text-[#417690] hover:underline"}
-                >
-                  No
-                </button>
-              </li>
-            </ul>
-          </div>
+            </div>
+          )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

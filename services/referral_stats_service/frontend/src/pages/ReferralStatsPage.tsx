@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ReferralStatRow } from "../api/client";
 
-const ADMIN_PANEL_BASE_URL = import.meta.env.VITE_ADMIN_PANEL_BASE_URL || "http://localhost:5176";
 const PER_PAGE = 50;
 
 type Filter = "all" | "clients" | "employees";
@@ -55,25 +54,19 @@ export function ReferralStatsPage() {
   const totalPages = Math.max(1, Math.ceil(count / PER_PAGE));
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-100">
-      <header className="bg-white p-4 shadow">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-800">Статистика</h1>
-          <a
-            href={`${ADMIN_PANEL_BASE_URL}/admin`}
-            className="rounded-full bg-gradient-to-r from-blue-400 to-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-blue-500 hover:to-blue-700"
-          >
-            Назад в меню
-          </a>
+    <div className="flex min-h-screen flex-col bg-[#f7f7f8] text-[#1c1c1e]">
+      <header className="border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-6xl px-6 py-4">
+          <h1 className="text-base font-semibold">Статистика</h1>
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl flex-1 p-6">
-        <div className="rounded-lg bg-white p-8 shadow">
-          <h2 className="mb-6 text-2xl font-bold">📊 Статистика по реферальным ссылкам</h2>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-6 text-lg font-semibold">Статистика по реферальным ссылкам</h2>
 
-          <div className="mb-6 flex flex-wrap items-center gap-4">
-            <div className="space-x-2">
+          <div className="mb-5 flex flex-wrap items-center gap-4">
+            <div className="flex gap-1 rounded-lg bg-[#f2f2f3] p-1">
               {([
                 ["all", "Все"],
                 ["clients", "Клиенты"],
@@ -82,8 +75,8 @@ export function ReferralStatsPage() {
                 <button
                   key={value}
                   onClick={() => changeFilter(value)}
-                  className={`rounded-lg px-4 py-2 font-medium transition ${
-                    filter === value ? "bg-blue-600 text-white shadow" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                    filter === value ? "bg-white text-[#1c1c1e] shadow-sm" : "text-gray-500 hover:text-[#1c1c1e]"
                   }`}
                 >
                   {label}
@@ -91,15 +84,15 @@ export function ReferralStatsPage() {
               ))}
             </div>
 
-            <div className="ml-auto">
-              <label htmlFor="sort" className="mr-2 font-medium">
+            <div className="ml-auto flex items-center gap-2">
+              <label htmlFor="sort" className="text-sm font-medium text-gray-500">
                 Сортировать по:
               </label>
               <select
                 id="sort"
                 value={sort}
                 onChange={(e) => changeSort(e.target.value as Sort)}
-                className="rounded-lg border bg-white px-3 py-2 shadow-sm"
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-[#1c1c1e] focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
               >
                 <option value="applications">Заявкам</option>
                 <option value="clicks">Кликам</option>
@@ -107,41 +100,41 @@ export function ReferralStatsPage() {
             </div>
           </div>
 
-          {error && <p className="mb-4 text-red-600">{error}</p>}
+          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-          <div className="overflow-x-auto rounded-xl bg-white shadow">
-            <table className="min-w-full border-collapse text-left">
-              <thead className="bg-gray-100 text-sm uppercase tracking-wider text-gray-700">
-                <tr>
-                  <th className="p-3">Тип</th>
-                  <th className="p-3">Имя</th>
-                  <th className="p-3">Реферальная ссылка</th>
-                  <th className="p-3 text-center">Клики</th>
-                  <th className="p-3 text-center">Заявки</th>
+          <div className="overflow-hidden rounded-xl border border-gray-200">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <th className="px-4 py-3">Тип</th>
+                  <th className="px-4 py-3">Имя</th>
+                  <th className="px-4 py-3">Реферальная ссылка</th>
+                  <th className="px-4 py-3 text-center">Клики</th>
+                  <th className="px-4 py-3 text-center">Заявки</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody>
                 {results.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-gray-500">
+                    <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
                       Нет данных для отображения
                     </td>
                   </tr>
                 )}
                 {results.map((row, idx) => (
-                  <tr key={`${row.type}-${row.name}-${idx}`} className="transition hover:bg-gray-50">
-                    <td className="p-3 font-medium text-gray-600">{row.type}</td>
-                    <td className="p-3">{row.name}</td>
-                    <td className="p-3">
+                  <tr key={`${row.type}-${row.name}-${idx}`} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-gray-500">{row.type}</td>
+                    <td className="px-4 py-2.5 font-medium text-[#1c1c1e]">{row.name}</td>
+                    <td className="px-4 py-2.5">
                       <button
                         onClick={() => copy(idx, row.ref_link)}
-                        className="rounded-lg bg-blue-600 px-3 py-1 text-sm text-white shadow transition hover:bg-blue-700"
+                        className="rounded-md bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-200"
                       >
                         {copiedIdx === idx ? "Скопировано!" : "Скопировать"}
                       </button>
                     </td>
-                    <td className="p-3 text-center font-semibold">{row.clicks}</td>
-                    <td className="p-3 text-center font-semibold">{row.applications}</td>
+                    <td className="px-4 py-2.5 text-center font-medium text-[#1c1c1e]">{row.clicks}</td>
+                    <td className="px-4 py-2.5 text-center font-medium text-[#1c1c1e]">{row.applications}</td>
                   </tr>
                 ))}
               </tbody>
@@ -149,21 +142,21 @@ export function ReferralStatsPage() {
           </div>
 
           {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2">
+            <div className="mt-4 flex items-center justify-center gap-4">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="rounded-lg bg-gray-200 px-4 py-2 font-medium text-gray-700 transition hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30"
               >
                 ← Назад
               </button>
-              <span className="px-2 font-medium text-gray-700">
+              <span className="text-sm text-gray-500">
                 Страница {page} из {totalPages}
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="rounded-lg bg-gray-200 px-4 py-2 font-medium text-gray-700 transition hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30"
               >
                 Вперёд →
               </button>
@@ -172,13 +165,13 @@ export function ReferralStatsPage() {
         </div>
       </main>
 
-      <footer className="bg-white p-4 text-center text-sm text-gray-500 shadow">
+      <footer className="border-t border-gray-200 bg-white p-4 text-center text-sm text-gray-400">
         © {new Date().getFullYear()} CRM
       </footer>
 
       {showToast && (
-        <div className="fixed bottom-6 right-6 rounded-lg bg-green-600 px-4 py-2 text-white shadow-lg">
-          ✅ Ссылка скопирована!
+        <div className="fixed bottom-6 right-6 rounded-lg bg-[#1c1c1e] px-4 py-2 text-sm font-medium text-white shadow-lg">
+          Ссылка скопирована
         </div>
       )}
     </div>

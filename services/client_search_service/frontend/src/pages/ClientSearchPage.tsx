@@ -2,8 +2,6 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ClientResult } from "../api/client";
 
-const ADMIN_PANEL_BASE_URL = import.meta.env.VITE_ADMIN_PANEL_BASE_URL || "http://localhost:5176";
-
 export function ClientSearchPage() {
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
@@ -36,31 +34,25 @@ export function ClientSearchPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-100">
-      <header className="bg-white p-4 shadow">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-800">Поиск клиентов</h1>
-          <a
-            href={`${ADMIN_PANEL_BASE_URL}/admin`}
-            className="rounded-full bg-gradient-to-r from-blue-400 to-blue-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:from-blue-500 hover:to-blue-700"
-          >
-            Назад в меню
-          </a>
+    <div className="flex min-h-screen flex-col bg-[#f7f7f8] text-[#1c1c1e]">
+      <header className="border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-6xl px-6 py-4">
+          <h1 className="text-base font-semibold">Поиск клиентов</h1>
         </div>
       </header>
 
-      <section className="mx-auto mt-6 w-full max-w-3xl px-4">
+      <section className="mx-auto mt-6 w-full max-w-3xl px-6">
         <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Введите имя, фамилию или Bitrix ID"
-            className="flex-1 rounded-lg border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-[#1c1c1e] shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
           />
           <button
             type="submit"
-            className="rounded-lg bg-blue-600 px-6 py-3 text-white transition duration-200 hover:bg-blue-700"
+            className="rounded-lg bg-[#1c1c1e] px-6 py-2.5 text-sm font-medium text-white transition hover:bg-[#333]"
           >
             Поиск
           </button>
@@ -68,24 +60,24 @@ export function ClientSearchPage() {
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       </section>
 
-      <section className="mx-auto mt-8 w-full max-w-7xl flex-1 px-4">
+      <section className="mx-auto mt-8 w-full max-w-6xl flex-1 px-6">
         {results.length > 0 && (
           <>
-            <h2 className="mb-4 text-lg font-semibold text-gray-700">Результаты поиска</h2>
+            <h2 className="mb-4 text-sm font-semibold text-gray-500">Результаты поиска</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {results.map((client) => (
                 <Link
                   key={client.id}
                   to={`/clients/${client.id}`}
-                  className="block rounded-lg bg-white p-5 shadow transition duration-200 hover:shadow-lg"
+                  className="block rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md"
                 >
-                  <h3 className="text-xl font-bold text-gray-800">
+                  <h3 className="text-base font-semibold text-[#1c1c1e]">
                     {client.surname} {client.name}
                     {client.middlename ? ` ${client.middlename}` : ""}
                   </h3>
-                  <p className="mt-1 text-gray-500">Bitrix ID: {client.bitrix_id || "None"}</p>
+                  <p className="mt-1 text-sm text-gray-500">Bitrix ID: {client.bitrix_id || "None"}</p>
                   {client.stage_name && (
-                    <p className="mt-2 w-fit rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-800">
+                    <p className="mt-2 w-fit rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
                       {client.stage_name}
                     </p>
                   )}
@@ -95,11 +87,11 @@ export function ClientSearchPage() {
           </>
         )}
         {searched && results.length === 0 && submittedQuery && (
-          <p className="mt-4 text-gray-500">Ничего не найдено</p>
+          <p className="mt-4 text-sm text-gray-400">Ничего не найдено</p>
         )}
       </section>
 
-      <footer className="mt-10 bg-white p-4 text-center text-sm text-gray-500 shadow">
+      <footer className="mt-10 border-t border-gray-200 bg-white p-4 text-center text-sm text-gray-400">
         © {new Date().getFullYear()} CRM
       </footer>
     </div>
