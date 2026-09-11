@@ -116,7 +116,7 @@ export function AdminPanelPage() {
       <aside className="flex w-64 flex-shrink-0 flex-col bg-[#1c1c1e] text-gray-200">
         <div className="flex items-center gap-2 border-b border-white/10 px-5 py-5">
           <div
-            className={`flex h-9 w-9 items-center justify-center rounded-lg bg-[#5AC8FA] ${
+            className={`flex h-9 w-9 items-center justify-center rounded-lg bg-[#93C5FD] ${
               shieldHop ? "shield-hop" : ""
             }`}
             onMouseEnter={handleShieldHover}
@@ -197,16 +197,15 @@ export function AdminPanelPage() {
       <style>{`
         @keyframes shield-hop {
           0%   { transform: translateY(0) rotate(0deg); }
-          10%  { transform: translateY(-9px) rotate(0deg); }
-          20%  { transform: translateY(0) rotate(16deg); }
-          35%  { transform: translateY(-9px) rotate(16deg); }
-          45%  { transform: translateY(0) rotate(-16deg); }
-          60%  { transform: translateY(-9px) rotate(-16deg); }
-          75%  { transform: translateY(0) rotate(0deg); }
+          16%  { transform: translateY(-10px) rotate(0deg); }
+          33%  { transform: translateY(0) rotate(14deg); }
+          49%  { transform: translateY(-10px) rotate(14deg); }
+          66%  { transform: translateY(0) rotate(-14deg); }
+          82%  { transform: translateY(-10px) rotate(-14deg); }
           100% { transform: translateY(0) rotate(0deg); }
         }
         .shield-hop {
-          animation: shield-hop 1.1s cubic-bezier(0.34, 1.56, 0.64, 1);
+          animation: shield-hop 2.4s ease-in-out;
         }
       `}</style>
     </div>
