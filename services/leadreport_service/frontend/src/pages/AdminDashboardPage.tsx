@@ -98,7 +98,34 @@ export function AdminDashboardPage() {
         </section>
 
         <section className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-gray-100 md:hidden">
+            {data && data.stats.length > 0 ? (
+              data.stats.map((entry) => (
+                <div key={entry.manager.id} className="space-y-2 px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-[#1c1c1e]">{entry.manager.name}</span>
+                    <span className="text-xs text-gray-500">ID {entry.manager.bitrix_user_id}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="inline-flex min-w-14 justify-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                      {entry.call_count} звонков
+                    </span>
+                    <span className="font-medium text-[#1c1c1e]">{entry.total_time}</span>
+                  </div>
+                  <Link
+                    to={`/admin/manager/${entry.manager.id}`}
+                    className="block w-full rounded-md bg-gray-100 px-3 py-1.5 text-center text-xs font-medium text-gray-700 transition hover:bg-gray-200"
+                  >
+                    Подробно
+                  </Link>
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-10 text-center text-gray-400">Нет активных менеджеров с Bitrix ID.</div>
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">

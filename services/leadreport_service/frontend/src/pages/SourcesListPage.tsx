@@ -112,7 +112,27 @@ export function SourcesListPage() {
         </div>
 
         <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-gray-100 md:hidden">
+            {data?.results.map((row) => (
+              <div key={row.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div>
+                  <div className="font-medium text-[#1c1c1e]">{row.name}</div>
+                  <div className="text-xs text-gray-500">
+                    Bitrix ID: {row.bitrix_id ?? "—"} · {new Date(row.created_at).toLocaleDateString("ru-RU")}
+                  </div>
+                </div>
+                <label className="flex flex-shrink-0 items-center gap-1.5 text-xs text-gray-500">
+                  Активен
+                  <input type="checkbox" checked={row.is_active} onChange={() => toggleActive(row)} />
+                </label>
+              </div>
+            ))}
+            {data && data.results.length === 0 && (
+              <div className="px-4 py-8 text-center text-gray-400">Источников нет</div>
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">

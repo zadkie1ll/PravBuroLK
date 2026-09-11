@@ -13,7 +13,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 md:px-6">
           <div className="flex min-w-0 flex-wrap items-center gap-3 md:gap-6">
             <h1 className="whitespace-nowrap text-base font-semibold">Статистика по источникам</h1>
-            <nav className="flex max-w-full gap-1 overflow-x-auto rounded-lg bg-[#f2f2f3] p-1">
+            <nav className="flex flex-wrap gap-1 rounded-lg bg-[#f2f2f3] p-1">
               {TABS.map((tab) => (
                 <NavLink
                   key={tab.to}

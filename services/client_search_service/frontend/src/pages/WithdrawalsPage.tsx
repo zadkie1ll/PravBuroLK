@@ -260,7 +260,120 @@ export function WithdrawalsPage() {
               <p className="mt-1 text-sm text-gray-400">Добавьте первую запись выше</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="divide-y divide-gray-100 md:hidden">
+              {records.map((record) => (
+                <div key={record.id} className="space-y-2 px-4 py-3">
+                  {editingId === record.id ? (
+                    <form onSubmit={(e) => saveEdit(e, record.id)} className="space-y-3">
+                      <div>
+                        <label className={labelClass}>Дата снятия</label>
+                        <input
+                          type="date"
+                          value={editForm.withdrawal_date}
+                          onChange={(e) => setEditForm({ ...editForm, withdrawal_date: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Сумма снятия</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min={0}
+                          value={editForm.withdrawal_amount}
+                          onChange={(e) => setEditForm({ ...editForm, withdrawal_amount: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Дата перевода</label>
+                        <input
+                          type="date"
+                          value={editForm.transfer_date}
+                          onChange={(e) => setEditForm({ ...editForm, transfer_date: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Сумма перевода</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min={0}
+                          value={editForm.transferred_amount}
+                          onChange={(e) => setEditForm({ ...editForm, transferred_amount: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Комментарий</label>
+                        <input
+                          type="text"
+                          maxLength={255}
+                          value={editForm.comment}
+                          onChange={(e) => setEditForm({ ...editForm, comment: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="submit" className={`${primaryBtn} flex-1`}>
+                          Сохранить
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(null)}
+                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 transition hover:bg-gray-50"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-[#1c1c1e]">
+                          {record.withdrawal_date ? record.withdrawal_date : "—"}
+                        </span>
+                        <span
+                          className={`font-semibold ${Number(record.tail_amount) > 0 ? "text-amber-600" : "text-green-600"}`}
+                        >
+                          Хвост: {record.tail_amount} ₽
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                        <div>
+                          Снято: <span className="font-medium text-[#1c1c1e]">{record.withdrawal_amount ? `${record.withdrawal_amount} ₽` : "—"}</span>
+                        </div>
+                        <div>
+                          Переведено: <span className="font-medium text-[#1c1c1e]">{record.transferred_amount ? `${record.transferred_amount} ₽` : "—"}</span>
+                        </div>
+                        <div>Дата перевода: {record.transfer_date ? record.transfer_date : "—"}</div>
+                        <div className="col-span-2">Комментарий: {record.comment || "—"}</div>
+                      </div>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(record)}
+                          className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100"
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(record.id)}
+                          className="rounded-md px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50">
@@ -387,6 +500,7 @@ export function WithdrawalsPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       </div>

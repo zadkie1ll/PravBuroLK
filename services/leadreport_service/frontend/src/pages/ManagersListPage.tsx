@@ -112,7 +112,35 @@ export function ManagersListPage() {
         </div>
 
         <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-gray-100 md:hidden">
+            {data?.results.map((row) => (
+              <div key={row.id} className="space-y-2 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-[#1c1c1e]">{row.name}</span>
+                  <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                    Активен
+                    <input type="checkbox" checked={row.is_active} onChange={() => toggleActive(row)} />
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm text-gray-600">
+                  <div>Bitrix ID: {row.bitrix_user_id}</div>
+                  <div>Megafon: {row.megafon_user || "—"}</div>
+                  <div>CLID: {row.megafon_clid || "—"}</div>
+                  <div>Телефон: {row.phone || "—"}</div>
+                  <div className="col-span-2 truncate">Email: {row.email || "—"}</div>
+                  <div className="col-span-2">Пользователь: {row.user_username || "—"}</div>
+                  <div className="col-span-2 text-xs text-gray-400">
+                    Обновлён: {new Date(row.updated_at).toLocaleString("ru-RU")}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {data && data.results.length === 0 && (
+              <div className="px-4 py-8 text-center text-gray-400">Менеджеров нет</div>
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">

@@ -103,6 +103,35 @@ export function ReferralStatsPage() {
           {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
           <div className="overflow-hidden rounded-xl border border-gray-200">
+            <div className="divide-y divide-gray-100 md:hidden">
+              {results.length === 0 && (
+                <div className="px-4 py-6 text-center text-gray-400">Нет данных для отображения</div>
+              )}
+              {results.map((row, idx) => (
+                <div key={`${row.type}-${row.name}-${idx}`} className="space-y-2 px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-[#1c1c1e]">{row.name}</span>
+                    <span className="text-xs text-gray-500">{row.type}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <span>
+                      Клики: <span className="font-medium text-[#1c1c1e]">{row.clicks}</span>
+                    </span>
+                    <span>
+                      Заявки: <span className="font-medium text-[#1c1c1e]">{row.applications}</span>
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => copy(idx, row.ref_link)}
+                    className="w-full rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-200"
+                  >
+                    {copiedIdx === idx ? "Скопировано!" : "Скопировать ссылку"}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -139,6 +168,7 @@ export function ReferralStatsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {totalPages > 1 && (

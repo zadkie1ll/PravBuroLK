@@ -59,6 +59,22 @@ export function PaymentsDashboardPage() {
               <h3 className="mb-4 text-sm font-semibold text-gray-500">Последние платежи</h3>
 
               <div className="overflow-hidden rounded-xl border border-gray-200">
+                <div className="divide-y divide-gray-100 md:hidden">
+                  {data.results.length === 0 && (
+                    <div className="px-4 py-4 text-center text-gray-400">Нет фактических платежей</div>
+                  )}
+                  {data.results.map((p, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                      <div>
+                        <div className="text-sm text-gray-500">{p.payment_date ? formatDate(p.payment_date) : "—"}</div>
+                        <div className="text-sm">{p.client_name || "—"}</div>
+                      </div>
+                      <span className="flex-shrink-0 font-medium text-[#1c1c1e]">{p.amount} ₽</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -84,6 +100,7 @@ export function PaymentsDashboardPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               {data.num_pages > 1 && (

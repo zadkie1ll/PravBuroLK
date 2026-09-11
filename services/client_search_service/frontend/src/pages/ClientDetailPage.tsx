@@ -333,6 +333,66 @@ export function ClientDetailPage() {
           </form>
 
           <div className="overflow-hidden rounded-lg border border-gray-200">
+            <div className="divide-y divide-gray-100 md:hidden">
+              {installments.length === 0 && (
+                <div className="px-3 py-4 text-gray-400">Нет платежей</div>
+              )}
+              {installments.map((p, idx) => (
+                <div key={p.id} className="space-y-2 px-3 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-[#1c1c1e]">Платёж #{p.number}</span>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget({ type: "installment", id: p.id })}
+                      className="text-sm font-medium text-red-600 hover:text-red-700"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Дата</label>
+                    <input
+                      type="date"
+                      value={p.due_date}
+                      onChange={(e) => {
+                        const next = [...installments];
+                        next[idx] = { ...p, due_date: e.target.value };
+                        setInstallments(next);
+                      }}
+                      className={cellInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Сумма</label>
+                    <input
+                      type="number"
+                      value={p.amount_due}
+                      onChange={(e) => {
+                        const next = [...installments];
+                        next[idx] = { ...p, amount_due: e.target.value };
+                        setInstallments(next);
+                      }}
+                      className={cellInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Статус</label>
+                    <input
+                      type="text"
+                      value={p.status}
+                      onChange={(e) => {
+                        const next = [...installments];
+                        next[idx] = { ...p, status: e.target.value };
+                        setInstallments(next);
+                      }}
+                      className={cellInputClass}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-gray-50">
@@ -403,6 +463,7 @@ export function ClientDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           <button type="button" onClick={saveInstallments} className={primaryBtn}>
@@ -446,6 +507,50 @@ export function ClientDetailPage() {
           </form>
 
           <div className="overflow-hidden rounded-lg border border-gray-200">
+            <div className="divide-y divide-gray-100 md:hidden">
+              {actuals.length === 0 && <div className="px-3 py-4 text-gray-400">Нет оплат</div>}
+              {actuals.map((p, idx) => (
+                <div key={p.id} className="space-y-2 px-3 py-3">
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget({ type: "actual", id: p.id })}
+                      className="text-sm font-medium text-red-600 hover:text-red-700"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Дата</label>
+                    <input
+                      type="date"
+                      value={p.payment_date || ""}
+                      onChange={(e) => {
+                        const next = [...actuals];
+                        next[idx] = { ...p, payment_date: e.target.value };
+                        setActuals(next);
+                      }}
+                      className={cellInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Сумма</label>
+                    <input
+                      type="number"
+                      value={p.amount}
+                      onChange={(e) => {
+                        const next = [...actuals];
+                        next[idx] = { ...p, amount: e.target.value };
+                        setActuals(next);
+                      }}
+                      className={cellInputClass}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-gray-50">
@@ -501,6 +606,7 @@ export function ClientDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           <button type="button" onClick={saveActuals} className={primaryBtn}>
@@ -543,6 +649,68 @@ export function ClientDetailPage() {
           </form>
 
           <div className="overflow-hidden rounded-lg border border-gray-200">
+            <div className="divide-y divide-gray-100 md:hidden">
+              {others.length === 0 && <div className="px-3 py-4 text-gray-400">Нет прочих платежей</div>}
+              {others.map((op, idx) => (
+                <div key={op.id} className="space-y-2 px-3 py-3">
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget({ type: "other", id: op.id })}
+                      className="text-sm font-medium text-red-600 hover:text-red-700"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Тип</label>
+                    <select
+                      value={op.payment_type}
+                      onChange={(e) => {
+                        const next = [...others];
+                        next[idx] = { ...op, payment_type: e.target.value };
+                        setOthers(next);
+                      }}
+                      className={cellInputClass}
+                    >
+                      {OTHER_PAYMENT_TYPES.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Сумма</label>
+                    <input
+                      type="number"
+                      value={op.amount}
+                      onChange={(e) => {
+                        const next = [...others];
+                        next[idx] = { ...op, amount: e.target.value };
+                        setOthers(next);
+                      }}
+                      className={cellInputClass}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">Комментарий</label>
+                    <input
+                      type="text"
+                      value={op.comment || ""}
+                      onChange={(e) => {
+                        const next = [...others];
+                        next[idx] = { ...op, comment: e.target.value };
+                        setOthers(next);
+                      }}
+                      className={cellInputClass}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-gray-50">
@@ -616,6 +784,7 @@ export function ClientDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           <button type="button" onClick={saveOthers} className={primaryBtn}>
