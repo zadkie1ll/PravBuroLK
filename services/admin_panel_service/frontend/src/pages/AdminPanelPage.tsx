@@ -106,11 +106,22 @@ export function AdminPanelPage() {
   const visibleItems = NAV_ITEMS.filter((item) => !user || !item.roles || item.roles.includes(user.role));
   const active = visibleItems.find((item) => item.id === activeId) ?? visibleItems[0];
 
+  const [shieldHop, setShieldHop] = useState(false);
+  function handleShieldHover() {
+    if (!shieldHop) setShieldHop(true);
+  }
+
   return (
     <div className="flex h-screen bg-[#f3f4f6] text-[#333]">
       <aside className="flex w-64 flex-shrink-0 flex-col bg-[#1c1c1e] text-gray-200">
         <div className="flex items-center gap-2 border-b border-white/10 px-5 py-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600">
+          <div
+            className={`flex h-9 w-9 items-center justify-center rounded-lg bg-[#5AC8FA] ${
+              shieldHop ? "shield-hop" : ""
+            }`}
+            onMouseEnter={handleShieldHover}
+            onAnimationEnd={() => setShieldHop(false)}
+          >
             <Icon path="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
           </div>
           <div>
@@ -182,6 +193,22 @@ export function AdminPanelPage() {
           )}
         </main>
       </div>
+
+      <style>{`
+        @keyframes shield-hop {
+          0%   { transform: translateY(0) rotate(0deg); }
+          10%  { transform: translateY(-9px) rotate(0deg); }
+          20%  { transform: translateY(0) rotate(16deg); }
+          35%  { transform: translateY(-9px) rotate(16deg); }
+          45%  { transform: translateY(0) rotate(-16deg); }
+          60%  { transform: translateY(-9px) rotate(-16deg); }
+          75%  { transform: translateY(0) rotate(0deg); }
+          100% { transform: translateY(0) rotate(0deg); }
+        }
+        .shield-hop {
+          animation: shield-hop 1.1s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+      `}</style>
     </div>
   );
 }
