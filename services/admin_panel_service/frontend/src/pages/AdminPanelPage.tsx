@@ -198,10 +198,10 @@ export function AdminPanelPage() {
         @keyframes shield-hop {
           0%   { transform: translateY(0) rotate(0deg); }
           16%  { transform: translateY(-5px) rotate(0deg); }
-          33%  { transform: translateY(0) rotate(14deg); }
-          49%  { transform: translateY(-5px) rotate(14deg); }
-          66%  { transform: translateY(0) rotate(-14deg); }
-          82%  { transform: translateY(-5px) rotate(-14deg); }
+          33%  { transform: translateY(0) rotate(8deg); }
+          49%  { transform: translateY(-5px) rotate(8deg); }
+          66%  { transform: translateY(0) rotate(-8deg); }
+          82%  { transform: translateY(-5px) rotate(-8deg); }
           100% { transform: translateY(0) rotate(0deg); }
         }
         .shield-hop {
