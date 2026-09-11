@@ -14,7 +14,14 @@ interface NavItem {
   description: string;
   icon: JSX.Element;
   url: (token: string) => string;
+  roles?: Array<UserOut["role"]>;
 }
+
+const ROLE_LABELS: Record<UserOut["role"], string> = {
+  admin: "администратор",
+  director: "руководитель",
+  marketer: "маркетолог",
+};
 
 function Icon({ path }: { path: string }) {
   return (
@@ -31,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
     description: "ФИО, телефон, ID",
     icon: <Icon path="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" />,
     url: (token) => `${CLIENT_SEARCH_BASE_URL}/?token=${encodeURIComponent(token)}`,
+    roles: ["admin", "director"],
   },
   {
     id: "referral-stats",
@@ -38,6 +46,7 @@ const NAV_ITEMS: NavItem[] = [
     description: "Клики и заявки по рефералкам",
     icon: <Icon path="M3 3v18h18M7 15l4-6 3 4 5-8" />,
     url: (token) => `${REFERRAL_STATS_BASE_URL}/?token=${encodeURIComponent(token)}`,
+    roles: ["admin", "director"],
   },
   {
     id: "dashboard-visits",
@@ -45,6 +54,7 @@ const NAV_ITEMS: NavItem[] = [
     description: "Заходы по дням/неделям/месяцам",
     icon: <Icon path="M8 7V3m8 4V3M3 11h18M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />,
     url: (token) => `${REFERRAL_STATS_BASE_URL}/visits?token=${encodeURIComponent(token)}`,
+    roles: ["admin", "director"],
   },
   {
     id: "payments-dashboard",
@@ -52,6 +62,7 @@ const NAV_ITEMS: NavItem[] = [
     description: "Статистика и последние платежи",
     icon: <Icon path="M12 2v20m5-17H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />,
     url: (token) => `${PAYMENTS_DASHBOARD_BASE_URL}/payments-dashboard?token=${encodeURIComponent(token)}`,
+    roles: ["admin", "director"],
   },
   {
     id: "leadreport",
@@ -59,6 +70,7 @@ const NAV_ITEMS: NavItem[] = [
     description: "Звонки и время разговоров",
     icon: <Icon path="M3 5a2 2 0 0 1 2-2h2.28a2 2 0 0 1 2 1.72l.45 3.16a2 2 0 0 1-.57 1.77l-1.4 1.4a16 16 0 0 0 6.19 6.19l1.4-1.4a2 2 0 0 1 1.77-.57l3.16.45a2 2 0 0 1 1.72 2V19a2 2 0 0 1-2 2h-1C9.72 21 3 14.28 3 6V5z" />,
     url: (token) => `${LEADREPORT_BASE_URL}/admin?token=${encodeURIComponent(token)}`,
+    roles: ["admin", "director"],
   },
   {
     id: "urlshorter",
@@ -71,14 +83,18 @@ const NAV_ITEMS: NavItem[] = [
 
 export function AdminPanelPage() {
   const navigate = useNavigate();
-  const [activeId, setActiveId] = useState(NAV_ITEMS[0].id);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [user, setUser] = useState<UserOut | null>(null);
   const token = localStorage.getItem("access_token") || "";
 
   useEffect(() => {
     api
       .me()
-      .then((res) => setUser(res.user))
+      .then((res) => {
+        setUser(res.user);
+        const visible = NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(res.user.role));
+        setActiveId(visible[0]?.id ?? null);
+      })
       .catch(() => setUser(null));
   }, []);
 
@@ -87,7 +103,8 @@ export function AdminPanelPage() {
     navigate("/login");
   }
 
-  const active = NAV_ITEMS.find((item) => item.id === activeId) ?? NAV_ITEMS[0];
+  const visibleItems = NAV_ITEMS.filter((item) => !user || !item.roles || item.roles.includes(user.role));
+  const active = visibleItems.find((item) => item.id === activeId) ?? visibleItems[0];
 
   return (
     <div className="flex h-screen bg-[#f3f4f6] text-[#333]">
@@ -103,7 +120,7 @@ export function AdminPanelPage() {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {NAV_ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveId(item.id)}
@@ -130,7 +147,7 @@ export function AdminPanelPage() {
               </div>
               <div>
                 <div className="text-sm font-medium text-white">{user?.username ?? "..."}</div>
-                <div className="text-xs text-gray-500">{user?.is_staff ? "администратор" : "сотрудник"}</div>
+                <div className="text-xs text-gray-500">{user ? ROLE_LABELS[user.role] : "..."}</div>
               </div>
             </div>
             <button
@@ -147,13 +164,13 @@ export function AdminPanelPage() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
           <div>
-            <h1 className="text-lg font-semibold text-[#333]">{active.label}</h1>
-            <p className="text-sm text-gray-500">{active.description}</p>
+            <h1 className="text-lg font-semibold text-[#333]">{active?.label ?? ""}</h1>
+            <p className="text-sm text-gray-500">{active?.description ?? ""}</p>
           </div>
         </header>
 
         <main className="flex-1 overflow-hidden bg-[#f3f4f6]">
-          {token ? (
+          {token && active ? (
             <iframe
               key={active.id}
               src={active.url(token)}

@@ -32,6 +32,7 @@ export interface UserOut {
   id: number;
   username: string;
   is_staff: boolean;
+  role: "admin" | "director" | "marketer";
 }
 
 export interface TokenResponse {

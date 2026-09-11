@@ -65,6 +65,8 @@ def require_staff(token: str | None = Depends(oauth2_scheme)) -> dict:
 
     if not payload.get("is_staff"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Доступно только сотрудникам")
+    if payload.get("role") == "marketer":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав")
     return payload
 
 

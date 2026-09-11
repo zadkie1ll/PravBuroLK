@@ -12,6 +12,7 @@ class UserOut(BaseModel):
     id: int
     username: str
     is_staff: bool
+    role: str
 
 
 class TokenResponse(BaseModel):
