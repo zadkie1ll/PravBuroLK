@@ -107,16 +107,46 @@ export function AdminPanelPage() {
   const active = visibleItems.find((item) => item.id === activeId) ?? visibleItems[0];
 
   const [shieldHop, setShieldHop] = useState(false);
+  const [canHover, setCanHover] = useState(() =>
+    typeof window === "undefined" ? true : window.matchMedia("(hover: hover)").matches,
+  );
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window === "undefined" ? true : window.innerWidth >= 768,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(hover: hover)");
+    const handler = () => setCanHover(mq.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   function handleShieldHover() {
-    if (!shieldHop) setShieldHop(true);
+    if (canHover && !shieldHop) setShieldHop(true);
+  }
+
+  function selectItem(id: string) {
+    setActiveId(id);
+    if (window.innerWidth < 768) setSidebarOpen(false);
   }
 
   return (
-    <div className="flex h-screen bg-[#f3f4f6] text-[#333]">
-      <aside className="flex w-64 flex-shrink-0 flex-col bg-[#1c1c1e] text-gray-200">
+    <div className="h-screen bg-[#f3f4f6] text-[#333]">
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-[#1c1c1e] text-gray-200 transition-transform duration-300 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="flex items-center gap-2 border-b border-white/10 px-5 py-5">
           <div
-            className={`flex h-9 w-9 items-center justify-center rounded-lg bg-[#93C5FD] text-[#1c1c1e] ${
+            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#93C5FD] text-[#1c1c1e] ${
               shieldHop ? "shield-hop" : ""
             }`}
             onMouseEnter={handleShieldHover}
@@ -134,7 +164,7 @@ export function AdminPanelPage() {
           {visibleItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveId(item.id)}
+              onClick={() => selectItem(item.id)}
               className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
                 item.id === activeId
                   ? "bg-white/10 text-white"
@@ -172,11 +202,22 @@ export function AdminPanelPage() {
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
-          <div>
-            <h1 className="text-lg font-semibold text-[#333]">{active?.label ?? ""}</h1>
-            <p className="text-sm text-gray-500">{active?.description ?? ""}</p>
+      <div
+        className={`flex h-full flex-col overflow-hidden transition-[margin] duration-300 ${
+          sidebarOpen ? "md:ml-64" : "md:ml-0"
+        }`}
+      >
+        <header className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-4 md:px-6">
+          <button
+            onClick={() => setSidebarOpen((open) => !open)}
+            aria-label="Переключить меню"
+            className="flex-shrink-0 rounded-md p-2 text-gray-500 transition hover:bg-gray-100"
+          >
+            <Icon path="M4 6h16M4 12h16M4 18h16" />
+          </button>
+          <div className="min-w-0">
+            <h1 className="truncate text-lg font-semibold text-[#333]">{active?.label ?? ""}</h1>
+            <p className="truncate text-sm text-gray-500">{active?.description ?? ""}</p>
           </div>
         </header>
 
