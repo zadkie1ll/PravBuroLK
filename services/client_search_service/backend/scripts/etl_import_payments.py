@@ -94,7 +94,9 @@ def main() -> None:
         psycopg2.extras.execute_values(
             dest_cur,
             """insert into installment_payments (id, plan_id, number, due_date, amount_due, amount_paid, status)
-               values %s on conflict (id) do nothing""",
+               values %s on conflict (id) do update set
+                   amount_paid = excluded.amount_paid,
+                   status = excluded.status""",
             [
                 (i["id"], i["plan_id"], i["number"], i["due_date"], i["amount_due"], i["amount_paid"], i["status"])
                 for i in installments
@@ -122,7 +124,9 @@ def main() -> None:
         psycopg2.extras.execute_values(
             dest_cur,
             """insert into other_payments (id, client_id, payment_type, amount, is_paid, comment, created_at)
-               values %s on conflict (id) do nothing""",
+               values %s on conflict (id) do update set
+                   is_paid = excluded.is_paid,
+                   comment = excluded.comment""",
             [
                 (o["id"], o["client_id"], o["payment_type"], o["amount"], o["is_paid"], o["comment"], o["created_at"])
                 for o in others

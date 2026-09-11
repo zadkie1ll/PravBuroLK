@@ -65,7 +65,12 @@ def main() -> None:
                     (id, client_id, withdrawal_date, transfer_date, withdrawal_amount,
                      transferred_amount, tail_amount, comment, created_at, updated_at)
                 values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                on conflict (id) do nothing
+                on conflict (id) do update set
+                    transfer_date = excluded.transfer_date,
+                    transferred_amount = excluded.transferred_amount,
+                    tail_amount = excluded.tail_amount,
+                    comment = excluded.comment,
+                    updated_at = excluded.updated_at
                 """,
                 (
                     row["id"],

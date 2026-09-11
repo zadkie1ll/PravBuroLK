@@ -67,7 +67,9 @@ def main() -> None:
         psycopg2.extras.execute_values(
             dest_cur,
             """insert into clients (id, name, surname, middlename, bitrix_id, stage_id, is_blocked)
-               values %s on conflict (id) do nothing""",
+               values %s on conflict (id) do update set
+                   stage_id = excluded.stage_id,
+                   is_blocked = excluded.is_blocked""",
             [
                 (
                     c["id"],
