@@ -72,7 +72,25 @@ def main() -> None:
                      last_task_closed_at, last_moderator_task_created_at, last_moderator_task_id,
                      last_checked_at, raw_deal_data, created_at, updated_at)
                 values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                on conflict (id) do nothing
+                on conflict (id) do update set
+                    bitrix_task_id = excluded.bitrix_task_id,
+                    moderator_bitrix_user_id = excluded.moderator_bitrix_user_id,
+                    responsible_bitrix_user_id = excluded.responsible_bitrix_user_id,
+                    task_description = excluded.task_description,
+                    attempts_total = excluded.attempts_total,
+                    attempts_today = excluded.attempts_today,
+                    attempts_last_reset_date = excluded.attempts_last_reset_date,
+                    entered_logic_at = excluded.entered_logic_at,
+                    current_stage_id = excluded.current_stage_id,
+                    is_active = excluded.is_active,
+                    status = excluded.status,
+                    status_comment = excluded.status_comment,
+                    last_task_closed_at = excluded.last_task_closed_at,
+                    last_moderator_task_created_at = excluded.last_moderator_task_created_at,
+                    last_moderator_task_id = excluded.last_moderator_task_id,
+                    last_checked_at = excluded.last_checked_at,
+                    raw_deal_data = excluded.raw_deal_data,
+                    updated_at = excluded.updated_at
                 """,
                 (
                     row["id"],

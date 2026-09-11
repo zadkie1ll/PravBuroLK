@@ -59,7 +59,10 @@ def main() -> None:
                 """
                 insert into url_shorteners (id, source, destination, created_at, updated_at)
                 values (%s, %s, %s, %s, %s)
-                on conflict (id) do nothing
+                on conflict (id) do update set
+                    source = excluded.source,
+                    destination = excluded.destination,
+                    updated_at = excluded.updated_at
                 """,
                 (row["id"], row["source"], row["destination"], row["created_at"], row["updated_at"]),
             )

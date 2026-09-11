@@ -84,7 +84,14 @@ def main() -> None:
                     record_file_id, dedupe_key, status, attempts, raw_payload, audio_file_path,
                     transcript, analysis, error_message)
                values %s
-               on conflict (id) do nothing""",
+               on conflict (id) do update set
+                   updated_at = excluded.updated_at,
+                   status = excluded.status,
+                   attempts = excluded.attempts,
+                   audio_file_path = excluded.audio_file_path,
+                   transcript = excluded.transcript,
+                   analysis = excluded.analysis,
+                   error_message = excluded.error_message""",
             lambda r: (
                 r["id"], r["created_at"], r["updated_at"], r["event_name"], r["call_id"], r["lead_id"],
                 r["deal_id"], r["contact_id"], r["record_file_id"], r["dedupe_key"], r["status"],

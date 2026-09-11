@@ -243,7 +243,14 @@ def main() -> None:
                        (id, user_id, block_id, status, started_at, completed_at, current_step,
                         last_activity_at, meta, created_at, updated_at)
                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                   on conflict (id) do nothing""",
+                   on conflict (id) do update set
+                       status = excluded.status,
+                       started_at = excluded.started_at,
+                       completed_at = excluded.completed_at,
+                       current_step = excluded.current_step,
+                       last_activity_at = excluded.last_activity_at,
+                       meta = excluded.meta,
+                       updated_at = excluded.updated_at""",
                 lambda r: (
                     r["id"], trainee_user_map[r["trainee_id"]], r["block_id"], r["status"],
                     r["started_at"], r["completed_at"], r["current_step"], r["last_activity_at"],
@@ -261,7 +268,14 @@ def main() -> None:
                        (id, user_id, test_id, status, attempt_number, score, max_score, passed,
                         started_at, finished_at, meta, created_at, updated_at)
                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                   on conflict (id) do nothing""",
+                   on conflict (id) do update set
+                       status = excluded.status,
+                       score = excluded.score,
+                       max_score = excluded.max_score,
+                       passed = excluded.passed,
+                       finished_at = excluded.finished_at,
+                       meta = excluded.meta,
+                       updated_at = excluded.updated_at""",
                 lambda r: (
                     r["id"], trainee_user_map[r["trainee_id"]], r["test_id"], r["status"],
                     r["attempt_number"], r["score"], r["max_score"], r["passed"],

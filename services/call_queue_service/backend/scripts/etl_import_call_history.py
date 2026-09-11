@@ -127,7 +127,17 @@ def main() -> None:
                         (id, created_by_id, entity_type, date_from, date_to, status, filters_json,
                          total_items, processed_items, success_count, failed_count, created_at, updated_at)
                     values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    on conflict (id) do nothing
+                    on conflict (id) do update set
+                        entity_type = excluded.entity_type,
+                        date_from = excluded.date_from,
+                        date_to = excluded.date_to,
+                        status = excluded.status,
+                        filters_json = excluded.filters_json,
+                        total_items = excluded.total_items,
+                        processed_items = excluded.processed_items,
+                        success_count = excluded.success_count,
+                        failed_count = excluded.failed_count,
+                        updated_at = excluded.updated_at
                     """,
                     (
                         row["id"],
@@ -168,7 +178,22 @@ def main() -> None:
                          last_call_at, last_provider_call_id, bitrix_url, needs_manual_processing,
                          repeat_unanswered, created_at, updated_at)
                     values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    on conflict (id) do nothing
+                    on conflict (id) do update set
+                        stage_id = excluded.stage_id,
+                        stage_name = excluded.stage_name,
+                        responsible_id = excluded.responsible_id,
+                        responsible_name = excluded.responsible_name,
+                        status = excluded.status,
+                        assigned_to_id = excluded.assigned_to_id,
+                        locked_at = excluded.locked_at,
+                        attempts_count = excluded.attempts_count,
+                        last_call_result = excluded.last_call_result,
+                        last_call_at = excluded.last_call_at,
+                        last_provider_call_id = excluded.last_provider_call_id,
+                        bitrix_url = excluded.bitrix_url,
+                        needs_manual_processing = excluded.needs_manual_processing,
+                        repeat_unanswered = excluded.repeat_unanswered,
+                        updated_at = excluded.updated_at
                     """,
                     (
                         row["id"],
@@ -216,7 +241,10 @@ def main() -> None:
                         (id, queue_item_id, manager_id, started_at, finished_at, result, comment,
                          provider_call_id, created_at)
                     values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    on conflict (id) do nothing
+                    on conflict (id) do update set
+                        finished_at = excluded.finished_at,
+                        result = excluded.result,
+                        comment = excluded.comment
                     """,
                     (
                         row["id"],
