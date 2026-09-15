@@ -46,7 +46,7 @@ export function LinksPage() {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Все ссылки</h2>
+        <h2 className="text-lg font-semibold">Управление ссылками</h2>
         <span className="text-sm text-gray-500">Всего: {totalItems}</span>
       </div>
 
