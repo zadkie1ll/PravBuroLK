@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { MarketingLinkListItem, marketingApi } from "../api/client";
+import { MarketingLinkListItem, MarketingLinksFilters, marketingApi } from "../api/client";
+
+const inputClass =
+  "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-[#1c1c1e] shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500";
+const labelClass = "block text-sm font-medium text-gray-700";
+
+type SortBy = "created_at" | "clicks";
+type SortDir = "asc" | "desc";
 
 export function LinksPage() {
   const [items, setItems] = useState<MarketingLinkListItem[]>([]);
@@ -10,11 +17,30 @@ export function LinksPage() {
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  const [sortBy, setSortBy] = useState<SortBy>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [createdFrom, setCreatedFrom] = useState("");
+  const [createdTo, setCreatedTo] = useState("");
+  const [clicksMin, setClicksMin] = useState("");
+  const [clicksMax, setClicksMax] = useState("");
+
+  function buildFilters(p: number): MarketingLinksFilters {
+    return {
+      page: p,
+      sort_by: sortBy,
+      sort_dir: sortDir,
+      created_from: createdFrom || undefined,
+      created_to: createdTo || undefined,
+      clicks_min: clicksMin ? Number(clicksMin) : undefined,
+      clicks_max: clicksMax ? Number(clicksMax) : undefined,
+    };
+  }
+
   function load(p: number) {
     setLoading(true);
     setError(null);
     marketingApi
-      .listLinks(p)
+      .listLinks(buildFilters(p))
       .then((res) => {
         setItems(res.items);
         setPage(res.page);
@@ -27,7 +53,22 @@ export function LinksPage() {
 
   useEffect(() => {
     load(1);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy, sortDir]);
+
+  function toggleSort(field: SortBy) {
+    if (sortBy === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDir("desc");
+    }
+  }
+
+  function sortIndicator(field: SortBy) {
+    if (sortBy !== field) return "";
+    return sortDir === "asc" ? " ▲" : " ▼";
+  }
 
   async function handleDelete(item: MarketingLinkListItem) {
     if (!window.confirm(`Удалить ссылку ${item.public_link}?`)) return;
@@ -50,12 +91,51 @@ export function LinksPage() {
         <span className="text-sm text-gray-500">Всего: {totalItems}</span>
       </div>
 
+      <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-4 sm:grid-cols-4">
+        <div>
+          <label className={labelClass}>Дата создания — с</label>
+          <input type="date" className={inputClass} value={createdFrom} onChange={(e) => setCreatedFrom(e.target.value)} />
+        </div>
+        <div>
+          <label className={labelClass}>Дата создания — по</label>
+          <input type="date" className={inputClass} value={createdTo} onChange={(e) => setCreatedTo(e.target.value)} />
+        </div>
+        <div>
+          <label className={labelClass}>Клики — от</label>
+          <input
+            type="number"
+            min={0}
+            className={inputClass}
+            value={clicksMin}
+            onChange={(e) => setClicksMin(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Клики — до</label>
+          <input
+            type="number"
+            min={0}
+            className={inputClass}
+            value={clicksMax}
+            onChange={(e) => setClicksMax(e.target.value)}
+          />
+        </div>
+        <div className="col-span-2 sm:col-span-4">
+          <button
+            onClick={() => load(1)}
+            className="rounded-lg bg-[#1c1c1e] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#333]"
+          >
+            Применить фильтр
+          </button>
+        </div>
+      </div>
+
       {error && <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</p>}
 
       {loading ? (
         <p className="text-sm text-gray-500">Загрузка...</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-gray-500">Ссылок пока нет.</p>
+        <p className="text-sm text-gray-500">Ссылок не найдено.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -64,8 +144,12 @@ export function LinksPage() {
                 <th className="py-2 pr-4">Ссылка</th>
                 <th className="py-2 pr-4">Назначение</th>
                 <th className="py-2 pr-4">utm_campaign</th>
-                <th className="py-2 pr-4">Клики</th>
-                <th className="py-2 pr-4">Создана</th>
+                <th className="cursor-pointer select-none py-2 pr-4" onClick={() => toggleSort("clicks")}>
+                  Клики{sortIndicator("clicks")}
+                </th>
+                <th className="cursor-pointer select-none whitespace-nowrap py-2 pr-4" onClick={() => toggleSort("created_at")}>
+                  Создана{sortIndicator("created_at")}
+                </th>
                 <th className="py-2" />
               </tr>
             </thead>

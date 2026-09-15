@@ -217,19 +217,47 @@ def known_values(db: Session = Depends(get_db)):
     )
 
 
+LINKS_SORT_FIELDS = {
+    "created_at": MarketingLink.created_at,
+    "clicks": "clicks",
+}
+
+
 @router.get("/links", response_model=MarketingLinksResponse)
 def list_links(
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=200),
+    sort_by: str = Query("created_at"),
+    sort_dir: str = Query("desc"),
+    created_from: date | None = None,
+    created_to: date | None = None,
+    clicks_min: int | None = Query(None, ge=0),
+    clicks_max: int | None = Query(None, ge=0),
 ):
+    if sort_by not in LINKS_SORT_FIELDS:
+        raise HTTPException(status_code=400, detail="Некорректное поле сортировки.")
+    if sort_dir not in ("asc", "desc"):
+        raise HTTPException(status_code=400, detail="Некорректное направление сортировки.")
+
     clicks_count = func.count(MarketingClick.id).filter(MarketingClick.is_bot_preview.is_(False))
-    q = (
-        db.query(MarketingLink, clicks_count.label("clicks"))
-        .outerjoin(MarketingClick, MarketingClick.link_id == MarketingLink.id)
-        .group_by(MarketingLink.id)
-        .order_by(MarketingLink.created_at.desc())
+    sort_column = clicks_count if sort_by == "clicks" else LINKS_SORT_FIELDS[sort_by]
+    order = sort_column.asc() if sort_dir == "asc" else sort_column.desc()
+
+    q = db.query(MarketingLink, clicks_count.label("clicks")).outerjoin(
+        MarketingClick, MarketingClick.link_id == MarketingLink.id
     )
+    if created_from:
+        q = q.filter(func.date(MarketingLink.created_at) >= created_from)
+    if created_to:
+        q = q.filter(func.date(MarketingLink.created_at) <= created_to)
+    q = q.group_by(MarketingLink.id)
+    if clicks_min is not None:
+        q = q.having(clicks_count >= clicks_min)
+    if clicks_max is not None:
+        q = q.having(clicks_count <= clicks_max)
+    q = q.order_by(order, MarketingLink.id.desc())
+
     total_items = q.count()
     total_pages = max(1, (total_items + page_size - 1) // page_size)
     page = min(page, total_pages)

@@ -127,6 +127,17 @@ export interface MarketingLinksResponse {
   total_items: number;
 }
 
+export interface MarketingLinksFilters {
+  page?: number;
+  page_size?: number;
+  sort_by?: "created_at" | "clicks";
+  sort_dir?: "asc" | "desc";
+  created_from?: string;
+  created_to?: string;
+  clicks_min?: number;
+  clicks_max?: number;
+}
+
 export interface MarketingStatsFilters {
   group_by?: string;
   page?: number;
@@ -177,8 +188,10 @@ export const marketingApi = {
   createLink: (payload: CreateMarketingLinkPayload) =>
     request<CreateMarketingLinkResponse>("/api/marketing/links", { method: "POST", body: JSON.stringify(payload) }),
 
-  listLinks: (page = 1, pageSize = 30) =>
-    request<MarketingLinksResponse>(`/api/marketing/links${toQueryString({ page, page_size: pageSize })}`),
+  listLinks: (filters: MarketingLinksFilters) =>
+    request<MarketingLinksResponse>(
+      `/api/marketing/links${toQueryString(filters as Record<string, string | number | undefined>)}`
+    ),
 
   deleteLink: (id: number) =>
     request<MutationResponse>(`/api/marketing/links/${id}`, { method: "DELETE" }),
