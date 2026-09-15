@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -117,3 +119,15 @@ class KnownValuesResponse(BaseModel):
     campaigns: list[str]
     contents: list[str]
     terms: list[str]
+
+
+class MarketingLinkListItem(MarketingLinkOut):
+    clicks: int
+    created_at: datetime
+
+
+class MarketingLinksResponse(BaseModel):
+    items: list[MarketingLinkListItem]
+    page: int
+    total_pages: int
+    total_items: int

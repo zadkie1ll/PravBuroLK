@@ -115,6 +115,18 @@ export interface KnownValuesResponse {
   terms: string[];
 }
 
+export interface MarketingLinkListItem extends MarketingLinkOut {
+  clicks: number;
+  created_at: string;
+}
+
+export interface MarketingLinksResponse {
+  items: MarketingLinkListItem[];
+  page: number;
+  total_pages: number;
+  total_items: number;
+}
+
 export interface MarketingStatsFilters {
   group_by?: string;
   page?: number;
@@ -164,6 +176,12 @@ export const marketingApi = {
 
   createLink: (payload: CreateMarketingLinkPayload) =>
     request<CreateMarketingLinkResponse>("/api/marketing/links", { method: "POST", body: JSON.stringify(payload) }),
+
+  listLinks: (page = 1, pageSize = 30) =>
+    request<MarketingLinksResponse>(`/api/marketing/links${toQueryString({ page, page_size: pageSize })}`),
+
+  deleteLink: (id: number) =>
+    request<MutationResponse>(`/api/marketing/links/${id}`, { method: "DELETE" }),
 
   stats: (filters: MarketingStatsFilters) =>
     request<MarketingStatsResponse>(`/api/marketing/stats${toQueryString(filters as Record<string, string | number | undefined>)}`),

@@ -27,7 +27,9 @@ from ..schemas import (
     DictionariesResponse,
     DictionaryItem,
     KnownValuesResponse,
+    MarketingLinkListItem,
     MarketingLinkOut,
+    MarketingLinksResponse,
     MarketingStatsResponse,
     MarketingStatsRow,
     MutationResponse,
@@ -213,6 +215,41 @@ def known_values(db: Session = Depends(get_db)):
         contents=distinct(MarketingLink.utm_content),
         terms=distinct(MarketingLink.utm_term),
     )
+
+
+@router.get("/links", response_model=MarketingLinksResponse)
+def list_links(
+    db: Session = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=200),
+):
+    clicks_count = func.count(MarketingClick.id).filter(MarketingClick.is_bot_preview.is_(False))
+    q = (
+        db.query(MarketingLink, clicks_count.label("clicks"))
+        .outerjoin(MarketingClick, MarketingClick.link_id == MarketingLink.id)
+        .group_by(MarketingLink.id)
+        .order_by(MarketingLink.created_at.desc())
+    )
+    total_items = q.count()
+    total_pages = max(1, (total_items + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    rows = q.offset((page - 1) * page_size).limit(page_size).all()
+
+    items = [
+        MarketingLinkListItem(**_link_out(link).model_dump(), clicks=clicks, created_at=link.created_at)
+        for link, clicks in rows
+    ]
+    return MarketingLinksResponse(items=items, page=page, total_pages=total_pages, total_items=total_items)
+
+
+@router.delete("/links/{link_id}", response_model=MutationResponse)
+def delete_link(link_id: int, db: Session = Depends(get_db)):
+    link = db.query(MarketingLink).filter(MarketingLink.id == link_id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Ссылка не найдена.")
+    db.delete(link)
+    db.commit()
+    return MutationResponse(success=True, message="Ссылка удалена.")
 
 
 @router.post("/links", response_model=CreateMarketingLinkResponse)

@@ -6,6 +6,7 @@ import { StatsPage } from "./pages/StatsPage";
 import { MarketingStatsPage } from "./pages/MarketingStatsPage";
 import { CreateLinkPage } from "./pages/CreateLinkPage";
 import { DictionariesPage } from "./pages/DictionariesPage";
+import { LinksPage } from "./pages/LinksPage";
 
 const ADMIN_PANEL_BASE_URL = import.meta.env.VITE_ADMIN_PANEL_BASE_URL || "http://localhost:5176";
 
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/" element={<MarketingStatsPage />} />
         <Route path="/legacy" element={<StatsPage />} />
         <Route path="/marketing/create" element={<CreateLinkPage />} />
+        <Route path="/marketing/links" element={<LinksPage />} />
         <Route path="/marketing/dictionaries" element={<DictionariesPage />} />
       </Routes>
     </Shell>

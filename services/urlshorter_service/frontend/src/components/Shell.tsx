@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 
 const TABS = [
   { to: "/", label: "Новая UTM-система", end: true },
+  { to: "/marketing/links", label: "Все ссылки", end: true },
   { to: "/marketing/dictionaries", label: "Справочники", end: true },
   { to: "/legacy", label: "Старая UTM-система", end: true },
 ];
