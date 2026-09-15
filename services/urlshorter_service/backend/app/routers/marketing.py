@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..auth import require_staff
+from ..config import settings
 from ..db import get_db
 from ..models import BOT_PREVIEW_USER_AGENTS, BotBlock, MarketingClick, MarketingLink, UtmMedium, UtmSource
 from ..schemas import (
@@ -83,12 +84,12 @@ def _build_destination_with_utm(link: MarketingLink) -> str:
     return f"{link.destination}{separator}{urlencode(params)}"
 
 
-def _public_link(link: MarketingLink, request: Request) -> str:
-    base = str(request.base_url).rstrip("/")
+def _public_link(link: MarketingLink) -> str:
+    base = settings.public_redirect_base_url.rstrip("/")
     return f"{base}/go?source={link.source}"
 
 
-def _link_out(link: MarketingLink, request: Request) -> MarketingLinkOut:
+def _link_out(link: MarketingLink) -> MarketingLinkOut:
     return MarketingLinkOut(
         id=link.id,
         source=link.source,
@@ -100,7 +101,7 @@ def _link_out(link: MarketingLink, request: Request) -> MarketingLinkOut:
         utm_content=link.utm_content,
         utm_term=link.utm_term,
         bot_block=link.bot_block.key if link.bot_block else None,
-        public_link=_public_link(link, request),
+        public_link=_public_link(link),
     )
 
 
@@ -215,7 +216,7 @@ def known_values(db: Session = Depends(get_db)):
 
 
 @router.post("/links", response_model=CreateMarketingLinkResponse)
-def create_link(payload: CreateMarketingLinkPayload, request: Request, db: Session = Depends(get_db)):
+def create_link(payload: CreateMarketingLinkPayload, db: Session = Depends(get_db)):
     if payload.link_type not in ("site", "bot", "other"):
         raise HTTPException(status_code=400, detail="Некорректный тип назначения.")
 
@@ -259,7 +260,7 @@ def create_link(payload: CreateMarketingLinkPayload, request: Request, db: Sessi
         .first()
     )
     if existing:
-        return CreateMarketingLinkResponse(link=_link_out(existing, request), is_existing=True)
+        return CreateMarketingLinkResponse(link=_link_out(existing), is_existing=True)
 
     link = MarketingLink(
         source=_generate_unique_source(db),
@@ -292,10 +293,10 @@ def create_link(payload: CreateMarketingLinkPayload, request: Request, db: Sessi
             .first()
         )
         if existing:
-            return CreateMarketingLinkResponse(link=_link_out(existing, request), is_existing=True)
+            return CreateMarketingLinkResponse(link=_link_out(existing), is_existing=True)
         raise
     db.refresh(link)
-    return CreateMarketingLinkResponse(link=_link_out(link, request), is_existing=False)
+    return CreateMarketingLinkResponse(link=_link_out(link), is_existing=False)
 
 
 def _build_stats_query(
