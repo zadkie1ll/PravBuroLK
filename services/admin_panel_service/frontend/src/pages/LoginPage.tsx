@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, setToken } from "../api/client";
 
 export function LoginPage() {
@@ -7,6 +7,9 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const expired = searchParams.has("expired");
+  const ssoFailed = searchParams.has("sso_failed");
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -35,6 +38,18 @@ export function LoginPage() {
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
             Неверное имя пользователя или пароль.
+          </div>
+        )}
+
+        {!error && expired && (
+          <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
+            Сессия истекла, войдите заново
+          </div>
+        )}
+
+        {!error && ssoFailed && (
+          <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
+            Не удалось войти через админку ботов — попробуйте обычный вход
           </div>
         )}
 

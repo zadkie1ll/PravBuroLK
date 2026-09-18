@@ -7,6 +7,7 @@ const CLIENT_SEARCH_BASE_URL = import.meta.env.VITE_CLIENT_SEARCH_BASE_URL || "h
 const REFERRAL_STATS_BASE_URL = import.meta.env.VITE_REFERRAL_STATS_BASE_URL || "http://localhost:5178";
 const PAYMENTS_DASHBOARD_BASE_URL = import.meta.env.VITE_CLIENT_SEARCH_BASE_URL || "http://localhost:5177";
 const URLSHORTER_BASE_URL = import.meta.env.VITE_URLSHORTER_BASE_URL || "http://localhost:5179";
+const BOT_ADMIN_BASE_URL = import.meta.env.VITE_BOT_ADMIN_BASE_URL || "http://localhost:8199";
 
 interface NavItem {
   id: string;
@@ -81,6 +82,14 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+// Бот-админка (bot_pravburo, отдельный репозиторий/сервер) — не модуль в общем списке
+// (открывается не в iframe, а отдельной вкладкой), а второй пункт в переключалке панелей
+// в шапке сайдбара, как и здесь сам LK. Принимает наш JWT на своём GET /api/auth/sso —
+// тот же общий SSO_JWT_SECRET, что и у остальных модулей-получателей.
+function botAdminUrl(token: string): string {
+  return `${BOT_ADMIN_BASE_URL}/api/auth/sso?token=${encodeURIComponent(token)}`;
+}
+
 export function AdminPanelPage() {
   const navigate = useNavigate();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -95,10 +104,16 @@ export function AdminPanelPage() {
         const visible = NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(res.user.role));
         setActiveId(visible[0]?.id ?? null);
       })
-      .catch(() => setUser(null));
-  }, []);
+      .catch(() => {
+        // И access_token, и refresh-кука (см. api/client.ts) оказались нерабочими —
+        // тихий релогин уже не спасёт, остаётся отправить на страницу входа.
+        clearToken();
+        navigate("/login?expired=1");
+      });
+  }, [navigate]);
 
   function logout() {
+    api.logout().catch(() => {});
     clearToken();
     navigate("/login");
   }
@@ -139,6 +154,15 @@ export function AdminPanelPage() {
     if (canHover && !shieldHop) setShieldHop(true);
   }
 
+  const [panelSwitcherOpen, setPanelSwitcherOpen] = useState(false);
+
+  useEffect(() => {
+    if (!panelSwitcherOpen) return;
+    const handler = () => setPanelSwitcherOpen(false);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [panelSwitcherOpen]);
+
   function selectItem(id: string) {
     setActiveId(id);
     if (window.innerWidth < 768) setSidebarOpen(false);
@@ -158,20 +182,68 @@ export function AdminPanelPage() {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center gap-2 border-b border-white/10 px-5 py-5">
-          <div
-            className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#93C5FD] text-[#1c1c1e] ${
-              shieldHop ? "shield-hop" : ""
-            }`}
-            onMouseEnter={handleShieldHover}
-            onAnimationEnd={() => setShieldHop(false)}
+        <div className="relative border-b border-white/10">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPanelSwitcherOpen((open) => !open);
+            }}
+            aria-expanded={panelSwitcherOpen}
+            className="flex w-full items-center gap-2 px-5 py-5 text-left transition hover:bg-white/5"
           >
-            <Icon path="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-white">Админ-панель</div>
-            <div className="text-xs text-gray-400">панель управления</div>
-          </div>
+            <div
+              className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#93C5FD] text-[#1c1c1e] ${
+                shieldHop ? "shield-hop" : ""
+              }`}
+              onMouseEnter={handleShieldHover}
+              onAnimationEnd={() => setShieldHop(false)}
+            >
+              <Icon path="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-white">Админ-панель</div>
+              <div className="text-xs text-gray-400">панель управления</div>
+            </div>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              className={`h-4 w-4 flex-shrink-0 text-gray-500 transition-transform ${
+                panelSwitcherOpen ? "rotate-180" : ""
+              }`}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          {panelSwitcherOpen && (
+            <div className="absolute left-3 right-3 top-full z-50 mt-1 overflow-hidden rounded-lg border border-white/10 bg-[#26262a] shadow-lg">
+              <div className="flex items-center gap-2 bg-white/5 px-3 py-2.5">
+                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-[#93C5FD] text-[#1c1c1e]">
+                  <Icon path="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z" />
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-white">Админ-панель</div>
+                  <div className="text-xs text-gray-500">вы здесь</div>
+                </div>
+              </div>
+
+              <a
+                href={token ? botAdminUrl(token) : undefined}
+                className="flex items-center gap-2 px-3 py-2.5 text-left transition hover:bg-white/10"
+              >
+                <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-[#1c1c1e] text-[#F5A524]">
+                  <Icon path="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-gray-200">Админка ботов</div>
+                  <div className="text-xs text-gray-500">TG/VK/Instagram боты</div>
+                </div>
+              </a>
+            </div>
+          )}
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">

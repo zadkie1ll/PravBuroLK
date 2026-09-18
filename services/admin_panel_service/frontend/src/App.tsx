@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { AdminPanelPage } from "./pages/AdminPanelPage";
+import { SsoPage } from "./pages/SsoPage";
 
 function isAuthenticated() {
   return Boolean(localStorage.getItem("access_token"));
@@ -15,6 +16,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/sso" element={<SsoPage />} />
       <Route
         path="/admin-panel"
         element={
