@@ -238,6 +238,7 @@ export function QueuePage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [stageId, setStageId] = useState("");
+  const [responsibleId, setResponsibleId] = useState("");
   const [autoDial, setAutoDial] = useState(true);
 
   const [customEntityType, setCustomEntityType] = useState("deal");
@@ -268,6 +269,7 @@ export function QueuePage() {
           date_from: dateFrom,
           date_to: dateTo,
           stage_id: stageId,
+          responsible_id: responsibleId,
           auto_dial: autoDial,
         })
       );
@@ -419,6 +421,21 @@ export function QueuePage() {
                   >
                     <option value="">Все стадии</option>
                     {state.stage_choices.map((choice) => (
+                      <option key={choice.value} value={choice.value}>
+                        {choice.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Ответственный менеджер</label>
+                  <select
+                    value={responsibleId}
+                    onChange={(e) => setResponsibleId(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-amber-500"
+                  >
+                    <option value="">Не выбрано</option>
+                    {state.responsible_choices.map((choice) => (
                       <option key={choice.value} value={choice.value}>
                         {choice.label}
                       </option>

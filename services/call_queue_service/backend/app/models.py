@@ -83,6 +83,7 @@ class UserQueueState(Base):
     date_from: Mapped[str] = mapped_column(String(16), default="")
     date_to: Mapped[str] = mapped_column(String(16), default="")
     stage_id: Mapped[str] = mapped_column(String(64), default="")
+    responsible_id: Mapped[str] = mapped_column(String(64), default="")
     auto_dial: Mapped[bool] = mapped_column(Boolean, default=True)
     custom_entity_type: Mapped[str] = mapped_column(String(16), default=CallEntityType.DEAL.value)
     custom_category_id: Mapped[str] = mapped_column(String(64), default="")

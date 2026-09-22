@@ -123,6 +123,7 @@ export interface QueueState {
   auto_dial_enabled: boolean;
   stage_choices: Choice[];
   category_choices: Choice[];
+  responsible_choices: Choice[];
 }
 
 export interface CallTimelineEntry {

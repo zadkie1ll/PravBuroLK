@@ -123,7 +123,10 @@ class BitrixDealService:
         try:
             users = self.client.paginated_call(
                 "user.get",
-                {"filter": {"ACTIVE": True}, "select": ["ID", "NAME", "LAST_NAME"]},
+                {
+                    "filter": {"ACTIVE": True, "UF_DEPARTMENT": settings.call_queue_sales_department_id},
+                    "select": ["ID", "NAME", "LAST_NAME"],
+                },
             )
         except Exception:
             return []
@@ -185,6 +188,7 @@ class BitrixDealService:
         date_to,
         stage_id: str = "",
         category_id: str = "",
+        responsible_id: int | str | None = None,
     ) -> list[dict[str, Any]]:
         from_dt, to_dt = _build_bitrix_date_range(date_from, date_to)
         method = "crm.deal.list" if entity_type == CallEntityType.DEAL else "crm.lead.list"
@@ -202,6 +206,8 @@ class BitrixDealService:
             bitrix_filter[stage_field] = stage_id
         if category_id and entity_type == CallEntityType.DEAL:
             bitrix_filter["CATEGORY_ID"] = category_id
+        if responsible_id:
+            bitrix_filter["ASSIGNED_BY_ID"] = responsible_id
         entities = self.client.paginated_call(
             method,
             {

@@ -34,6 +34,7 @@ class BuildQueueRequest(BaseModel):
     date_from: date
     date_to: date
     stage_id: str = ""
+    responsible_id: str = ""
     auto_dial: bool = True
 
 
@@ -60,6 +61,7 @@ class QueueStateOut(BaseModel):
     auto_dial_enabled: bool
     stage_choices: list[ChoiceOut]
     category_choices: list[ChoiceOut]
+    responsible_choices: list[ChoiceOut]
 
 
 class ResolveCallRequest(BaseModel):

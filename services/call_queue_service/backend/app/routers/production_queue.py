@@ -31,6 +31,7 @@ def _state_out(db: Session, user: User) -> QueueStateOut:
     service = BitrixDealService()
     stage_choices = service.get_stage_choices(state.entity_type)
     category_choices = service.get_deal_category_choices() if state.entity_type == CallEntityType.DEAL.value else []
+    responsible_choices = service.get_responsible_choices()
     return QueueStateOut(
         queue=queue,
         queue_size=len(queue),
@@ -41,6 +42,7 @@ def _state_out(db: Session, user: User) -> QueueStateOut:
         auto_dial_enabled=state.auto_dial,
         stage_choices=[ChoiceOut(value=v, label=label) for v, label in stage_choices],
         category_choices=[ChoiceOut(value=v, label=label) for v, label in category_choices],
+        responsible_choices=[ChoiceOut(value=v, label=label) for v, label in responsible_choices],
     )
 
 
@@ -68,6 +70,7 @@ def build_queue(
         date_from=payload.date_from,
         date_to=payload.date_to,
         stage_id=payload.stage_id,
+        responsible_id=payload.responsible_id,
     )
     queue_state.build_queue(db, current_user, entity_type=payload.entity_type.value, items=items)
 
@@ -75,6 +78,7 @@ def build_queue(
     state.date_from = payload.date_from.isoformat()
     state.date_to = payload.date_to.isoformat()
     state.stage_id = payload.stage_id
+    state.responsible_id = payload.responsible_id
     state.auto_dial = payload.auto_dial
     db.commit()
 

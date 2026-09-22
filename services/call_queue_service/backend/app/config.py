@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     call_queue_max_desktop_url: str = "max://"
     deal_duplication_source_category_id: int = 2
     deal_duplication_target_category_id: int = 10
+    call_queue_sales_department_id: int = 5
 
     megafon_vats_api_url: str = ""
     megafon_vats_api_key: str = ""
