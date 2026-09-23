@@ -1,10 +1,13 @@
-"""One-shot ETL: копирует clients_stagetemplate/clients_client из монолита (схема public,
-Django ORM) в схему client_search_service. Только поля, нужные для поиска/списка (см.
-app/models.py) — договор/платежи/эквайринг остаются в монолите вместе с client_admin_view.
+"""Периодический ETL (гоняется из ~/etl_sync.sh по crontab каждые ~20 минут вместе с
+остальными etl_import_*.py): копирует clients_stagetemplate/clients_client из монолита
+(схема public, Django ORM) в схему client_search_service. Только поля, нужные для
+поиска/списка (см. app/models.py) — договор/платежи/эквайринг остаются в монолите вместе
+с client_admin_view.
 
 Explicit-PK insert (сохраняем id как есть, чтобы monolith_client_admin_url/<id>/ продолжал
-указывать на верного клиента) + ON CONFLICT (id) DO NOTHING — идемпотентно, безопасно
-перезапускать. Никакого сопоставления пользователей не нужно: тут нет auth_user FK.
+указывать на верного клиента) + ON CONFLICT (id) DO UPDATE — идемпотентно, безопасно
+перезапускать; при повторном запуске подтягивает изменения полей, а не только создаёт новые
+строки. Никакого сопоставления пользователей не нужно: тут нет auth_user FK.
 
 Использование:
     SOURCE_DATABASE_URL=postgresql://admin:...@host:5440/bd \
@@ -68,6 +71,10 @@ def main() -> None:
             dest_cur,
             """insert into clients (id, name, surname, middlename, bitrix_id, stage_id, is_blocked)
                values %s on conflict (id) do update set
+                   name = excluded.name,
+                   surname = excluded.surname,
+                   middlename = excluded.middlename,
+                   bitrix_id = excluded.bitrix_id,
                    stage_id = excluded.stage_id,
                    is_blocked = excluded.is_blocked""",
             [
