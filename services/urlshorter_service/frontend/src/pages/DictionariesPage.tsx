@@ -19,6 +19,8 @@ export function DictionariesPage() {
   const [data, setData] = useState<DictionariesResponse | null>(null);
   const [newSourceCode, setNewSourceCode] = useState("");
   const [newMediumCode, setNewMediumCode] = useState("");
+  const [newBlockKey, setNewBlockKey] = useState("");
+  const [newBlockTitle, setNewBlockTitle] = useState("");
 
   function load() {
     marketingApi.dictionaries(true).then(setData);
@@ -39,6 +41,17 @@ export function DictionariesPage() {
     if (!newMediumCode.trim()) return;
     await marketingApi.addUtmMedium(newMediumCode.trim().toLowerCase());
     setNewMediumCode("");
+    load();
+  }
+
+  async function addBlock(e: FormEvent) {
+    e.preventDefault();
+    if (!newBlockKey.trim() || !newBlockTitle.trim()) return;
+    // key — то же значение, что заводится в DEEPLINK_BLOCKS бота (tg_bot/app/handlers.py),
+    // иначе ссылка будет вести на несуществующий в боте блок.
+    await marketingApi.addBotBlock(newBlockKey.trim().toLowerCase(), newBlockTitle.trim());
+    setNewBlockKey("");
+    setNewBlockTitle("");
     load();
   }
 
@@ -115,8 +128,27 @@ export function DictionariesPage() {
             </div>
           ))}
         </div>
+        <form onSubmit={addBlock} className="mt-3 flex flex-wrap gap-2">
+          <input
+            placeholder="ключ, например banki"
+            pattern="[a-z0-9\-]+"
+            value={newBlockKey}
+            onChange={(e) => setNewBlockKey(e.target.value)}
+            className="w-32 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+          />
+          <input
+            placeholder="название, например «Гайд про банки»"
+            value={newBlockTitle}
+            onChange={(e) => setNewBlockTitle(e.target.value)}
+            className="min-w-[12rem] flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+          />
+          <button type="submit" className="rounded-lg bg-[#1c1c1e] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#333]">
+            Добавить
+          </button>
+        </form>
         <p className="mt-3 text-xs text-gray-400">
-          Блоки создаются в админке бота — здесь можно только скрыть/показать уже существующие.
+          Ключ должен совпадать с тем, что заведено в DEEPLINK_BLOCKS бота (tg_bot/app/handlers.py) —
+          иначе ссылка будет вести на несуществующий в боте раздел.
         </p>
       </div>
 
