@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     bitrix_profile_default_webhook_url: str = ""
     bitrix_profile_documents_webhook_url: str = ""
     bitrix_profile_messaging_webhook_url: str = ""
+    bitrix_profile_consultation_webhook_url: str = ""
 
     @property
     def profile_webhook_urls(self) -> dict[str, str]:
@@ -16,6 +17,7 @@ class Settings(BaseSettings):
             "default": self.bitrix_profile_default_webhook_url,
             "documents": self.bitrix_profile_documents_webhook_url,
             "messaging": self.bitrix_profile_messaging_webhook_url,
+            "consultation": self.bitrix_profile_consultation_webhook_url,
         }
 
 
