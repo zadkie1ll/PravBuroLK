@@ -1,0 +1,29 @@
+name: consultation_service
+
+# network_mode: host — backend и frontend видят друг друга через 127.0.0.1,
+# поэтому PRINT_BASE_URL в проде = http://127.0.0.1:5180 (см. .env на сервере).
+#
+# Запуск:
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  backend:
+    build: ./backend
+    container_name: consultation_backend
+    network_mode: host
+    env_file: .env
+    command: uvicorn app.main:app --host 127.0.0.1 --port 8012
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_BASE_URL: "https://pdf.prav-buro.ru"
+        DEPLOY_BASE_PATH: "/"
+    container_name: consultation_frontend
+    network_mode: host
+    environment:
+      NGINX_PORT: "5180"
+    restart: unless-stopped

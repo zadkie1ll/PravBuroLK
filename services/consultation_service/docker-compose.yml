@@ -1,0 +1,26 @@
+name: consultation_service
+
+services:
+  backend:
+    build: ./backend
+    container_name: consultation_backend
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8012:8012"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build: ./frontend
+    container_name: consultation_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8012
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5180:5180"
+    depends_on:
+      - backend

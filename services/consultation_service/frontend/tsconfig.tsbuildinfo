@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/api/client.ts","./src/components/report/editablefield.tsx","./src/components/report/reportpages.tsx","./src/components/report/format.ts","./src/components/report/staticcontent.ts","./src/pages/consultationpage.tsx","./src/pages/consultationprintpage.tsx"],"version":"5.9.3"}
