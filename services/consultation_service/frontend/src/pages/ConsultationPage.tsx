@@ -73,6 +73,9 @@ export function ConsultationPage() {
         editable
         onFieldChange={handleFieldChange}
       />
+      <div style={{ textAlign: "center", fontSize: 12, color: "#8593a5", padding: "4px 20px 0" }}>
+        * — поля, которые пока не сохраняются в Bitrix (временно)
+      </div>
       <div
         style={{
           position: "fixed",

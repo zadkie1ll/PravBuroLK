@@ -143,22 +143,31 @@ function ReadOnlyTerm({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** "*" у подписи — этого поля физически нет в Bitrix (см. config.py:
+ * PENDING_BITRIX_FIELD_KEYS), значение не сохранится при "Сохранить". Только на
+ * сайте (editable=true) — в PDF звёздочка не попадает вообще. */
+function pendingLabel(label: string, editable: boolean): string {
+  return editable ? `${label} *` : label;
+}
+
 function Term({
   label,
   value,
   editable,
   onChange,
   money,
+  pending = false,
 }: {
   label: string;
   value: string;
   editable: boolean;
   onChange: (v: string) => void;
   money?: boolean;
+  pending?: boolean;
 }) {
   return (
     <div className="term">
-      <span className="label">{label}</span>
+      <span className="label">{pending ? pendingLabel(label, editable) : label}</span>
       <span className="value">
         <EditableField value={value} editable={editable} onChange={onChange} money={money} />
       </span>
@@ -183,7 +192,7 @@ function OptionalNote({
   if (!editable && !value.trim()) return null;
   return (
     <div className="note">
-      <div className="section-title">{title}</div>
+      <div className="section-title">{pendingLabel(title, editable)}</div>
       <p>
         <EditableField value={value} editable={editable} onChange={onChange} multiline />
       </p>
@@ -211,6 +220,7 @@ function FinancialTerms({ fields, computed, editable, onFieldChange }: Pick<Repo
           editable={editable}
           onChange={(v) => onFieldChange("currentPayment", v)}
           money
+          pending
         />
       ) : null}
       <OptionalNote
@@ -234,7 +244,7 @@ function NextActions({ fields, editable, onFieldChange }: Pick<ReportPagesProps,
       <div className="section-title">Дальнейшие действия</div>
       {rows.map(([key, label, placeholder]) => (
         <div className="action-row" key={key}>
-          <div className="label">{label}</div>
+          <div className="label">{pendingLabel(label, editable)}</div>
           <div className="value">
             <EditableField value={fields[key]} editable={editable} onChange={(v) => onFieldChange(key, v)} placeholder={placeholder} />
           </div>
@@ -242,7 +252,7 @@ function NextActions({ fields, editable, onFieldChange }: Pick<ReportPagesProps,
       ))}
       {editable || fields.documents.trim() ? (
         <div className="action-row">
-          <div className="label">Предоставить</div>
+          <div className="label">{pendingLabel("Предоставить", editable)}</div>
           <div className="value">
             <EditableField value={fields.documents} editable={editable} onChange={(v) => onFieldChange("documents", v)} multiline />
           </div>
