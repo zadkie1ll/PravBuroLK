@@ -45,7 +45,15 @@ def process_next():
             subprocess.run(['curl', '-fL', '--retry', '3', '-o', str(source), href], check=True)
             module.video_import_status = 'converting'
             db.commit()
-            subprocess.run(['ffmpeg', '-nostdin', '-y', '-i', str(source), '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'medium', '-crf', '23', '-c:a', 'aac', '-movflags', '+faststart', str(output)], check=True)
+            subprocess.run([
+                'ffmpeg', '-nostdin', '-y', '-i', str(source),
+                '-map', '0:v:0', '-map', '0:a:0?',
+                # 1080p is enough for the LMS and keeps peak RAM usage safe on the server.
+                '-vf', 'scale=min(1920,iw):-2',
+                '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+                '-preset', 'veryfast', '-threads', '2', '-crf', '23',
+                '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', str(output)
+            ], check=True)
             subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-xerror', '-i', str(output), '-f', 'null', '-'], check=True)
             db.refresh(module)
             if module.video_url != source_url or module.video_import_status != 'converting':
