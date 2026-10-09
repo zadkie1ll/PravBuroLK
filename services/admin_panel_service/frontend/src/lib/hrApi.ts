@@ -1,5 +1,4 @@
-import { backend } from "./utils";
-import { authHeaders } from "./token";
+import { request } from "../api/client";
 
 export interface HrDepartment {
   code: string;
@@ -119,17 +118,7 @@ export interface HrTraineeDetail {
   course_rows: HrCourseProgressRow[];
 }
 
-async function req<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${backend}${path}`, {
-    ...options,
-    headers: { ...authHeaders(), ...(options.headers || {}) },
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error((data as { detail?: string }).detail || `Ошибка запроса (${response.status})`);
-  }
-  return data as T;
-}
+const req = <T,>(path: string, options: RequestInit = {}) => request<T>(`/education-management${path}`, options);
 
 function jsonBody(body: unknown): RequestInit {
   return { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };

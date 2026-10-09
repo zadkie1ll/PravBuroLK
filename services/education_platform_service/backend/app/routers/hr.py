@@ -6,7 +6,7 @@ import string
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session, joinedload
 
-from ..auth import hash_password, require_staff
+from ..auth import hash_password, require_education_admin
 from ..db import get_db
 from ..models import (
     Course,
@@ -48,7 +48,7 @@ from ..schemas import (
 from ..services.file_streaming import save_upload
 from ..services.video_import import is_yandex
 
-router = APIRouter(prefix="/hr", tags=["hr"], dependencies=[Depends(require_staff)])
+router = APIRouter(prefix="/hr", tags=["hr"], dependencies=[Depends(require_education_admin)])
 
 
 def _generate_password(length: int = 12) -> str:
@@ -112,6 +112,7 @@ def dashboard(db: Session = Depends(get_db)):
                     description=module.description,
                     video_url=module.video_url,
                     private_video=module.private_video,
+                    video_import_status=module.video_import_status,
                     order=module.order,
                     is_active=module.is_active,
                     materials=[

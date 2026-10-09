@@ -32,10 +32,10 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-async function request<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
+export async function request<T>(path: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const token = getToken();
   const headers: HeadersInit = {
-    "Content-Type": "application/json",
+    ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   };

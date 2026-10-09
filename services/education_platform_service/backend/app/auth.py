@@ -61,6 +61,23 @@ def require_staff(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+def require_education_admin(token: str | None = Depends(oauth2_scheme)) -> dict:
+    """Only the hub gateway may call management routes; trainee JWTs never qualify."""
+    if not token:
+        raise credentials_exception
+    signing_secret = settings.education_admin_secret or settings.jwt_secret
+    try:
+        payload = jwt.decode(
+            token, signing_secret, algorithms=[settings.jwt_algorithm],
+            audience="education-admin", issuer="admin_panel",
+        )
+    except JWTError:
+        raise credentials_exception
+    if payload.get("type") != "education_admin" or not payload.get("username"):
+        raise credentials_exception
+    return payload
+
+
 def get_current_user_flexible(
     token: str | None = Depends(oauth2_scheme),
     query_token: str | None = Query(default=None, alias="token"),

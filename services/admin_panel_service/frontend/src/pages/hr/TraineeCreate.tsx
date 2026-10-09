@@ -46,7 +46,7 @@ export default function TraineeCreate() {
 
   return (
     <Box sx={{ p: 4, maxWidth: 500, mx: "auto" }}>
-      <Button onClick={() => navigate("/admin/trainees")} sx={{ mb: 2 }}>
+      <Button onClick={() => navigate("/admin-panel/education/trainees")} sx={{ mb: 2 }}>
         ← Назад к стажёрам
       </Button>
       <Typography variant="h4" fontWeight="bold" sx={{ mb: 3 }}>

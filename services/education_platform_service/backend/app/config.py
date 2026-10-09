@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-insecure-secret-change-me"
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 12
+    education_admin_secret: str = ""
 
     # Примонтированный private_media монолита (BASE_DIR/private_media), read-only.
     media_root: str = "/private_media"

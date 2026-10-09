@@ -191,8 +191,8 @@ export default function TestEdit() {
 
   return (
     <Box sx={{ p: 4, maxWidth: 800, mx: "auto" }}>
-      <Button onClick={() => navigate("/admin")} sx={{ mb: 2 }}>
-        ← Назад в HR
+      <Button onClick={() => navigate("/admin-panel/education")} sx={{ mb: 2 }}>
+        ← Назад к курсам
       </Button>
       <Typography variant="h5" fontWeight="bold" sx={{ mb: 2 }}>
         Редактирование теста

@@ -1,0 +1,14 @@
+{
+  "0": "hrApi.ts",
+  "1": "CourseDetails.tsx",
+  "2": "dependencies",
+  "3": "compilerOptions",
+  "4": "devDependencies",
+  "5": "compilerOptions",
+  "6": "auth.ts",
+  "7": "useStaffGuard",
+  "8": "React + TypeScript + Vite",
+  "9": "tsconfig.json",
+  "10": "eslint.config.js",
+  "11": "vite.config.ts"
+}

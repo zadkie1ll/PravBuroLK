@@ -2,6 +2,11 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
 import { AdminPanelPage } from "./pages/AdminPanelPage";
 import { SsoPage } from "./pages/SsoPage";
+import HrDashboard from "./pages/hr/HrDashboard";
+import TestEdit from "./pages/hr/TestEdit";
+import Trainees from "./pages/hr/Trainees";
+import TraineeCreate from "./pages/hr/TraineeCreate";
+import TraineeDetail from "./pages/hr/TraineeDetail";
 
 function isAuthenticated() {
   return Boolean(localStorage.getItem("access_token"));
@@ -24,7 +29,13 @@ export default function App() {
             <AdminPanelPage />
           </RequireAuth>
         }
-      />
+      >
+        <Route path="education" element={<HrDashboard />} />
+        <Route path="education/module/:id/test" element={<TestEdit />} />
+        <Route path="education/trainees" element={<Trainees />} />
+        <Route path="education/trainees/new" element={<TraineeCreate />} />
+        <Route path="education/trainees/:id" element={<TraineeDetail />} />
+      </Route>
       <Route path="*" element={<Navigate to={isAuthenticated() ? "/admin-panel" : "/login"} replace />} />
     </Routes>
   );

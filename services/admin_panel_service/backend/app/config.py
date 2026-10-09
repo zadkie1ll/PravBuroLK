@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-insecure-secret-change-me"
     jwt_algorithm: str = "HS256"
     jwt_expires_minutes: int = 60 * 12
+    education_api_url: str = "http://127.0.0.1:8003"
+    education_admin_secret: str = ""
 
     # Refresh-токен живёт в httponly-куке (недоступен из JS, не светится в localStorage) —
     # фронт дёргает /auth/refresh при протухшем access_token вместо принудительного релогина.

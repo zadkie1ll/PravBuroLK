@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import auth
+from .routers import auth, education
 
 app = FastAPI(title="Admin Panel Service", version="0.1.0")
 
@@ -14,6 +14,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(education.router)
 
 
 @app.get("/health")

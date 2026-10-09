@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api, clearToken, UserOut } from "../api/client";
+import { ThemeProvider } from "@mui/material/styles";
+import { educationTheme } from "../lib/educationTheme";
 
 const LEADREPORT_BASE_URL = import.meta.env.VITE_LEADREPORT_BASE_URL || "http://localhost:5175";
 const CLIENT_SEARCH_BASE_URL = import.meta.env.VITE_CLIENT_SEARCH_BASE_URL || "http://localhost:5177";
@@ -8,7 +10,6 @@ const REFERRAL_STATS_BASE_URL = import.meta.env.VITE_REFERRAL_STATS_BASE_URL || 
 const PAYMENTS_DASHBOARD_BASE_URL = import.meta.env.VITE_CLIENT_SEARCH_BASE_URL || "http://localhost:5177";
 const URLSHORTER_BASE_URL = import.meta.env.VITE_URLSHORTER_BASE_URL || "http://localhost:5179";
 const BOT_ADMIN_BASE_URL = import.meta.env.VITE_BOT_ADMIN_BASE_URL || "http://localhost:8199";
-const EDUCATION_ADMIN_BASE_URL = import.meta.env.VITE_EDUCATION_ADMIN_BASE_URL || "http://localhost:5174/education/admin";
 
 interface NavItem {
   id: string;
@@ -39,7 +40,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Обучение",
     description: "Курсы, модули и стажёры",
     icon: <Icon path="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15zM4 20.5A2.5 2.5 0 0 1 6.5 18H20" />,
-    url: (token) => `${EDUCATION_ADMIN_BASE_URL}?token=${encodeURIComponent(token)}`,
+    url: () => "/admin-panel/education",
     roles: ["admin", "director"],
   },
   {
@@ -101,6 +102,8 @@ function botAdminUrl(token: string): string {
 
 export function AdminPanelPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isEducation = location.pathname.startsWith("/admin-panel/education");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [user, setUser] = useState<UserOut | null>(null);
   const token = localStorage.getItem("access_token") || "";
@@ -111,7 +114,8 @@ export function AdminPanelPage() {
       .then((res) => {
         setUser(res.user);
         const visible = NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(res.user.role));
-        setActiveId(visible[0]?.id ?? null);
+        setActiveId(visible.find((item) => item.id !== "education")?.id ?? visible[0]?.id ?? null);
+        if (isEducation && (!res.user.is_staff || !["admin", "director"].includes(res.user.role))) navigate("/admin-panel", { replace: true });
       })
       .catch(() => {
         // И access_token, и refresh-кука (см. api/client.ts) оказались нерабочими —
@@ -128,7 +132,7 @@ export function AdminPanelPage() {
   }
 
   const visibleItems = NAV_ITEMS.filter((item) => !user || !item.roles || item.roles.includes(user.role));
-  const active = visibleItems.find((item) => item.id === activeId) ?? visibleItems[0];
+  const active = visibleItems.find((item) => item.id === (isEducation ? "education" : activeId)) ?? visibleItems[0];
 
   const [shieldHop, setShieldHop] = useState(false);
   const [canHover, setCanHover] = useState(() =>
@@ -174,6 +178,7 @@ export function AdminPanelPage() {
 
   function selectItem(id: string) {
     setActiveId(id);
+    navigate(id === "education" ? "/admin-panel/education" : "/admin-panel");
     if (window.innerWidth < 768) setSidebarOpen(false);
   }
 
@@ -317,7 +322,11 @@ export function AdminPanelPage() {
         </header>
 
         <main className="flex-1 overflow-hidden bg-[#f3f4f6]">
-          {token && active ? (
+          {isEducation && user?.is_staff && ["admin", "director"].includes(user.role) ? (
+            <ThemeProvider theme={educationTheme}>
+              <div className="h-full overflow-auto"><Outlet /></div>
+            </ThemeProvider>
+          ) : token && active ? (
             <iframe
               key={active.id}
               src={active.url(token)}
