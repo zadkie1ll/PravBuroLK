@@ -29,6 +29,7 @@ export interface HrModule {
   description: string;
   video_url: string;
   private_video: string;
+  video_import_status?: string;
   order: number;
   is_active: boolean;
   materials: HrMaterial[];

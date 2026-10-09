@@ -204,7 +204,10 @@ function ModuleDialog({
           {error && <Alert severity="error">{error}</Alert>}
           <TextField label="Название" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
           <TextField label="Описание" value={description} onChange={(e) => setDescription(e.target.value)} multiline rows={3} fullWidth />
-          <TextField label="video_url (если видео внешнее)" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} fullWidth />
+          <TextField label="Ссылка на видео" helperText="Вставьте ссылку на видео Яндекс.Диска и сохраните. Видео автоматически загрузится и подготовится на сервере. Для внешнего плеера используйте embed-ссылку." value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} fullWidth />
+          {module?.video_import_status && <Alert severity={module.video_import_status === 'failed' ? 'error' : 'info'}>
+            {{queued: 'В очереди', downloading: 'Скачивание', converting: 'Подготовка видео', ready: 'Видео готово', failed: 'Импорт не удался. Проверьте ссылку и сохраните модуль для повтора.'}[module.video_import_status] || module.video_import_status}
+          </Alert>}
           <Button variant="outlined" component="label">
             {videoFile ? videoFile.name : "Загрузить приватное видео"}
             <input type="file" accept="video/*" hidden onChange={(e) => setVideoFile(e.target.files?.[0] || null)} />

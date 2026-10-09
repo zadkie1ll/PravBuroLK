@@ -31,6 +31,7 @@ from ..schemas import (
     TestQuestionOut,
 )
 from .auth import _department_codes
+from ..services.video_import import is_yandex
 
 router = APIRouter(tags=["courses"])
 
@@ -143,7 +144,7 @@ def get_modules(
                 id=module.id,
                 name=module.name,
                 description=module.description,
-                video_url=f"/modules/{module.id}/video" if module.private_video else module.video_url,
+                video_url=f"/modules/{module.id}/video" if module.private_video else ('' if is_yandex(module.video_url) else module.video_url),
                 video_is_private=bool(module.private_video),
                 materials=materials,
                 order=module.order,

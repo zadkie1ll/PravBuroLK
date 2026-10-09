@@ -46,6 +46,7 @@ from ..schemas import (
     HrTraineeUpdateIn,
 )
 from ..services.file_streaming import save_upload
+from ..services.video_import import is_yandex
 
 router = APIRouter(prefix="/hr", tags=["hr"], dependencies=[Depends(require_staff)])
 
@@ -172,6 +173,7 @@ def _module_out(module: Module) -> HrModuleOut:
         description=module.description,
         video_url=module.video_url,
         private_video=module.private_video,
+        video_import_status=module.video_import_status,
         order=module.order,
         is_active=module.is_active,
         materials=[
@@ -200,6 +202,7 @@ def create_module(
         name=name,
         description=description,
         video_url=video_url,
+        video_import_status='queued' if is_yandex(video_url) and not private_video else '',
         order=order,
         is_active=is_active,
         private_video=save_upload(private_video, "education/videos") if private_video and private_video.filename else "",
@@ -240,6 +243,10 @@ def update_module(
     module.course_id = course_id
     module.name = name
     module.description = description
+    if is_yandex(video_url) and not private_video and (module.video_url != video_url or module.video_import_status == 'failed'):
+        module.video_import_status = 'queued'
+    elif not is_yandex(video_url) or private_video:
+        module.video_import_status = ''
     module.video_url = video_url
     module.order = order
     module.is_active = is_active

@@ -138,6 +138,7 @@ class HrTestSummaryOut(BaseModel):
 
 
 class HrModuleOut(BaseModel):
+    video_import_status: str = ''
     id: int
     course_id: int
     name: str

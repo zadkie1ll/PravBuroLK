@@ -120,6 +120,7 @@ class Module(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     video_url: Mapped[str] = mapped_column(String(1000), default="")
     private_video: Mapped[str] = mapped_column(String(500), default="")
+    video_import_status: Mapped[str] = mapped_column(String(32), default="")
     order: Mapped[int] = mapped_column(Integer, default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
