@@ -36,14 +36,6 @@ function Icon({ path }: { path: string }) {
 
 const NAV_ITEMS: NavItem[] = [
   {
-    id: "education",
-    label: "Обучение",
-    description: "Курсы, модули и стажёры",
-    icon: <Icon path="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15zM4 20.5A2.5 2.5 0 0 1 6.5 18H20" />,
-    url: () => "/admin-panel/education",
-    roles: ["admin", "director"],
-  },
-  {
     id: "client-search",
     label: "Поиск клиентов",
     description: "ФИО, телефон, ID",
@@ -89,6 +81,14 @@ const NAV_ITEMS: NavItem[] = [
     description: "Короткие ссылки, клики по UTM",
     icon: <Icon path="M13.5 10.5 21 3m0 0h-5.5M21 3v5.5M10 6H6a3 3 0 0 0-3 3v9a3 3 0 0 0 3 3h9a3 3 0 0 0 3-3v-4" />,
     url: (token) => `${URLSHORTER_BASE_URL}/?token=${encodeURIComponent(token)}`,
+  },
+  {
+    id: "education",
+    label: "Обучение",
+    description: "Курсы, модули и стажёры",
+    icon: <Icon path="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15zM4 20.5A2.5 2.5 0 0 1 6.5 18H20" />,
+    url: () => "/admin-panel/education",
+    roles: ["admin", "director"],
   },
 ];
 
