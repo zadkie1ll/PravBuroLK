@@ -54,23 +54,8 @@ def _assign_department(user: User, department_code: str, db: Session) -> None:
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    username = payload.username.strip()
-    if not username or not payload.password or not payload.department:
-        raise HTTPException(status_code=400, detail="username, password and department required")
+    raise HTTPException(status_code=403, detail="Самостоятельная регистрация отключена. Обратитесь к администратору.")
 
-    department = db.query(Department).filter(Department.code == payload.department, Department.is_active.is_(True)).first()
-    if not department:
-        raise HTTPException(status_code=400, detail="Неизвестный отдел")
-
-    if db.query(User).filter(User.username == username).first():
-        raise HTTPException(status_code=409, detail="Пользователь уже существует")
-
-    user = User(username=username, hashed_password=hash_password(payload.password))
-    _assign_department(user, payload.department, db)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return TokenResponse(access_token=create_access_token(user), user=serialize_user(user, db))
 
 
 @router.post("/login", response_model=TokenResponse)

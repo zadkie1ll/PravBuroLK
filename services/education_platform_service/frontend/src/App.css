@@ -1,6 +1,4 @@
-body {
-  display: flex;
-  margin: 0 auto;
-  text-align: center;
-  font-family: Arial, sans-serif;
-}
+#root { min-height: 100vh; }
+.MuiButton-contained { box-shadow: none !important; text-transform: none !important; font-weight: 700 !important; }
+.MuiLinearProgress-bar { background: #38a9dc !important; }
+.MuiLinearProgress-root { background: #dceff8 !important; }

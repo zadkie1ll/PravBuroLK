@@ -23,3 +23,13 @@ div[style*="overflow-x: auto"]::-webkit-scrollbar {
 .course-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
+
+.dashboard { background: #f4f9fc !important; }
+.dashboard-header { background: linear-gradient(135deg, #dff5ff 0%, #f7fcff 72%) !important; border-bottom: 1px solid #dcecf3; }
+.dashboard-header h4 { color: #333; letter-spacing: -.7px; }
+.dashboard-header .MuiButton-outlined { color: #238fc2; border-color: #8dcee7; text-transform: none; border-radius: 10px; }
+
+@media (max-width: 760px) {
+  .dashboard-header { padding: 24px !important; }
+  .dashboard > .MuiBox-root:last-child { padding: 20px !important; }
+}

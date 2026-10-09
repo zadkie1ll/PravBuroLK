@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import "./Auth.css";
 import { Alert, MenuItem, TextField } from "@mui/material";
-import { RegistateUser, LoginUser } from "../lib/auth";
+import { LoginUser } from "../lib/auth";
 import { useNavigate } from "react-router-dom";
 
 const Auth = () => {
-  const [isRegister, setIsRegister] = useState(false);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [department, setDepartment] = useState('');
@@ -47,32 +46,6 @@ const Auth = () => {
     }
   }
 
-  async function onRegisterClick() {
-    if (login && password && department) {
-      try {
-        const result = await RegistateUser(login, password, department);
-        if (result.user) { // Исправлено: проверяем result.user, а не result.department
-          localStorage.setItem("user", result.user.id.toString()); // Сохраняем user.id как "user"
-          localStorage.setItem("username", result.user.username);
-          localStorage.setItem("department", result.user.department);
-          localStorage.setItem("departments", JSON.stringify(result.user.departments || []));
-          localStorage.setItem("is_staff", String(result.user.is_staff));
-          navigate("/dashboard", { replace: true });
-        }
-      } catch (error) {
-        if (error instanceof Error) {
-          setAlertText(error.message);
-        } else {
-          setAlertText("Неизвестная ошибка");
-        }
-        setAlertShown(true);
-      }
-    } else {
-      setAlertText("Заполните логин, отдел и пароль!");
-      setAlertShown(true);
-    }
-  }
-
   return (
     <div className="auth">
       <div className={`auth-card`}>
@@ -81,7 +54,7 @@ const Auth = () => {
           <h2>Вход</h2>
           <input value={login} onChange={(e) => setLogin(e.target.value)} type="text" placeholder="Логин" />
           <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Пароль" />
-          <div className={`department-wrapper ${isRegister || needsDepartment ? "open" : ""}`}>
+          <div className={`department-wrapper ${needsDepartment ? "open" : ""}`}>
             <TextField
               variant="filled"
               value={department}
@@ -110,8 +83,7 @@ const Auth = () => {
               <MenuItem value="law">Юридический</MenuItem>
             </TextField>
           </div>
-          {!isRegister && <button onClick={onLoginClick}>Войти</button>}
-          {isRegister && <button onClick={onRegisterClick}>Зарегистрироваться</button>}
+          <button onClick={onLoginClick}>Войти</button>
         </div>
         <div className="alert-container">
           {alertShown && (
@@ -121,15 +93,8 @@ const Auth = () => {
           )}
         </div>
       </div>
-      {/* ПЕРЕКЛЮЧАТЕЛЬ */}
       <p className="switch">
-        {isRegister ? "Уже есть аккаунт?" : "Нет аккаунта?"}
-        <span onClick={() => {
-          setIsRegister(!isRegister);
-          setNeedsDepartment(false);
-        }}>
-          {isRegister ? " Войти" : " Зарегистрироваться"}
-        </span>
+        Нет аккаунта? Обратитесь к администратору обучения.
       </p>
     </div>
   );

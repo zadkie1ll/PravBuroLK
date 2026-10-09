@@ -1,63 +1,25 @@
-.auth {
-  min-height: 100vh;
-  min-width: 100vw;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  background: #1e1e1e;
-  color: white;
-}
+.auth { min-height: 100vh; display: grid; place-items: center; padding: 28px; color: #333; background: radial-gradient(circle at 80% 15%, #d8f4ff 0, transparent 35%), #f4f9fc; }
 
-.auth-card {
-  width: 30vw;
-  overflow: hidden;
-  position: relative;
-  display: flex;
-  transition: transform 0.4s ease;
-}
+.auth-card { width: min(100%, 430px); }
 
 
-.form {
-  min-width: 80%;
-  background: #2a2a2a;
-  padding: 10%;
-  border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
+.form { padding: 36px; background: white; border: 1px solid #e1eef5; border-radius: 24px; box-shadow: 0 20px 60px rgba(39,111,143,.13); display: flex; flex-direction: column; gap: 14px; }
+.form h2 { margin: 0 0 8px; font-size: 30px; letter-spacing: -.5px; }
 
-input, select {
-  padding: 12px;
-  border-radius: 8px;
-  border: none;
-  outline: none;
-  font-size: 14px;
-}
+.form input { width: 100%; padding: 14px 15px; border: 1px solid #d7e6ed; border-radius: 12px; outline: none; color: #333; background: #fbfdfe; }
+.form input:focus { border-color: #54b8e3; box-shadow: 0 0 0 4px rgba(84,184,227,.14); }
 
-button {
-  padding: 12px;
-  border-radius: 8px;
-  border: none;
-  background: #2563eb;
-  color: white;
-  cursor: pointer;
-  font-size: 15px;
-}
+.form > button { border: 0; border-radius: 12px; padding: 14px; color: white; background: #35a8dc; font-weight: 700; }
 
 button:hover {
-  background: #1e4fd8;
+  background: #238fc2;
 }
 
-.switch {
-  margin-top: 20px;
-  font-size: 14px;
-}
+.switch { margin-top: 20px; color: #758896; text-align: center; }
 
 .switch span {
-  color: #60a5fa;
+  color: #238fc2;
+  font-weight: 700;
   cursor: pointer;
 }
 .inputLabel {
@@ -88,12 +50,7 @@ button:hover {
 }
 
 .custom-alert {
-  background-color: rgba(200, 30, 30, 0.75) !important;
-  color: white !important;
-  backdrop-filter: blur(6px);
-  border-radius: 12px;
-  padding: 12px 18px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  border-radius: 12px !important;
 
   animation: fadeInOut 3s ease forwards;
 }

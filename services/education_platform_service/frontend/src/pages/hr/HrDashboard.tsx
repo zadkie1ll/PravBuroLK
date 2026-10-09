@@ -108,8 +108,22 @@ function CourseDialog({
           {error && <Alert severity="error">{error}</Alert>}
           <TextField label="Название" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
           <TextField label="Описание" value={description} onChange={(e) => setDescription(e.target.value)} multiline rows={3} fullWidth />
-          <TextField label="image_url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} fullWidth />
-          <TextField label="photo_url" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} fullWidth />
+          <TextField
+            label="Картинка карточки курса"
+            helperText="Ссылка на изображение, которое ученик увидит в списке курсов. Необязательное поле."
+            placeholder="https://example.com/course.jpg"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            fullWidth
+          />
+          <TextField
+            label="Дополнительное изображение"
+            helperText="Пока не отображается в интерфейсе. Можно оставить пустым."
+            placeholder="https://example.com/photo.jpg"
+            value={photoUrl}
+            onChange={(e) => setPhotoUrl(e.target.value)}
+            fullWidth
+          />
           <Box>
             <Typography variant="subtitle2">Отделы</Typography>
             {departments.map((d) => (
