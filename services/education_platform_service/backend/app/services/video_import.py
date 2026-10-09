@@ -49,7 +49,7 @@ def process_next():
                 'ffmpeg', '-nostdin', '-y', '-i', str(source),
                 '-map', '0:v:0', '-map', '0:a:0?',
                 # 1080p is enough for the LMS and keeps peak RAM usage safe on the server.
-                '-vf', 'scale=min(1920,iw):-2',
+                '-vf', r'scale=w=min(1920\,iw):h=-2',
                 '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
                 '-preset', 'veryfast', '-threads', '2', '-crf', '23',
                 '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', str(output)
