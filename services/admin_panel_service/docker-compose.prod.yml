@@ -29,6 +29,7 @@ services:
         VITE_LEADREPORT_BASE_URL: "https://panel.prav-buro.ru/leadreport"
         VITE_REFERRAL_STATS_BASE_URL: "https://panel.prav-buro.ru/referrals"
         VITE_CLIENT_SEARCH_BASE_URL: "https://panel.prav-buro.ru/clients"
+        VITE_EDUCATION_ADMIN_BASE_URL: "https://panel.prav-buro.ru/education/admin"
         # Отдельный сервис на другом сервере (не путь хаба, а свой домен) — ссылка,
         # а не iframe, см. AdminPanelPage.tsx NAV_ITEMS "bot".
         VITE_BOT_ADMIN_BASE_URL: "https://admin.prav-buro.ru"

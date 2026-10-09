@@ -25,6 +25,7 @@ services:
       VITE_REFERRAL_STATS_BASE_URL: http://localhost:5178
       VITE_URLSHORTER_BASE_URL: http://localhost:5179
       VITE_BOT_ADMIN_BASE_URL: https://admin.prav-buro.ru
+      VITE_EDUCATION_ADMIN_BASE_URL: http://localhost:5174/admin
     volumes:
       - ./frontend:/app
       - /app/node_modules

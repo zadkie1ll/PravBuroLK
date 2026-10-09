@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from ..auth import create_access_token, get_current_user, hash_password, verify_password
+from ..config import settings
 from ..db import get_db
 from ..models import Department, User
 from ..schemas import DepartmentOut, LoginRequest, RegisterRequest, TokenResponse, UserOut
@@ -79,6 +81,30 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         _assign_department(user, payload.department, db)
         db.commit()
         db.refresh(user)
+
+    return TokenResponse(access_token=create_access_token(user), user=serialize_user(user, db))
+
+
+@router.post("/admin-exchange", response_model=TokenResponse)
+def admin_exchange(token: str, db: Session = Depends(get_db)):
+    """Exchange a signed admin-panel token for an education session.
+
+    The admin panel and education service intentionally share the JWT secret, but
+    keep separate user tables/schemas. Resolving by username avoids coupling the
+    two services to identical numeric user IDs.
+    """
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Недействительный токен админки")
+
+    username = str(payload.get("username") or "").strip()
+    if not username or payload.get("is_staff") is not True:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нужны права сотрудника")
+
+    user = db.query(User).filter(User.username == username).first()
+    if user is None or not user.is_active or not user.is_staff:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Сотрудник не найден в education")
 
     return TokenResponse(access_token=create_access_token(user), user=serialize_user(user, db))
 

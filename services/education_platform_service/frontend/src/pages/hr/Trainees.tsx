@@ -30,14 +30,14 @@ export default function Trainees() {
 
   return (
     <Box sx={{ p: 4, maxWidth: 900, mx: "auto" }}>
-      <Button onClick={() => navigate("/hr")} sx={{ mb: 2 }}>
+      <Button onClick={() => navigate("/admin")} sx={{ mb: 2 }}>
         ← Назад в HR
       </Button>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="h4" fontWeight="bold">
           Стажёры
         </Typography>
-        <Button variant="contained" onClick={() => navigate("/hr/trainees/new")}>
+        <Button variant="contained" onClick={() => navigate("/admin/trainees/new")}>
           + Новый стажёр
         </Button>
       </Stack>
@@ -57,7 +57,7 @@ export default function Trainees() {
           </TableHead>
           <TableBody>
             {trainees.map((t) => (
-              <TableRow key={t.id} hover sx={{ cursor: "pointer" }} onClick={() => navigate(`/hr/trainees/${t.id}`)}>
+              <TableRow key={t.id} hover sx={{ cursor: "pointer" }} onClick={() => navigate(`/admin/trainees/${t.id}`)}>
                 <TableCell>{t.username}</TableCell>
                 <TableCell>
                   {t.departments.map((d) => (

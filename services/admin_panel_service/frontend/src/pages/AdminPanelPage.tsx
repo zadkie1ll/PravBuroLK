@@ -8,6 +8,7 @@ const REFERRAL_STATS_BASE_URL = import.meta.env.VITE_REFERRAL_STATS_BASE_URL || 
 const PAYMENTS_DASHBOARD_BASE_URL = import.meta.env.VITE_CLIENT_SEARCH_BASE_URL || "http://localhost:5177";
 const URLSHORTER_BASE_URL = import.meta.env.VITE_URLSHORTER_BASE_URL || "http://localhost:5179";
 const BOT_ADMIN_BASE_URL = import.meta.env.VITE_BOT_ADMIN_BASE_URL || "http://localhost:8199";
+const EDUCATION_ADMIN_BASE_URL = import.meta.env.VITE_EDUCATION_ADMIN_BASE_URL || "http://localhost:5174/education/admin";
 
 interface NavItem {
   id: string;
@@ -33,6 +34,14 @@ function Icon({ path }: { path: string }) {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  {
+    id: "education",
+    label: "Обучение",
+    description: "Курсы, модули и стажёры",
+    icon: <Icon path="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15zM4 20.5A2.5 2.5 0 0 1 6.5 18H20" />,
+    url: (token) => `${EDUCATION_ADMIN_BASE_URL}?token=${encodeURIComponent(token)}`,
+    roles: ["admin", "director"],
+  },
   {
     id: "client-search",
     label: "Поиск клиентов",

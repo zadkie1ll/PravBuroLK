@@ -341,7 +341,7 @@ export default function HrDashboard() {
           HR-админка
         </Typography>
         <Stack direction="row" spacing={1}>
-          <Button variant="outlined" onClick={() => navigate("/hr/trainees")}>
+          <Button variant="outlined" onClick={() => navigate("/admin/trainees")}>
             Стажёры
           </Button>
           <Button
@@ -387,7 +387,7 @@ export default function HrDashboard() {
                     {module.order}. {module.name} {!module.is_active && <Chip label="неактивен" size="small" sx={{ ml: 1 }} />}
                   </Typography>
                   <Stack direction="row" spacing={1}>
-                    <Button size="small" onClick={() => navigate(`/hr/module/${module.id}/test`)}>
+                    <Button size="small" onClick={() => navigate(`/admin/module/${module.id}/test`)}>
                       Тест {module.test ? `(${module.test.questions_count} вопр.)` : ""}
                     </Button>
                     <IconButton
