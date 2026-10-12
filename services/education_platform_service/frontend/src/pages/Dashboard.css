@@ -1,35 +1,11 @@
-/* Dashboard.css */
-
-/* Убираем ненужные маржины и паддинги глобально для body, если нужно (добавьте в index.css, если это глобально) */
-/* body { margin: 0; padding: 0; } */
-
-
-/* Скрываем скроллбар для контейнера в CourseList (опционально, если CourseList имеет overflow-x: auto) */
-div[style*="overflow-x: auto"]::-webkit-scrollbar {
-  display: none;
-}
-
-/* Дополнительные стили для согласованности, если CourseList нуждается в них */
-/* Предполагаем, что CourseList рендерит карточки; добавьте это, если нужно стилизовать их похоже на модули в CourseDetails */
-.course-card {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  background: white;
-  padding: 16px;
-  margin: 8px;
-  transition: box-shadow 0.3s;
-}
-
-.course-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.dashboard { background: #f4f9fc !important; }
-.dashboard-header { background: linear-gradient(135deg, #dff5ff 0%, #f7fcff 72%) !important; border-bottom: 1px solid #dcecf3; }
+.dashboard { min-height: 100vh; background: #f4f9fc; color: #333; }
+.dashboard-header { padding: 36px 24px; background: linear-gradient(135deg, #dff5ff 0%, #f7fcff 72%); border-bottom: 1px solid #dcecf3; }
+.dashboard-container { width: 100%; max-width: 1360px; margin: 0 auto; }
 .dashboard-header h4 { color: #333; letter-spacing: -.7px; }
-.dashboard-header .MuiButton-outlined { color: #238fc2; border-color: #8dcee7; text-transform: none; border-radius: 10px; }
-
-@media (max-width: 760px) {
-  .dashboard-header { padding: 24px !important; }
-  .dashboard > .MuiBox-root:last-child { padding: 20px !important; }
+.dashboard-content { padding: 32px 24px 48px; }
+@media (max-width: 600px) {
+  .dashboard-header { padding: 24px 16px; }
+  .dashboard-header h4 { font-size: 26px; }
+  .dashboard-content { padding: 24px 16px 32px; }
+  .courses-grid { gap: 20px; }
 }

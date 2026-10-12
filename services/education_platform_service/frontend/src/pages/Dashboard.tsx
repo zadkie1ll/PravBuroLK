@@ -89,31 +89,29 @@ const Dashboard = () => {
       sx={{
         display: "flex",
         flexDirection: "column",
-        width: "100vw",
-        height: "100vh",
-        bgcolor: "background.default",
-        overflow: "hidden",
+        width: "100%",
         p: 0,
         m: 0,
       }}
       className="dashboard"
     >
       <Box
-        sx={{
-          p: 4,
-          bgcolor: "lightblue",
-        }}
         className="dashboard-header"
       >
+        <div className="dashboard-container">
         <Typography variant="h4" fontWeight="bold" color="black">
           Привет, {username} 👋
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Отделы: {departmentNames.length > 0 ? departmentNames.join(", ") : department && department in depsName ? depsName[department as keyof typeof depsName] : "Неизвестный"}
         </Typography>
+        </div>
       </Box>
-      <Box sx={{ flexGrow: 1, overflowY: "auto", p: 4 }}>
-        <CourseList courses={courses} />
+      <Box component="main" className="dashboard-content">
+        <div className="dashboard-container">
+          <Typography component="h2" variant="h5" fontWeight="bold" sx={{ mb: 3 }}>Мои курсы</Typography>
+          <CourseList courses={courses} />
+        </div>
       </Box>
     </Box>
   );

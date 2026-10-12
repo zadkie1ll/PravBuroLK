@@ -43,7 +43,7 @@ const CourseCard = ({ course }: CourseCardProps) => {
           variant="contained"
           fullWidth
           sx={{ marginTop: 2 }}
-          onClick={() => navigate(url, {replace: true})}
+          onClick={() => navigate(url)}
         >
           {percent === 100 ? "Повторить" : "Продолжить"}
         </Button>
