@@ -1,7 +1,7 @@
-import { LinearProgress, Button } from "@mui/material";
+import { LinearProgress } from "@mui/material";
 import type { Course } from "../lib/types/components";
 import "./CourseCard.css";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 interface CourseCardProps {
   course: Course;
@@ -9,13 +9,13 @@ interface CourseCardProps {
 
 const CourseCard = ({ course }: CourseCardProps) => {
   const completed = course.completed_modules ?? 0;
-  const navigate = useNavigate()
   const percent = course.modules_count > 0 ? Math.round(
     (completed / course.modules_count) * 100
   ) : 0;
   const url = `/course/${course.id}`
   return (
-    <div className="course-card">
+    <Link className="course-card-link" to={url} aria-label={`Открыть курс «${course.name}»`}>
+      <div className="course-card">
       <div className="course-image-wrapper">
         <img src={course.image_url} alt={course.name} />
       </div>
@@ -39,16 +39,12 @@ const CourseCard = ({ course }: CourseCardProps) => {
           />
         </div>
 
-        <Button
-          variant="contained"
-          fullWidth
-          sx={{ marginTop: 2 }}
-          onClick={() => navigate(url)}
-        >
+        <span className="course-card-action" aria-hidden="true">
           {percent === 100 ? "Повторить" : "Продолжить"}
-        </Button>
+        </span>
       </div>
-    </div>
+      </div>
+    </Link>
   );
 };
 
