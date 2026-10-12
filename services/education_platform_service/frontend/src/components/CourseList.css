@@ -1,0 +1,14 @@
+.courses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 24px;
+  align-items: stretch;
+}
+.courses-empty {
+  padding: 32px;
+  background: #fff;
+  border: 1px solid #dcecf3;
+  border-radius: 16px;
+  color: #657985;
+  line-height: 1.6;
+}
