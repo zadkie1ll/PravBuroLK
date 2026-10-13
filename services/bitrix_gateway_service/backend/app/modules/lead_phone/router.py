@@ -13,11 +13,17 @@ from .processor import extract_id
 router = APIRouter(tags=["lead-phone"])
 
 
-@router.post("/webhooks/bitrix24/{secret}", include_in_schema=False)
-async def webhook(secret: str, request: Request):
+@router.post("/webhooks/bitrix24/{path_secret:path}", include_in_schema=False)
+async def webhook(path_secret: str, request: Request):
     # URL secret authorizes events; existing internal token still protects /bitrix/*.
     if not settings.lead_phone_enabled:
         raise HTTPException(404, "not_found")
+    # Bitrix24 appends its application token to an outgoing-webhook URL.
+    # Depending on whether the configured URL ends with '/', the request can be
+    # /<secret>/<app_token> or //<app_token>. The first non-empty segment is our
+    # endpoint secret; the appended application token is intentionally ignored.
+    segments = [segment for segment in path_secret.split("/") if segment]
+    secret = segments[0] if segments else ""
     if not settings.lead_phone_secret or not hmac.compare_digest(secret.encode(), settings.lead_phone_secret.encode()):
         raise HTTPException(403, "forbidden")
     runtime = getattr(request.app.state, "lead_phone", None)
