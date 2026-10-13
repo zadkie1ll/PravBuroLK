@@ -44,8 +44,16 @@ def extract_id(body: Any) -> str | None:
 
 
 def phone_changes(item: dict, options: Options) -> dict[str, dict]:
-    fields = item.get("fm") or []
-    if not isinstance(fields, list) or any(not isinstance(field, dict) for field in fields):
+    raw_fields = item.get("fm") or {}
+    # crm.item.get returns fm as an object keyed by the existing multifield ID.
+    # Accept a list too for compatibility with wrappers that normalize the response.
+    if isinstance(raw_fields, dict):
+        fields = [{**field, "id": key} for key, field in raw_fields.items() if isinstance(field, dict)]
+        if len(fields) != len(raw_fields):
+            raise ProcessingError("INVALID_MULTIFIELDS")
+    elif isinstance(raw_fields, list) and all(isinstance(field, dict) for field in raw_fields):
+        fields = raw_fields
+    else:
         raise ProcessingError("INVALID_MULTIFIELDS")
     changes = {}
     for field in fields:
@@ -67,7 +75,9 @@ def process_lead(call: Callable, lead_id: str, options: Options) -> tuple[str, i
         if options.allowed_sources and str(item.get("sourceId", "")) not in options.allowed_sources:
             return "filtered", 0
         changes = phone_changes(item, options)
-        if not any(field.get("typeId") == "PHONE" for field in item.get("fm") or []):
+        raw_fields = item.get("fm") or {}
+        fields = list(raw_fields.values()) if isinstance(raw_fields, dict) else raw_fields
+        if not any(isinstance(field, dict) and field.get("typeId") == "PHONE" for field in fields):
             raise ProcessingError("PHONE_NOT_READY", True)
         if changes and not options.dry_run:
             # Numeric keys modify existing records; n0/n1 would create duplicates.
