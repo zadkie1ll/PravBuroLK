@@ -7,5 +7,9 @@ services:
     env_file: .env
     volumes:
       - ./backend:/app
+      - gateway_module_data:/data
     ports:
       - "8002:8002"
+
+volumes:
+  gateway_module_data:

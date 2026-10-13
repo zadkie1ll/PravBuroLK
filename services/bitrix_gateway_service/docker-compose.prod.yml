@@ -15,3 +15,8 @@ services:
     env_file: .env
     command: uvicorn app.main:app --host 127.0.0.1 --port 8002
     restart: unless-stopped
+    volumes:
+      - gateway_module_data:/data
+
+volumes:
+  gateway_module_data:

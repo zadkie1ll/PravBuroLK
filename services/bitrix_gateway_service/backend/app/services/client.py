@@ -10,7 +10,9 @@ BITRIX_BATCH_LIMIT = 50
 
 
 class BitrixAPIError(Exception):
-    pass
+    def __init__(self, message: str, *, retryable: bool = True):
+        super().__init__(message)
+        self.retryable = retryable
 
 
 def _encode_bitrix_query(params: Any, prefix: str = "") -> list[str]:
@@ -39,11 +41,27 @@ def _post(url: str, body: dict[str, Any], timeout: int) -> dict[str, Any]:
         response = requests.post(url, json=body, timeout=timeout)
         response.raise_for_status()
     except requests.RequestException as exc:
-        raise BitrixAPIError(f"Bitrix недоступен: {exc}") from exc
-    payload = response.json()
+        status = exc.response.status_code if exc.response is not None else None
+        retryable = status is None or status == 429 or status >= 500
+        # Bitrix can return a rate-limit code with HTTP 400.
+        if exc.response is not None:
+            try:
+                retryable = retryable or exc.response.json().get("error") in {
+                    "QUERY_LIMIT_EXCEEDED", "OPERATION_TIME_LIMIT"
+                }
+            except (ValueError, AttributeError):
+                pass
+        raise BitrixAPIError(f"Bitrix недоступен: {exc}", retryable=retryable) from exc
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise BitrixAPIError("Invalid Bitrix response", retryable=True) from exc
+    if not isinstance(payload, dict):
+        raise BitrixAPIError("Invalid Bitrix response", retryable=True)
     if "error" in payload:
         raise BitrixAPIError(
-            f"{payload['error']}: {payload.get('error_description', 'Bitrix API error')}"
+            f"{payload['error']}: {payload.get('error_description', 'Bitrix API error')}",
+            retryable=payload["error"] in {"QUERY_LIMIT_EXCEEDED", "OPERATION_TIME_LIMIT", "ERROR_NOT_FOUND"},
         )
     return payload
 
