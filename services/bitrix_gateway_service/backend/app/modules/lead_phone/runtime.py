@@ -28,7 +28,10 @@ class Runtime:
             retry_seconds=settings.lead_phone_retry_seconds,
         )
         self.options.validate()
-        self.queue = Queue(settings.lead_phone_queue_path, self.options)
+        self.queue = Queue(
+            settings.lead_phone_queue_path, self.options,
+            settings.lead_contact_phone_field, settings.lead_contact_stage_id,
+        )
         self.client = BitrixProfileClient(webhook)
         self.stopping = asyncio.Event()
         self.task = None

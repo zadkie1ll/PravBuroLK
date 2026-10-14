@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     lead_phone_profile: str = "consultation"
     lead_phone_from_type: str = "OTHER"
     lead_phone_to_type: str = "WORK"
+    lead_contact_phone_field: str = "UF_CRM_68931B5269702"
+    lead_contact_stage_id: str = "CONVERTED"
     lead_phone_allowed_sources: str = ""  # comma-separated SOURCE_ID; empty = all
     lead_phone_dry_run: bool = True
     lead_phone_max_attempts: int = Field(default=8, ge=1, le=20)

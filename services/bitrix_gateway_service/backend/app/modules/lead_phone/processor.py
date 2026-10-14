@@ -86,3 +86,43 @@ def process_lead(call: Callable, lead_id: str, options: Options) -> tuple[str, i
     except BitrixAPIError as exc:
         # Never log str(exc): it can contain phone numbers or webhook URLs.
         raise ProcessingError("BITRIX_REQUEST_FAILED", exc.retryable) from None
+
+
+def process_contact(call: Callable, contact_id: str, field_code: str, dry_run: bool) -> tuple[str, int]:
+    try:
+        result = call("crm.contact.get", {"id": int(contact_id)})
+        contact = result if isinstance(result, dict) else None
+        if not contact:
+            raise ProcessingError("INVALID_CONTACT_RESPONSE", True)
+        phones = contact.get("PHONE") or []
+        if isinstance(phones, dict):
+            phones = list(phones.values())
+        if not isinstance(phones, list):
+            raise ProcessingError("INVALID_CONTACT_PHONE", True)
+        value = next((phone.get("VALUE") for phone in phones if isinstance(phone, dict) and phone.get("VALUE")), None)
+        if not value:
+            raise ProcessingError("CONTACT_PHONE_NOT_READY", True)
+        if contact.get(field_code):
+            return "already_filled", 0
+        if not dry_run:
+            call("crm.contact.update", {"id": int(contact_id), "fields": {field_code: value}})
+        return ("dry_run" if dry_run else "done"), 1
+    except BitrixAPIError as exc:
+        raise ProcessingError("BITRIX_REQUEST_FAILED", exc.retryable) from None
+
+
+def process_converted_lead(call: Callable, lead_id: str, stage_id: str,
+                           field_code: str, dry_run: bool) -> tuple[str, int]:
+    try:
+        result = call("crm.lead.get", {"id": int(lead_id)})
+        lead = result if isinstance(result, dict) else None
+        if not lead:
+            raise ProcessingError("INVALID_LEAD_RESPONSE", True)
+        if str(lead.get("STATUS_ID", "")) != stage_id:
+            return "filtered", 0
+        contact_id = str(lead.get("CONTACT_ID") or "")
+        if not re.fullmatch(r"[1-9][0-9]*", contact_id):
+            raise ProcessingError("CONTACT_NOT_READY", True)
+        return process_contact(call, contact_id, field_code, dry_run)
+    except BitrixAPIError as exc:
+        raise ProcessingError("BITRIX_REQUEST_FAILED", exc.retryable) from None

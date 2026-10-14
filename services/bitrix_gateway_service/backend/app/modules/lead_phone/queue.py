@@ -7,7 +7,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from .processor import Options, ProcessingError, process_lead
+from .processor import Options, ProcessingError, process_contact, process_converted_lead, process_lead
 
 logger = logging.getLogger("lead_phone")
 
@@ -15,9 +15,11 @@ logger = logging.getLogger("lead_phone")
 class Queue:
     """Durable ID-only queue. One worker; HTTP enqueues via separate connections."""
 
-    def __init__(self, path: str, options: Options, clock=time.time):
+    def __init__(self, path: str, options: Options, contact_field: str, contact_stage: str, clock=time.time):
         self.path = Path(path)
         self.options = options
+        self.contact_field = contact_field
+        self.contact_stage = contact_stage
         self.clock = clock
         self._lock = None
 
@@ -65,7 +67,15 @@ class Queue:
         lead_id, attempts = job["lead_id"], job["attempts"] + 1
         changed, error_code = 0, None
         try:
-            status, changed = process_lead(call, lead_id, self.options)
+            if lead_id.startswith("converted-lead:"):
+                status, changed = process_converted_lead(
+                    call, lead_id.removeprefix("converted-lead:"), self.contact_stage,
+                    self.contact_field, self.options.dry_run,
+                )
+            elif lead_id.startswith("contact:"):
+                status, changed = process_contact(call, lead_id.removeprefix("contact:"), self.contact_field, self.options.dry_run)
+            else:
+                status, changed = process_lead(call, lead_id, self.options)
         except ProcessingError as exc:
             error_code = exc.code
             status = "pending" if exc.retryable and attempts < self.options.max_attempts else "failed"

@@ -49,13 +49,15 @@ async def webhook(path_secret: str, request: Request):
         raise HTTPException(400, "invalid_body") from None
     if not isinstance(body, dict):
         raise HTTPException(400, "invalid_body")
-    if body.get("event") != "ONCRMLEADADD":
+    event = body.get("event")
+    if event != "ONCRMLEADUPDATE":
         return {"status": "ignored"}
-    lead_id = extract_id(body)
-    if lead_id is None:
+    entity_id = extract_id(body)
+    if entity_id is None:
         raise HTTPException(400, "invalid_lead_id")
+    job_id = f"converted-lead:{entity_id}"
     try:
-        added = await asyncio.to_thread(runtime.queue.enqueue, lead_id)
+        added = await asyncio.to_thread(runtime.queue.enqueue, job_id)
     except Exception:
         raise HTTPException(503, "queue_unavailable") from None
     from fastapi.responses import JSONResponse
