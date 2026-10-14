@@ -5,6 +5,9 @@ export function AppIndexPage() {
     <div className="min-h-screen bg-[#f7f7f8] text-[#1c1c1e]">
       <header className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-6xl px-6 py-4">
+          <Link to="/admin" className="mb-3 inline-flex items-center text-sm font-medium text-gray-500 transition hover:text-[#1c1c1e]">
+            ← К отчёту по менеджерам
+          </Link>
           <h1 className="text-base font-semibold">Справочники</h1>
         </div>
       </header>
