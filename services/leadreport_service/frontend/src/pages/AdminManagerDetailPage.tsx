@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, ManagerStats } from "../api/client";
 
 function toLocalInput(iso: string): string {
@@ -13,6 +13,8 @@ const inputClass =
 
 export function AdminManagerDetailPage() {
   const { managerId } = useParams();
+  const [params] = useSearchParams();
+  const reportQuery = params.toString();
   const [stats, setStats] = useState<ManagerStats | null>(null);
   const [error, setError] = useState("");
   const [start, setStart] = useState("");
@@ -31,7 +33,7 @@ export function AdminManagerDetailPage() {
       .catch((err) => setError(err.message));
   }
 
-  useEffect(() => load(), [managerId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => load(params.get("start") || undefined, params.get("end") || undefined), [managerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -45,8 +47,11 @@ export function AdminManagerDetailPage() {
 
         <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm md:flex-row md:items-start md:justify-between">
           <div>
-            <Link to="/admin" className="text-sm font-medium text-gray-500 transition hover:text-[#1c1c1e]">
+            <Link to={`/admin${reportQuery ? `?${reportQuery}` : ""}`} className="text-sm font-medium text-gray-500 transition hover:text-[#1c1c1e]">
               ← К общему отчёту
+            </Link>
+            <Link to="/admin/leadreport" className="ml-4 text-sm font-medium text-gray-500 transition hover:text-[#1c1c1e]">
+              Справочники
             </Link>
             {stats && (
               <>

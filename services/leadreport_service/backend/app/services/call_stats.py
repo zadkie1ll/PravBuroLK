@@ -15,8 +15,8 @@ def get_manager_call_stats(manager_id: int, start_date: datetime, end_date: date
     """Портировано из leadreport/services/pick_manager_calls.py. Раньше слало запросы
     напрямую в захардкоженный Bitrix webhook, теперь идёт через bitrix_gateway_service."""
     tz_offset = "+03:00"
-    start_iso = start_date.replace(hour=0, minute=0, second=0).strftime(f"%Y-%m-%dT%H:%M:%S{tz_offset}")
-    end_iso = end_date.replace(hour=23, minute=59, second=59).strftime(f"%Y-%m-%dT%H:%M:%S{tz_offset}")
+    start_iso = start_date.strftime(f"%Y-%m-%dT%H:%M:%S{tz_offset}")
+    end_iso = end_date.strftime(f"%Y-%m-%dT%H:%M:%S{tz_offset}")
 
     client = BitrixClient()
     calls = client.paginated_call(

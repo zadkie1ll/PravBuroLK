@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, DashboardResponse } from "../api/client";
 
 function today(): string {
@@ -11,10 +11,11 @@ const inputClass =
 const cardClass = "rounded-xl border border-gray-200 bg-white p-6 shadow-sm";
 
 export function AdminDashboardPage() {
+  const [params, setParams] = useSearchParams();
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [error, setError] = useState("");
-  const [start, setStart] = useState(today());
-  const [end, setEnd] = useState(today());
+  const [start, setStart] = useState(params.get("start") || today());
+  const [end, setEnd] = useState(params.get("end") || today());
 
   function load(s = start, e = end) {
     setError("");
@@ -24,6 +25,7 @@ export function AdminDashboardPage() {
         setData(res);
         setStart(res.period_start);
         setEnd(res.period_end);
+        setParams({ start: res.period_start, end: res.period_end }, { replace: true });
       })
       .catch((err) => setError(err.message));
   }
@@ -113,7 +115,7 @@ export function AdminDashboardPage() {
                     <span className="font-medium text-[#1c1c1e]">{entry.total_time}</span>
                   </div>
                   <Link
-                    to={`/admin/manager/${entry.manager.id}`}
+                    to={`/admin/manager/${entry.manager.id}?${new URLSearchParams({ start: data.period_start, end: data.period_end })}`}
                     className="block w-full rounded-md bg-gray-100 px-3 py-1.5 text-center text-xs font-medium text-gray-700 transition hover:bg-gray-200"
                   >
                     Подробно
@@ -150,7 +152,7 @@ export function AdminDashboardPage() {
                       <td className="px-4 py-2.5 text-center font-medium text-[#1c1c1e]">{entry.total_time}</td>
                       <td className="px-4 py-2.5 text-right">
                         <Link
-                          to={`/admin/manager/${entry.manager.id}`}
+                          to={`/admin/manager/${entry.manager.id}?${new URLSearchParams({ start: data.period_start, end: data.period_end })}`}
                           className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100"
                         >
                           Подробно

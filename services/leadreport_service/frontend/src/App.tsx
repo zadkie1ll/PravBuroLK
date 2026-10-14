@@ -29,7 +29,9 @@ function useTokenHandoff(): boolean {
     const incomingToken = params.get("token");
     if (incomingToken) {
       setToken(incomingToken);
-      window.history.replaceState({}, "", window.location.pathname);
+      params.delete("token");
+      const search = params.toString();
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
     }
     setReady(true);
   }, []);

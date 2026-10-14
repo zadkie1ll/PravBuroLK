@@ -27,11 +27,17 @@ def _parse_period(start_str: str | None, end_str: str | None) -> tuple[datetime,
     today = date.today()
     if start_str and end_str:
         try:
-            start = datetime.strptime(start_str, "%Y-%m-%d")
-            end = datetime.strptime(end_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+            start = datetime.fromisoformat(start_str)
+            end = datetime.fromisoformat(end_str)
+            if len(end_str) == 10:
+                end = end.replace(hour=23, minute=59, second=59, microsecond=999999)
+            if start > end:
+                raise ValueError("reversed period")
             return start, end
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="Некорректный период: проверьте даты начала и окончания") from None
+    if start_str or end_str:
+        raise HTTPException(status_code=400, detail="Укажите обе даты периода")
     return (
         datetime.combine(today, datetime.min.time()),
         datetime.combine(today, datetime.max.time()),
