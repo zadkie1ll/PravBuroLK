@@ -50,12 +50,14 @@ async def webhook(path_secret: str, request: Request):
     if not isinstance(body, dict):
         raise HTTPException(400, "invalid_body")
     event = body.get("event")
-    if event != "ONCRMLEADUPDATE":
+    if event not in {"ONCRMLEADADD", "ONCRMLEADUPDATE"}:
         return {"status": "ignored"}
     entity_id = extract_id(body)
     if entity_id is None:
         raise HTTPException(400, "invalid_lead_id")
-    job_id = f"converted-lead:{entity_id}"
+    job_id = entity_id if event == "ONCRMLEADUPDATE" else f"lead:{entity_id}"
+    if event == "ONCRMLEADUPDATE":
+        job_id = f"converted-lead:{entity_id}"
     try:
         added = await asyncio.to_thread(runtime.queue.enqueue, job_id)
     except Exception:

@@ -75,7 +75,7 @@ class Queue:
             elif lead_id.startswith("contact:"):
                 status, changed = process_contact(call, lead_id.removeprefix("contact:"), self.contact_field, self.options.dry_run)
             else:
-                status, changed = process_lead(call, lead_id, self.options)
+                status, changed = process_lead(call, lead_id.removeprefix("lead:"), self.options)
         except ProcessingError as exc:
             error_code = exc.code
             status = "pending" if exc.retryable and attempts < self.options.max_attempts else "failed"
