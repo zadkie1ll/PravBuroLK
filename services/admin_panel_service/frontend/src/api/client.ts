@@ -111,3 +111,14 @@ export const api = {
   ssoExchange: (token: string) =>
     request<TokenResponse>(`/auth/sso-exchange?token=${encodeURIComponent(token)}`, { method: "POST" }),
 };
+
+/** Validate/refresh the session at click time, then read the current stored token. */
+export async function prepareBotAdminUrl(baseUrl: string): Promise<string> {
+  const { user } = await api.me();
+  if (!user.is_staff || !["admin", "director", "marketer"].includes(user.role)) {
+    throw new Error("Нет доступа к админке ботов");
+  }
+  const token = getToken();
+  if (!token) throw new Error("Сессия завершена. Войдите в LK повторно.");
+  return `${baseUrl.replace(/\/$/, "")}/api/auth/sso?token=${encodeURIComponent(token)}`;
+}

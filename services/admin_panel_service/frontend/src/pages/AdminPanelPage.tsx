@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { api, clearToken, UserOut } from "../api/client";
+import { api, clearToken, prepareBotAdminUrl, UserOut } from "../api/client";
 import { ThemeProvider } from "@mui/material/styles";
 import { educationTheme } from "../lib/educationTheme";
 import { activeNavigationItem, isEducationPath, panelSectionUrl } from "../lib/panelNavigation";
@@ -97,16 +97,27 @@ const NAV_ITEMS: NavItem[] = [
 // (открывается не в iframe, а отдельной вкладкой), а второй пункт в переключалке панелей
 // в шапке сайдбара, как и здесь сам LK. Принимает наш JWT на своём GET /api/auth/sso —
 // тот же общий SSO_JWT_SECRET, что и у остальных модулей-получателей.
-function botAdminUrl(token: string): string {
-  return `${BOT_ADMIN_BASE_URL}/api/auth/sso?token=${encodeURIComponent(token)}`;
-}
-
 export function AdminPanelPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isEducation = isEducationPath(location.pathname);
   const [user, setUser] = useState<UserOut | null>(null);
+  const [switchingPanel, setSwitchingPanel] = useState(false);
+  const [panelSwitchError, setPanelSwitchError] = useState<string | null>(null);
   const token = localStorage.getItem("access_token") || "";
+
+  async function openBotAdmin() {
+    if (switchingPanel) return;
+    setSwitchingPanel(true);
+    setPanelSwitchError(null);
+    try {
+      window.location.assign(await prepareBotAdminUrl(BOT_ADMIN_BASE_URL));
+    } catch (error) {
+      setPanelSwitchError(error instanceof Error ? error.message : "Не удалось перейти в админку ботов");
+    } finally {
+      setSwitchingPanel(false);
+    }
+  }
 
   useEffect(() => {
     api
@@ -246,18 +257,23 @@ export function AdminPanelPage() {
                 </div>
               </div>
 
-              <a
-                href={token ? botAdminUrl(token) : undefined}
-                className="flex items-center gap-2 px-3 py-2.5 text-left transition hover:bg-white/10"
+              <button
+                type="button"
+                onClick={openBotAdmin}
+                disabled={switchingPanel || !user}
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left transition hover:bg-white/10 disabled:opacity-50"
               >
                 <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-white/10 bg-[#1c1c1e] text-[#F5A524]">
                   <Icon path="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
                 </div>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-gray-200">Админка ботов</div>
-                  <div className="text-xs text-gray-500">TG/VK/Instagram боты</div>
+                  <div className="text-xs text-gray-500">{switchingPanel ? "Проверяем вход…" : "TG/VK/Instagram боты"}</div>
                 </div>
-              </a>
+              </button>
+              {panelSwitchError && (
+                <p role="alert" className="px-3 pb-3 text-xs text-red-300">{panelSwitchError}</p>
+              )}
             </div>
           )}
         </div>
