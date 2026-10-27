@@ -13,7 +13,9 @@ export default function TraineeDetail() {
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -25,23 +27,30 @@ export default function TraineeDetail() {
         setSelectedDepts(t.departments.map((d) => d.code));
         setIsActive(t.is_active);
       })
-      .catch((err) => setError((err as Error).message))
+      .catch((err) => setLoadError(err instanceof Error ? err.message : "Не удалось загрузить стажёра"))
       .finally(() => setLoading(false));
   }, [ready, id]);
 
   const toggleDept = (code: string) => {
+    setSaved(false);
     setSelectedDepts((prev) => (prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]));
   };
 
   const handleSave = async () => {
-    if (!id) return;
+    if (!id || saving) return;
     setSaved(false);
+    setSaveError(null);
+    setSaving(true);
     try {
       const updated = await updateTrainee(Number(id), { department_codes: selectedDepts, is_active: isActive });
       setTrainee(updated);
+      setSelectedDepts(updated.departments.map((d) => d.code));
+      setIsActive(updated.is_active);
       setSaved(true);
     } catch (err) {
-      setError((err as Error).message);
+      setSaveError(err instanceof Error ? err.message : "Не удалось сохранить доступы стажёра");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -53,10 +62,13 @@ export default function TraineeDetail() {
       </Box>
     );
   }
-  if (error || !trainee) {
+  if (loadError || !trainee) {
     return (
       <Box sx={{ p: 4 }}>
-        <Alert severity="error">{error || "Стажёр не найден"}</Alert>
+        <Button onClick={() => navigate("/admin-panel/education/trainees")} sx={{ mb: 2 }}>
+          ← Назад к стажёрам
+        </Button>
+        <Alert severity="error">{loadError || "Стажёр не найден"}</Alert>
       </Box>
     );
   }
@@ -71,6 +83,7 @@ export default function TraineeDetail() {
       </Typography>
 
       {saved && <Alert severity="success" sx={{ mb: 2 }}>Доступы стажёра обновлены.</Alert>}
+      {saveError && <Alert severity="error" sx={{ mb: 2 }}>{saveError} Выбранные настройки сохранены в форме. Можно повторить попытку.</Alert>}
 
       <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
         <Stack spacing={2}>
@@ -79,14 +92,14 @@ export default function TraineeDetail() {
             {departments.map((d) => (
               <FormControlLabel
                 key={d.code}
-                control={<Checkbox checked={selectedDepts.includes(d.code)} onChange={() => toggleDept(d.code)} />}
+                control={<Checkbox disabled={saving} checked={selectedDepts.includes(d.code)} onChange={() => toggleDept(d.code)} />}
                 label={d.name}
               />
             ))}
           </Box>
-          <FormControlLabel control={<Checkbox checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Активен" />
-          <Button variant="contained" onClick={handleSave} sx={{ alignSelf: "flex-start" }}>
-            Сохранить доступы
+          <FormControlLabel control={<Checkbox disabled={saving} checked={isActive} onChange={(e) => { setIsActive(e.target.checked); setSaved(false); }} />} label="Активен" />
+          <Button variant="contained" disabled={saving} onClick={handleSave} sx={{ alignSelf: "flex-start" }}>
+            {saving ? "Сохранение…" : "Сохранить доступы"}
           </Button>
         </Stack>
       </Paper>

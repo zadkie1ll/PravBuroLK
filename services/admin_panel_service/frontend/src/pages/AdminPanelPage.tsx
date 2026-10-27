@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api, clearToken, UserOut } from "../api/client";
 import { ThemeProvider } from "@mui/material/styles";
 import { educationTheme } from "../lib/educationTheme";
+import { activeNavigationItem, isEducationPath, panelSectionUrl } from "../lib/panelNavigation";
 
 const LEADREPORT_BASE_URL = import.meta.env.VITE_LEADREPORT_BASE_URL || "http://localhost:5175";
 const CLIENT_SEARCH_BASE_URL = import.meta.env.VITE_CLIENT_SEARCH_BASE_URL || "http://localhost:5177";
@@ -103,8 +104,7 @@ function botAdminUrl(token: string): string {
 export function AdminPanelPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const isEducation = location.pathname.startsWith("/admin-panel/education");
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const isEducation = isEducationPath(location.pathname);
   const [user, setUser] = useState<UserOut | null>(null);
   const token = localStorage.getItem("access_token") || "";
 
@@ -113,9 +113,6 @@ export function AdminPanelPage() {
       .me()
       .then((res) => {
         setUser(res.user);
-        const visible = NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(res.user.role));
-        setActiveId(visible.find((item) => item.id !== "education")?.id ?? visible[0]?.id ?? null);
-        if (isEducation && (!res.user.is_staff || !["admin", "director"].includes(res.user.role))) navigate("/admin-panel", { replace: true });
       })
       .catch(() => {
         // И access_token, и refresh-кука (см. api/client.ts) оказались нерабочими —
@@ -125,14 +122,20 @@ export function AdminPanelPage() {
       });
   }, [navigate]);
 
+  useEffect(() => {
+    if (user && isEducation && (!user.is_staff || !["admin", "director"].includes(user.role))) {
+      navigate("/admin-panel", { replace: true });
+    }
+  }, [user, isEducation, navigate]);
+
   function logout() {
     api.logout().catch(() => {});
     clearToken();
     navigate("/login");
   }
 
-  const visibleItems = NAV_ITEMS.filter((item) => !user || !item.roles || item.roles.includes(user.role));
-  const active = visibleItems.find((item) => item.id === (isEducation ? "education" : activeId)) ?? visibleItems[0];
+  const visibleItems = user ? NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(user.role)) : [];
+  const active = activeNavigationItem(visibleItems, location.pathname, location.search);
 
   const [shieldHop, setShieldHop] = useState(false);
   const [canHover, setCanHover] = useState(() =>
@@ -177,8 +180,7 @@ export function AdminPanelPage() {
   }, [panelSwitcherOpen]);
 
   function selectItem(id: string) {
-    setActiveId(id);
-    navigate(id === "education" ? "/admin-panel/education" : "/admin-panel");
+    navigate(panelSectionUrl(id));
     if (window.innerWidth < 768) setSidebarOpen(false);
   }
 
@@ -265,8 +267,9 @@ export function AdminPanelPage() {
             <button
               key={item.id}
               onClick={() => selectItem(item.id)}
+              aria-current={item.id === active?.id ? "page" : undefined}
               className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ${
-                item.id === activeId
+                item.id === active?.id
                   ? "bg-white/10 text-white"
                   : "text-gray-400 hover:bg-white/5 hover:text-gray-100"
               }`}

@@ -29,7 +29,76 @@ import {
   deleteOption,
   type HrTest,
   type HrQuestion,
+  type HrQuestionOption,
 } from "../../lib/hrApi";
+
+function OptionEditor({ option, onDeleted }: { option: HrQuestionOption; onDeleted: () => void }) {
+  // Keep drafts separate from the server snapshot. Refreshing the test must not
+  // overwrite another option's unsaved text, nor run once per keystroke.
+  const [text, setText] = useState(option.text);
+  const [isCorrect, setIsCorrect] = useState(option.is_correct);
+  const [saved, setSaved] = useState({ text: option.text, isCorrect: option.is_correct });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const dirty = text !== saved.text || isCorrect !== saved.isCorrect;
+
+  async function save() {
+    if (busy || !dirty) return;
+    setBusy(true);
+    setError("");
+    try {
+      const updated = await updateOption(option.id, { text, is_correct: isCorrect, order: option.order });
+      setText(updated.text);
+      setIsCorrect(updated.is_correct);
+      setSaved({ text: updated.text, isCorrect: updated.is_correct });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось сохранить вариант ответа");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await deleteOption(option.id);
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось удалить вариант ответа");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Box>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
+        <TextField
+          size="small"
+          label="Вариант ответа"
+          value={text}
+          disabled={busy}
+          sx={{ flexGrow: 1 }}
+          onChange={(e) => setText(e.target.value)}
+          helperText={dirty ? "Есть несохранённые изменения" : "Сохранено"}
+        />
+        <FormControlLabel
+          control={<Checkbox checked={isCorrect} disabled={busy} onChange={(e) => setIsCorrect(e.target.checked)} />}
+          label="Верный"
+        />
+        <Button variant="outlined" size="small" disabled={busy || !dirty} onClick={save}>
+          {busy ? "Подождите…" : "Сохранить вариант"}
+        </Button>
+        <IconButton size="small" aria-label="Удалить вариант ответа" disabled={busy} onClick={remove}>
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+      {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+    </Box>
+  );
+}
 
 function QuestionEditor({ question, onChanged }: { question: HrQuestion; onChanged: () => void }) {
   const [text, setText] = useState(question.text);
@@ -78,39 +147,7 @@ function QuestionEditor({ question, onChanged }: { question: HrQuestion; onChang
         <Divider sx={{ my: 1 }} />
         <Typography variant="subtitle2">Варианты ответа</Typography>
         {question.options.map((option) => (
-          <Stack key={option.id} direction="row" spacing={2} alignItems="center">
-            <TextField
-              size="small"
-              value={option.text}
-              sx={{ flexGrow: 1 }}
-              onChange={(e) => {
-                option.text = e.target.value;
-                onChanged();
-              }}
-              onBlur={() => updateOption(option.id, { text: option.text, is_correct: option.is_correct, order: option.order })}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={option.is_correct}
-                  onChange={async (e) => {
-                    await updateOption(option.id, { text: option.text, is_correct: e.target.checked, order: option.order });
-                    onChanged();
-                  }}
-                />
-              }
-              label="Верный"
-            />
-            <IconButton
-              size="small"
-              onClick={async () => {
-                await deleteOption(option.id);
-                onChanged();
-              }}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </Stack>
+          <OptionEditor key={option.id} option={option} onDeleted={onChanged} />
         ))}
         <Stack direction="row" spacing={1}>
           <TextField
