@@ -18,6 +18,7 @@ import {
   DialogActions,
   IconButton,
   CircularProgress,
+  LinearProgress,
   Alert,
   Stack,
   Divider,
@@ -166,6 +167,7 @@ function ModuleDialog({
   const [order, setOrder] = useState(1);
   const [isActive, setIsActive] = useState(true);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -177,16 +179,19 @@ function ModuleDialog({
     setOrder(module?.order ?? 1);
     setIsActive(module?.is_active ?? true);
     setVideoFile(null);
+    setUploadProgress(0);
     setError(null);
   }, [open, module]);
 
   const handleSave = async () => {
+    if (saving) return;
     setSaving(true);
     setError(null);
+    setUploadProgress(0);
     try {
       const payload = { course_id: courseId, name, description, video_url: videoUrl, order, is_active: isActive, private_video: videoFile };
-      if (module) await updateModule(module.id, payload);
-      else await createModule(payload);
+      if (module) await updateModule(module.id, payload, setUploadProgress);
+      else await createModule(payload, setUploadProgress);
       onSaved();
       onClose();
     } catch (err) {
@@ -197,29 +202,38 @@ function ModuleDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
       <DialogTitle>{module ? "Редактировать модуль" : "Новый модуль"}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
-          <TextField label="Название" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
-          <TextField label="Описание" value={description} onChange={(e) => setDescription(e.target.value)} multiline rows={3} fullWidth />
-          <TextField label="Ссылка на видео" helperText="Вставьте ссылку на видео Яндекс.Диска и сохраните. Видео автоматически загрузится и подготовится на сервере. Для внешнего плеера используйте embed-ссылку." value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} fullWidth />
+          <TextField disabled={saving} label="Название" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
+          <TextField disabled={saving} label="Описание" value={description} onChange={(e) => setDescription(e.target.value)} multiline rows={3} fullWidth />
+          <TextField disabled={saving} label="Ссылка на видео" helperText="Вставьте ссылку на видео Яндекс.Диска и сохраните. Видео автоматически загрузится и подготовится на сервере. Для внешнего плеера используйте embed-ссылку." value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} fullWidth />
           {module?.video_import_status && <Alert severity={module.video_import_status === 'failed' ? 'error' : 'info'}>
-            {{queued: 'В очереди', downloading: 'Скачивание', converting: 'Подготовка видео', ready: 'Видео готово', failed: 'Импорт не удался. Проверьте ссылку и сохраните модуль для повтора.'}[module.video_import_status] || module.video_import_status}
+            {{queued: 'В очереди', downloading: 'Скачивание', converting: 'Подготовка видео', ready: 'Видео готово', failed: 'Обработка не удалась. Повторно выберите файл или сохраните ссылку Яндекс.Диска.'}[module.video_import_status] || module.video_import_status}
           </Alert>}
-          <Button variant="outlined" component="label">
+          <Button variant="outlined" component="label" disabled={saving}>
             {videoFile ? videoFile.name : "Загрузить приватное видео"}
             <input type="file" accept="video/*" hidden onChange={(e) => setVideoFile(e.target.files?.[0] || null)} />
           </Button>
-          <TextField label="Порядок" type="number" value={order} onChange={(e) => setOrder(Number(e.target.value))} fullWidth />
-          <FormControlLabel control={<Checkbox checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Активен" />
+          {videoFile && <Typography variant="caption" color="text.secondary">
+            {(videoFile.size / 1024 ** 3).toFixed(2)} ГБ. После загрузки видео подготовится в фоне.
+          </Typography>}
+          {saving && videoFile && <Box role="status" aria-live="polite">
+            <LinearProgress variant={uploadProgress < 100 ? "determinate" : "indeterminate"} value={uploadProgress} />
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              {uploadProgress < 100 ? `Передача файла: ${uploadProgress}%` : "Файл передан. Сервер сохраняет модуль…"}
+            </Typography>
+          </Box>}
+          <TextField disabled={saving} label="Порядок" type="number" value={order} onChange={(e) => setOrder(Number(e.target.value))} fullWidth />
+          <FormControlLabel control={<Checkbox disabled={saving} checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Активен" />
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Отмена</Button>
+        <Button onClick={onClose} disabled={saving}>Отмена</Button>
         <Button variant="contained" onClick={handleSave} disabled={saving || !name}>
-          Сохранить
+          {saving ? "Сохранение…" : "Сохранить"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -325,6 +339,17 @@ export default function HrDashboard() {
     if (ready) refresh();
   }, [ready]);
 
+  const preparingVideo = courses.some((course) => course.modules.some((module) =>
+    ["queued", "downloading", "converting"].includes(module.video_import_status || "")));
+  useEffect(() => {
+    if (!ready || !preparingVideo) return;
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      loadDashboard().then((tree) => { if (!cancelled) setCourses(tree); }).catch(() => {});
+    }, 10000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [ready, preparingVideo]);
+
   if (!ready) return null;
   if (loading) {
     return (
@@ -385,6 +410,9 @@ export default function HrDashboard() {
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Typography fontWeight="bold">
                     {module.order}. {module.name} {!module.is_active && <Chip label="неактивен" size="small" sx={{ ml: 1 }} />}
+                    {module.video_import_status && <Chip size="small" sx={{ ml: 1 }}
+                      color={module.video_import_status === "failed" ? "error" : "default"}
+                      label={{ queued: "Видео в очереди", downloading: "Скачивание видео", converting: "Подготовка видео", ready: "Видео готово", failed: "Ошибка видео" }[module.video_import_status] || module.video_import_status} />}
                   </Typography>
                   <Stack direction="row" spacing={1}>
                     <Button size="small" onClick={() => navigate(`/admin-panel/education/module/${module.id}/test`)}>

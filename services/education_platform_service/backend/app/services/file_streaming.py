@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from ..config import settings
 
 _RANGE_RE = re.compile(r"bytes=(\d+)-(\d*)")
+UPLOAD_CHUNK_SIZE = 1024 * 1024
 
 
 def resolve_media_path(relative_path: str) -> str:
@@ -27,8 +28,16 @@ def save_upload(upload: UploadFile, subdir: str) -> str:
     safe_name = os.path.basename(upload.filename or "file")
     stored_name = f"{uuid.uuid4().hex}_{safe_name}"
     full_path = os.path.join(directory, stored_name)
-    with open(full_path, "wb") as destination:
-        destination.write(upload.file.read())
+    partial_path = full_path + ".part"
+    try:
+        with open(partial_path, "xb") as destination:
+            while chunk := upload.file.read(UPLOAD_CHUNK_SIZE):
+                destination.write(chunk)
+        os.replace(partial_path, full_path)
+    except BaseException:
+        if os.path.exists(partial_path):
+            os.unlink(partial_path)
+        raise
     return f"{subdir}/{stored_name}"
 
 

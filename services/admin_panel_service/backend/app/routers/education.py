@@ -25,15 +25,19 @@ async def proxy_education(path: str, request: Request, user: User = Depends(requ
     if any(part in {".", ".."} for part in path.split("/")):
         raise HTTPException(status_code=400, detail="Недопустимый путь")
     signing_secret = settings.education_admin_secret or settings.jwt_secret
+    is_upload = request.headers.get("content-type", "").startswith("multipart/form-data")
+    # Education validates the JWT after parsing multipart. A large upload can take
+    # much longer than two minutes; keep this internal, scoped token valid then.
+    lifetime = 65 if is_upload else 2
     token = jwt.encode({
         "sub": str(user.id), "username": user.username,
         "iss": "admin_panel", "aud": "education-admin", "type": "education_admin",
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=2),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=lifetime),
     }, signing_secret, algorithm=settings.jwt_algorithm)
     headers = {"Authorization": f"Bearer {token}"}
     if request.headers.get("content-type"):
         headers["Content-Type"] = request.headers["content-type"]
-    client = httpx.AsyncClient(timeout=httpx.Timeout(600, connect=10), follow_redirects=False)
+    client = httpx.AsyncClient(timeout=httpx.Timeout(3600 if is_upload else 600, connect=10), follow_redirects=False)
     try:
         upstream_request = client.build_request(
             request.method, f"{settings.education_api_url.rstrip('/')}/hr/{path}",

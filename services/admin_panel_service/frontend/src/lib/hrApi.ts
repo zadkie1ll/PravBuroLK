@@ -1,4 +1,4 @@
-import { request } from "../api/client";
+import { request, uploadRequest } from "../api/client";
 
 export interface HrDepartment {
   code: string;
@@ -152,10 +152,10 @@ function moduleFormData(payload: {
   return fd;
 }
 
-export const createModule = (payload: Parameters<typeof moduleFormData>[0]) =>
-  req<HrModule>("/hr/modules", { method: "POST", body: moduleFormData(payload) });
-export const updateModule = (id: number, payload: Parameters<typeof moduleFormData>[0]) =>
-  req<HrModule>(`/hr/modules/${id}`, { method: "PUT", body: moduleFormData(payload) });
+export const createModule = (payload: Parameters<typeof moduleFormData>[0], onProgress?: (percent: number) => void) =>
+  uploadRequest<HrModule>("/education-management/hr/modules", "POST", moduleFormData(payload), onProgress);
+export const updateModule = (id: number, payload: Parameters<typeof moduleFormData>[0], onProgress?: (percent: number) => void) =>
+  uploadRequest<HrModule>(`/education-management/hr/modules/${id}`, "PUT", moduleFormData(payload), onProgress);
 
 function materialFormData(payload: {
   title: string;

@@ -57,6 +57,39 @@ export async function request<T>(path: string, options: RequestInit = {}, isRetr
   return response.json();
 }
 
+/** XHR exposes upload progress; FormData is streamed by the browser, not encoded in JS. */
+export async function uploadRequest<T>(path: string, method: string, body: FormData,
+  onProgress?: (percent: number) => void, isRetry = false): Promise<T> {
+  const response = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, `${API_BASE_URL}${path}`);
+    xhr.withCredentials = true;
+    xhr.timeout = 3600000;
+    const token = getToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(Math.round(event.loaded / event.total * 100));
+    };
+    xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
+    xhr.onerror = () => reject(new Error("Загрузка прервана. Проверьте соединение и лимит размера файла на сервере."));
+    xhr.ontimeout = () => reject(new Error("Время загрузки истекло. Проверьте соединение и попробуйте снова."));
+    xhr.onabort = () => reject(new Error("Загрузка отменена"));
+    onProgress?.(0);
+    xhr.send(body);
+  });
+  if (response.status === 401 && !isRetry) {
+    const token = await refreshAccessToken();
+    if (token) return uploadRequest<T>(path, method, body, onProgress, true);
+  }
+  if (response.status === 413) throw new Error("Файл превышает разрешённый сервером размер загрузки");
+  let data;
+  try { data = JSON.parse(response.text); } catch { data = {}; }
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(data.detail || `Ошибка загрузки: ${response.status}`);
+  }
+  return data as T;
+}
+
 export interface UserOut {
   id: number;
   username: string;

@@ -198,15 +198,19 @@ def create_module(
 ):
     if not db.get(Course, course_id):
         raise HTTPException(status_code=404, detail="Курс не найден")
+    uploaded_source = save_upload(private_video, "education/video_sources") if private_video and private_video.filename else ""
+    if uploaded_source:
+        video_url = ""
     module = Module(
         course_id=course_id,
         name=name,
         description=description,
         video_url=video_url,
-        video_import_status='queued' if is_yandex(video_url) and not private_video else '',
+        video_import_status='queued' if uploaded_source or is_yandex(video_url) else '',
+        video_import_source=uploaded_source,
         order=order,
         is_active=is_active,
-        private_video=save_upload(private_video, "education/videos") if private_video and private_video.filename else "",
+        private_video="",
     )
     db.add(module)
     db.flush()
@@ -244,15 +248,19 @@ def update_module(
     module.course_id = course_id
     module.name = name
     module.description = description
-    if is_yandex(video_url) and not private_video and (module.video_url != video_url or module.video_import_status == 'failed'):
+    if private_video and private_video.filename:
+        module.video_import_source = save_upload(private_video, "education/video_sources")
         module.video_import_status = 'queued'
-    elif not is_yandex(video_url) or private_video:
+        video_url = ""
+    elif is_yandex(video_url) and (module.video_url != video_url or module.video_import_status == 'failed'):
+        module.video_import_status = 'queued'
+        module.video_import_source = ''
+    elif module.video_url != video_url:
         module.video_import_status = ''
+        module.video_import_source = ''
     module.video_url = video_url
     module.order = order
     module.is_active = is_active
-    if private_video and private_video.filename:
-        module.private_video = save_upload(private_video, "education/videos")
     db.commit()
     db.refresh(module)
     return _module_out(module)
