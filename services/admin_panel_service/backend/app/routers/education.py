@@ -8,9 +8,8 @@ from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 
 from ..auth import get_current_user
-from ..config import settings
+from ..config import settings, can_manage_education
 from ..models import User
-from ..permissions import can_manage_education
 
 router = APIRouter(prefix="/education-management/hr", tags=["education"])
 

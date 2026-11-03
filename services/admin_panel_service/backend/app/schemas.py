@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, computed_field
 
-from .permissions import can_manage_education
+from .config import can_manage_education
 
 
 class LoginRequest(BaseModel):

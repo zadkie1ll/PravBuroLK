@@ -5,7 +5,7 @@ import { api, setToken } from "../api/client";
 export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const expired = searchParams.has("expired");
@@ -13,13 +13,13 @@ export function LoginPage() {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    setError(false);
+    setError(null);
     try {
       const response = await api.login(username, password);
       setToken(response.access_token);
       navigate("/admin-panel");
     } catch (err) {
-      setError(true);
+      setError(err instanceof Error ? err.message : "Не удалось выполнить вход. Попробуйте снова.");
     }
   }
 
@@ -37,7 +37,7 @@ export function LoginPage() {
 
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-            Неверное имя пользователя или пароль.
+            {error}
           </div>
         )}
 

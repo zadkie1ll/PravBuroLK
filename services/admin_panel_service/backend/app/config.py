@@ -25,3 +25,10 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def can_manage_education(is_staff: bool, role: str) -> bool:
+    return is_staff and (
+        role in {"admin", "director"}
+        or (role == "marketer" and settings.education_marketing_enabled)
+    )
