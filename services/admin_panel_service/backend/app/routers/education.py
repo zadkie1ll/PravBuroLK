@@ -10,12 +10,13 @@ from starlette.responses import StreamingResponse
 from ..auth import get_current_user
 from ..config import settings
 from ..models import User
+from ..permissions import can_manage_education
 
 router = APIRouter(prefix="/education-management/hr", tags=["education"])
 
 
 def require_education_manager(user: User = Depends(get_current_user)) -> User:
-    if not user.is_staff or user.role not in {"admin", "director"}:
+    if not can_manage_education(user.is_staff, user.role):
         raise HTTPException(status_code=403, detail="Нет доступа к управлению обучением")
     return user
 

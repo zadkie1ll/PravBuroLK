@@ -1,4 +1,6 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
+
+from .permissions import can_manage_education
 
 
 class LoginRequest(BaseModel):
@@ -13,6 +15,11 @@ class UserOut(BaseModel):
     username: str
     is_staff: bool
     role: str
+
+    @computed_field
+    @property
+    def can_manage_education(self) -> bool:
+        return can_manage_education(self.is_staff, self.role)
 
 
 class TokenResponse(BaseModel):

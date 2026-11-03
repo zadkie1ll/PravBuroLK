@@ -134,7 +134,7 @@ export function AdminPanelPage() {
   }, [navigate]);
 
   useEffect(() => {
-    if (user && isEducation && (!user.is_staff || !["admin", "director"].includes(user.role))) {
+    if (user && isEducation && !user.can_manage_education) {
       navigate("/admin-panel", { replace: true });
     }
   }, [user, isEducation, navigate]);
@@ -145,7 +145,8 @@ export function AdminPanelPage() {
     navigate("/login");
   }
 
-  const visibleItems = user ? NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(user.role)) : [];
+  const visibleItems = user ? NAV_ITEMS.filter((item) => item.id === "education"
+    ? user.can_manage_education : !item.roles || item.roles.includes(user.role)) : [];
   const active = activeNavigationItem(visibleItems, location.pathname, location.search);
 
   const [shieldHop, setShieldHop] = useState(false);
@@ -341,7 +342,7 @@ export function AdminPanelPage() {
         </header>
 
         <main className="flex-1 overflow-hidden bg-[#f3f4f6]">
-          {isEducation && user?.is_staff && ["admin", "director"].includes(user.role) ? (
+          {isEducation && user?.can_manage_education ? (
             <ThemeProvider theme={educationTheme}>
               <div className="h-full overflow-auto"><Outlet /></div>
             </ThemeProvider>

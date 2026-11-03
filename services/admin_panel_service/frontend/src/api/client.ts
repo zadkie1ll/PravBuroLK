@@ -91,6 +91,7 @@ export async function uploadRequest<T>(path: string, method: string, body: FormD
 }
 
 export interface UserOut {
+  can_manage_education: boolean;
   id: number;
   username: string;
   is_staff: boolean;

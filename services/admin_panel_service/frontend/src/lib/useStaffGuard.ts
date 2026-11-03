@@ -6,7 +6,7 @@ export function useStaffGuard() {
   useEffect(() => {
     let cancelled = false;
     api.me().then(({ user }) => {
-      if (!cancelled) setReady(user.is_staff && ["admin", "director"].includes(user.role));
+      if (!cancelled) setReady(user.can_manage_education);
     }).catch(() => { if (!cancelled) setReady(false); });
     return () => { cancelled = true; };
   }, []);
