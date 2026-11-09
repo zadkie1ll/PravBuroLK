@@ -1,0 +1,31 @@
+name: uptime_kuma_service
+
+services:
+  kuma:
+    image: louislam/uptime-kuma:2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - kuma_data:/app/data
+    networks:
+      - default
+      - docker_api
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
+    environment:
+      CONTAINERS: "1"
+      POST: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - docker_api
+
+networks:
+  docker_api:
+    internal: true
+
+volumes:
+  kuma_data:
