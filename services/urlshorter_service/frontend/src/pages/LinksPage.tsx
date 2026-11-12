@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MarketingLinkListItem, MarketingLinksFilters, marketingApi } from "../api/client";
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-[#1c1c1e] shadow-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500";
 const labelClass = "block text-sm font-medium text-gray-700";
 
-type SortBy = "created_at" | "clicks";
+type SortBy = "created_at" | "clicks" | "utm_campaign";
 type SortDir = "asc" | "desc";
 
 export function LinksPage() {
@@ -23,6 +23,10 @@ export function LinksPage() {
   const [createdTo, setCreatedTo] = useState("");
   const [clicksMin, setClicksMin] = useState("");
   const [clicksMax, setClicksMax] = useState("");
+  const [utmCampaign, setUtmCampaign] = useState("");
+  const [campaigns, setCampaigns] = useState<string[]>([]);
+  const [campaignsError, setCampaignsError] = useState<string | null>(null);
+  const requestId = useRef(0);
 
   function buildFilters(p: number): MarketingLinksFilters {
     return {
@@ -33,35 +37,52 @@ export function LinksPage() {
       created_to: createdTo || undefined,
       clicks_min: clicksMin ? Number(clicksMin) : undefined,
       clicks_max: clicksMax ? Number(clicksMax) : undefined,
+      utm_campaign: utmCampaign || undefined,
     };
   }
 
   function load(p: number) {
+    const id = ++requestId.current;
     setLoading(true);
     setError(null);
     marketingApi
       .listLinks(buildFilters(p))
       .then((res) => {
+        if (id !== requestId.current) return;
         setItems(res.items);
         setPage(res.page);
         setTotalPages(res.total_pages);
         setTotalItems(res.total_items);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Ошибка загрузки"))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (id === requestId.current) setError(err instanceof Error ? err.message : "Ошибка загрузки");
+      })
+      .finally(() => {
+        if (id === requestId.current) setLoading(false);
+      });
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    marketingApi.knownValues().then((values) => {
+      if (!cancelled) setCampaigns([...values.campaigns].sort((a, b) => a.localeCompare(b)));
+    }).catch(() => {
+      if (!cancelled) setCampaignsError("Не удалось загрузить список UTM-меток. Обновите страницу.");
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     load(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortBy, sortDir]);
+  }, [sortBy, sortDir, utmCampaign]);
 
   function toggleSort(field: SortBy) {
     if (sortBy === field) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     } else {
       setSortBy(field);
-      setSortDir("desc");
+      setSortDir(field === "utm_campaign" ? "asc" : "desc");
     }
   }
 
@@ -92,6 +113,17 @@ export function LinksPage() {
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-4 sm:grid-cols-4">
+        <div className="col-span-2">
+          <label htmlFor="links-utm-campaign" className={labelClass}>UTM-метка (utm_campaign)</label>
+          <select id="links-utm-campaign" className={inputClass} value={utmCampaign}
+            onChange={(e) => setUtmCampaign(e.target.value)}>
+            <option value="">Все метки</option>
+            {campaigns.map((campaign) => (
+              <option key={campaign} value={campaign}>{campaign}</option>
+            ))}
+          </select>
+          {campaignsError && <p role="alert" className="mt-1 text-sm text-red-600">{campaignsError}</p>}
+        </div>
         <div>
           <label className={labelClass}>Дата создания — с</label>
           <input type="date" className={inputClass} value={createdFrom} onChange={(e) => setCreatedFrom(e.target.value)} />
@@ -143,7 +175,12 @@ export function LinksPage() {
               <tr className="border-b border-gray-200 text-xs uppercase text-gray-500">
                 <th className="py-2 pr-4">Ссылка</th>
                 <th className="py-2 pr-4">Назначение</th>
-                <th className="py-2 pr-4">utm_campaign</th>
+                <th className="py-2 pr-4" aria-sort={sortBy === "utm_campaign"
+                  ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+                  <button type="button" onClick={() => toggleSort("utm_campaign")}>
+                    utm_campaign{sortIndicator("utm_campaign")}
+                  </button>
+                </th>
                 <th className="cursor-pointer select-none py-2 pr-4" onClick={() => toggleSort("clicks")}>
                   Клики{sortIndicator("clicks")}
                 </th>

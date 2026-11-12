@@ -220,6 +220,7 @@ def known_values(db: Session = Depends(get_db)):
 LINKS_SORT_FIELDS = {
     "created_at": MarketingLink.created_at,
     "clicks": "clicks",
+    "utm_campaign": MarketingLink.utm_campaign,
 }
 
 
@@ -234,6 +235,7 @@ def list_links(
     created_to: date | None = None,
     clicks_min: int | None = Query(None, ge=0),
     clicks_max: int | None = Query(None, ge=0),
+    utm_campaign: str | None = None,
 ):
     if sort_by not in LINKS_SORT_FIELDS:
         raise HTTPException(status_code=400, detail="Некорректное поле сортировки.")
@@ -247,6 +249,8 @@ def list_links(
     q = db.query(MarketingLink, clicks_count.label("clicks")).outerjoin(
         MarketingClick, MarketingClick.link_id == MarketingLink.id
     )
+    if utm_campaign is not None:
+        q = q.filter(MarketingLink.utm_campaign == utm_campaign)
     if created_from:
         q = q.filter(func.date(MarketingLink.created_at) >= created_from)
     if created_to:

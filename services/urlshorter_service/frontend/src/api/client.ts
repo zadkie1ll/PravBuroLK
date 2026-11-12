@@ -130,12 +130,13 @@ export interface MarketingLinksResponse {
 export interface MarketingLinksFilters {
   page?: number;
   page_size?: number;
-  sort_by?: "created_at" | "clicks";
+  sort_by?: "created_at" | "clicks" | "utm_campaign";
   sort_dir?: "asc" | "desc";
   created_from?: string;
   created_to?: string;
   clicks_min?: number;
   clicks_max?: number;
+  utm_campaign?: string;
 }
 
 export interface MarketingStatsFilters {
