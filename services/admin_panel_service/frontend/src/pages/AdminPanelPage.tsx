@@ -4,6 +4,7 @@ import { api, clearToken, prepareBotAdminUrl, UserOut } from "../api/client";
 import { ThemeProvider } from "@mui/material/styles";
 import { educationTheme } from "../lib/educationTheme";
 import { activeNavigationItem, isEducationPath, panelSectionUrl } from "../lib/panelNavigation";
+import { NewYearGarland } from "../components/NewYearGarland";
 
 const LEADREPORT_BASE_URL = import.meta.env.VITE_LEADREPORT_BASE_URL || "http://localhost:5175";
 const CLIENT_SEARCH_BASE_URL = import.meta.env.VITE_CLIENT_SEARCH_BASE_URL || "http://localhost:5177";
@@ -327,7 +328,8 @@ export function AdminPanelPage() {
           sidebarOpen ? "md:ml-64" : "md:ml-0"
         }`}
       >
-        <header className="flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-4 md:px-6">
+        <header className="relative flex shrink-0 items-center gap-3 border-b border-gray-200 bg-white pb-4 pl-4 pr-20 pt-12 md:pl-6 md:pr-24">
+          <NewYearGarland />
           <button
             onClick={() => setSidebarOpen((open) => !open)}
             aria-label="Переключить меню"
@@ -338,6 +340,9 @@ export function AdminPanelPage() {
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold text-[#333]">{active?.label ?? ""}</h1>
             <p className="truncate text-sm text-gray-500">{active?.description ?? ""}</p>
+          </div>
+          <div className="new-year-garland__greeting" aria-hidden="true">
+            <span>✧</span>С наступающим!
           </div>
         </header>
 
